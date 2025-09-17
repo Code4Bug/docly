@@ -1,0 +1,258 @@
+/* 按钮样式 */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+  background: #ffffff;
+  color: #333333;
+  min-height: 32px;
+}
+
+.btn:hover {
+  border-color: #409eff;
+  color: #409eff;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  border-color: #d9d9d9;
+  color: #999999;
+}
+
+.btn-primary {
+  background-color: #409eff;
+  border-color: #409eff;
+  color: #ffffff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #66b1ff;
+  border-color: #66b1ff;
+}
+
+.btn-secondary {
+  background-color: #f5f5f5;
+  border-color: #d9d9d9;
+  color: #333333;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #e6f7ff;
+  border-color: #409eff;
+  color: #409eff;
+}
+
+.btn-outline {
+  background-color: transparent;
+  border-color: #409eff;
+  color: #409eff;
+}
+
+.btn-outline:hover:not(:disabled) {
+  background-color: #409eff;
+  color: #ffffff;
+}
+
+/* 格式化按钮特殊样式 */
+.format-btn {
+  min-width: 32px;
+  padding: 6px 8px;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+/* 对齐按钮特殊样式 */
+.align-btn {
+  min-width: 32px;
+  padding: 6px 8px;
+  font-size: 16px;
+  font-weight: bold;
+  font-family: monospace;
+}
+
+/* 按钮组 */
+.button-group {
+  display: flex;
+  gap: 0;
+}
+
+.button-group .btn {
+  border-radius: 0;
+}
+
+.button-group .btn:first-child {
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
+}
+
+.button-group .btn:last-child {
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
+}
+
+.button-group .btn:not(:first-child) {
+  border-left: none;
+}
+
+/* 标题选择器 */
+.heading-selector {
+  display: flex;
+  align-items: center;
+}
+
+.heading-select {
+  padding: 6px 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  font-size: 14px;
+  background-color: #ffffff;
+  color: #333333;
+  cursor: pointer;
+  min-width: 100px;
+}
+
+.heading-select:hover {
+  border-color: #409eff;
+}
+
+.heading-select:focus {
+  outline: none;
+  border-color: #409eff;
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
+}
+
+/* 工具栏样式 */
+.docly-toolbar {
+  padding: 12px 16px;
+  background-color: #ffffff;
+  border-bottom: 1px solid #e0e0e0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow-x: auto;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: max-content;
+}
+
+.divider {
+  width: 1px;
+  height: 24px;
+  background-color: #e0e0e0;
+  flex-shrink: 0;
+}
+
+/* 上传包装器 */
+.upload-wrapper {
+  position: relative;
+}
+
+/* 编辑器容器 */
+.docly-editor-container {
+  flex: 1;
+  padding: 20px;
+  background-color: #f9f9f9;
+  overflow: auto;
+}
+
+.docly-editor-holder {
+  max-width: 800px;
+  margin: 0 auto;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  min-height: 500px;
+}
+
+/* 状态栏样式 */
+.docly-statusbar {
+  padding: 8px 16px;
+  background-color: #f5f5f5;
+  border-top: 1px solid #e0e0e0;
+  font-size: 12px;
+  color: #666666;
+}
+
+.status-group {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+}
+
+.unsaved-indicator {
+  color: #ff4d4f;
+  font-weight: 500;
+}
+
+/* 编辑器主容器 */
+.docly-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: #ffffff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 消息提示动画 */
+.message {
+  animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .toolbar-group {
+    gap: 8px;
+  }
+  
+  .btn {
+    padding: 6px 12px;
+    font-size: 13px;
+    min-height: 28px;
+  }
+  
+  .format-btn {
+     min-width: 28px;
+     padding: 4px 6px;
+     font-size: 14px;
+   }
+   
+   .align-btn {
+     min-width: 28px;
+     padding: 4px 6px;
+     font-size: 14px;
+   }
+  
+  .heading-select {
+    min-width: 80px;
+    font-size: 13px;
+  }
+}

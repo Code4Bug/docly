@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>测试Word文档样式</title>
+</head>
+<body>
+    <h1>测试文档</h1>
+    <p>这是一个用于测试Word导入样式的HTML文档。</p>
+    
+    <h2>测试步骤：</h2>
+    <ol>
+        <li>打开浏览器开发者工具（F12）</li>
+        <li>切换到Console标签页</li>
+        <li>在编辑器中导入一个Word文档</li>
+        <li>观察控制台输出的调试信息</li>
+    </ol>
+    
+    <h2>需要观察的调试信息：</h2>
+    <ul>
+        <li><strong>Mammoth转换阶段：</strong>
+            <ul>
+                <li>"Mammoth转换后的HTML:" - 查看mammoth是否正确提取了HTML和样式</li>
+                <li>"Mammoth转换消息:" - 查看转换过程中的警告或错误</li>
+            </ul>
+        </li>
+        <li><strong>样式提取阶段：</strong>
+            <ul>
+                <li>"转换后的编辑器数据:" - 查看样式是否被正确提取并存储</li>
+            </ul>
+        </li>
+        <li><strong>编辑器渲染阶段：</strong>
+            <ul>
+                <li>"EditorCore接收到的数据:" - 确认编辑器收到了带样式的数据</li>
+                <li>"处理后的数据:" - 查看样式处理后的数据结构</li>
+            </ul>
+        </li>
+        <li><strong>样式应用阶段：</strong>
+            <ul>
+                <li>"开始应用块级样式..." - 确认样式应用流程启动</li>
+                <li>"处理第X个块:" - 查看每个块的处理情况</li>
+                <li>"块X的样式:" - 查看提取到的样式信息</li>
+                <li>"找到块X的DOM元素:" - 确认能找到对应的DOM元素</li>
+                <li>"应用XXX:" - 查看每个样式属性的应用过程</li>
+            </ul>
+        </li>
+    </ul>
+    
+    <p><strong>请按照上述步骤进行测试，并将控制台输出的调试信息反馈给我。</strong></p>
+</body>
+</html>

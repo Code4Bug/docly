@@ -1,0 +1,96 @@
+/* Editor.js 编辑器样式 */
+.codex-editor {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: #ffffff;
+  min-height: 400px;
+}
+
+.codex-editor__redactor {
+  padding: 20px;
+}
+
+.ce-block__content {
+  max-width: none;
+  margin: 0;
+}
+
+.ce-paragraph {
+  line-height: 1.6;
+  font-size: 16px;
+  color: #333333;
+}
+
+.ce-header {
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.ce-header[data-level="1"] {
+  font-size: 32px;
+  margin: 24px 0 16px;
+}
+
+.ce-header[data-level="2"] {
+  font-size: 28px;
+  margin: 20px 0 12px;
+}
+
+.ce-header[data-level="3"] {
+  font-size: 24px;
+  margin: 16px 0 8px;
+}
+
+.ce-list {
+  padding-left: 0;
+}
+
+.ce-list__item {
+  line-height: 1.6;
+  margin: 8px 0;
+}
+
+/* 工具栏样式 */
+.ce-toolbar__content {
+  max-width: none;
+}
+
+.ce-toolbar__plus {
+  color: #409eff;
+}
+
+.ce-toolbar__plus:hover {
+  background: #ecf5ff;
+}
+
+/* 内联工具栏样式 */
+.ce-inline-toolbar {
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.ce-inline-tool {
+  color: #333333;
+}
+
+.ce-inline-tool:hover {
+  background: #f5f5f5;
+}
+
+/* 块工具样式 */
+.ce-popover {
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.ce-popover__item:hover {
+  background: #f5f5f5;
+}
+
+/* 占位符样式 */
+.ce-paragraph[data-placeholder]:empty::before {
+  color: #999999;
+  font-style: italic;
+}
