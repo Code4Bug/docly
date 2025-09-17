@@ -1,6 +1,7 @@
 import { renderAsync } from 'docx-preview';
 import Docxtemplater from 'docxtemplater';
 import type { FileHandler, EditorData } from '../types';
+import { TextAnalyzer } from '../utils/TextAnalyzer';
 
 /**
  * Word文件处理器
@@ -52,33 +53,19 @@ export class WordHandler implements FileHandler {
         
         // 调试：输出转换后的HTML内容
         console.log('docx-preview转换完成');
-        console.log('转换后的HTML长度:', htmlContent.length);
-        console.log('HTML前500字符:', htmlContent.substring(0, 500));
         
         // 检查是否有空的HTML内容
         if (htmlContent.length === 0) {
           console.warn('警告：转换后的HTML内容为空');
         }
         
-        // 检查HTML中是否包含style属性
-        const styleMatches = htmlContent.match(/style="[^"]*"/g);
-        console.log('找到的style属性数量:', styleMatches ? styleMatches.length : 0);
-        if (styleMatches && styleMatches.length > 0) {
-          console.log('前5个style属性:', styleMatches.slice(0, 5));
-        }
-        
         // 检查是否包含font-family
         const fontFamilyMatches = htmlContent.match(/font-family[^;"]*/g);
-        console.log('找到的font-family属性数量:', fontFamilyMatches ? fontFamilyMatches.length : 0);
         if (fontFamilyMatches && fontFamilyMatches.length > 0) {
-          console.log('找到的font-family属性:', fontFamilyMatches);
           // 特别检查楷体相关字体
           const kaitiMatches = fontFamilyMatches.filter(font => 
             font.includes('楷体') || font.includes('KaiTi') || font.includes('Kai')
           );
-          if (kaitiMatches.length > 0) {
-            console.log('发现楷体字体:', kaitiMatches);
-          }
         }
         
         // 在转换前先处理HTML中的楷体字体
@@ -87,7 +74,6 @@ export class WordHandler implements FileHandler {
         // 查找并标记所有包含楷体字体的元素
         const kaitiRegex = /(font-family[^;]*(?:楷体|KaiTi|kaiti)[^;"]*)/gi;
         if (kaitiRegex.test(htmlContent)) {
-          console.log('在HTML中发现楷体字体，进行预处理');
           // 为包含楷体的元素添加特殊类名
           processedHtml = htmlContent.replace(
             /(<[^>]*style="[^"]*(?:楷体|KaiTi|kaiti)[^"]*"[^>]*>)/gi,
@@ -99,13 +85,19 @@ export class WordHandler implements FileHandler {
               }
             }
           );
-          console.log('楷体字体预处理完成');
         }
 
         // 查找并标记所有包含仿宋字体的元素
         const fangsongRegex = /(font-family[^;]*(?:仿宋|FangSong|fangsong)[^;"]*)/gi;
         if (fangsongRegex.test(processedHtml)) {
-          console.log('在HTML中发现仿宋字体，进行预处理');
+          console.log('仿宋字体调试 - 在HTML中发现仿宋字体，进行预处理');
+          const fangsongMatches = processedHtml.match(/(<[^>]*style="[^"]*(?:仿宋|FangSong|fangsong)[^"]*"[^>]*>)/gi);
+          if (fangsongMatches) {
+            console.log(`仿宋字体调试 - 发现 ${fangsongMatches.length} 个仿宋字体元素`);
+            fangsongMatches.forEach((match, index) => {
+              console.log(`仿宋字体调试 - 元素 ${index + 1}: ${match.substring(0, 100)}...`);
+            });
+          }
           // 为包含仿宋的元素添加特殊类名
           processedHtml = processedHtml.replace(
             /(<[^>]*style="[^"]*(?:仿宋|FangSong|fangsong)[^"]*"[^>]*>)/gi,
@@ -117,15 +109,11 @@ export class WordHandler implements FileHandler {
               }
             }
           );
-          console.log('仿宋字体预处理完成');
+          console.log('仿宋字体调试 - 仿宋字体预处理完成');
         }
 
         // 将HTML转换为编辑器数据格式
         const editorData = this.htmlToEditorData(processedHtml);
-        
-        // 调试：输出编辑器数据
-        console.log('转换后的编辑器数据:', JSON.stringify(editorData, null, 2));
-        console.log('编辑器数据块数量:', editorData.blocks.length);
         
         // 检查是否有空的编辑器数据
         if (editorData.blocks.length === 0) {
@@ -191,8 +179,17 @@ export class WordHandler implements FileHandler {
    */
   private htmlToEditorData(html: string): EditorData {
     console.log('开始HTML到编辑器数据转换');
-    console.log('输入HTML长度:', html.length);
-    console.log('输入HTML内容:', html.substring(0, 200));
+    // 移除通用HTML长度日志
+    
+    // 仿宋字体调试 - 检查输入HTML中是否包含仿宋字体
+    const fangsongCheck = /(?:仿宋|FangSong|fangsong)/gi;
+    if (fangsongCheck.test(html)) {
+      console.log('仿宋字体调试 - 输入HTML包含仿宋字体相关内容');
+      const fangsongMatches = html.match(/[^<>]*(?:仿宋|FangSong|fangsong)[^<>]*/gi);
+      if (fangsongMatches) {
+        console.log('仿宋字体调试 - 发现的仿宋字体片段:', fangsongMatches.slice(0, 5));
+      }
+    }
     
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
@@ -200,11 +197,9 @@ export class WordHandler implements FileHandler {
 
     // 遍历所有子节点，保持原有顺序
     const bodyChildren = Array.from(doc.body.children);
-    console.log('找到的body子元素数量:', bodyChildren.length);
     
     bodyChildren.forEach((element, index) => {
       const tagName = element.tagName.toLowerCase();
-      console.log(`处理第${index}个元素: ${tagName}, 内容: ${element.textContent?.substring(0, 50)}`);
       
       // 处理标题
       if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tagName)) {
@@ -218,7 +213,6 @@ export class WordHandler implements FileHandler {
             styles: this.extractElementStyles(element)
           }
         };
-        console.log('添加标题块:', block);
         blocks.push(block);
       }
       // 处理段落
@@ -232,10 +226,7 @@ export class WordHandler implements FileHandler {
               styles: this.extractElementStyles(element)
             }
           };
-          console.log('添加段落块:', block);
           blocks.push(block);
-        } else {
-          console.log('跳过空段落');
         }
       }
       // 处理列表
@@ -284,9 +275,6 @@ export class WordHandler implements FileHandler {
       }
     });
 
-    console.log('HTML转换完成，生成的块数量:', blocks.length);
-    console.log('生成的块详情:', blocks.map(b => ({ type: b.type, id: b.id, textLength: b.data.text?.length || 0 })));
-
     return {
       time: Date.now(),
       blocks: blocks,
@@ -299,19 +287,12 @@ export class WordHandler implements FileHandler {
    * 基于元素结构和属性进行智能样式推断，而非依赖具体内容匹配
    */
   private extractElementStyles(element: Element): any {
-    console.log('=== 样式提取详细信息 ===');
-    console.log('元素标签:', element.tagName);
-    console.log('元素类名:', element.className);
-    console.log('元素ID:', element.id);
-    console.log('所有属性:', Array.from(element.attributes).map(attr => `${attr.name}="${attr.value}"`));
-    console.log('元素文本内容:', element.textContent?.substring(0, 50));
-
     const styles: any = {};
     
-    // 检查元素是否包含中文字体相关的属性或样式
+    // 检查元素是否包含仿宋字体相关的属性或样式
     const elementHtml = element.outerHTML;
-    if (elementHtml.includes('方正') || elementHtml.includes('楷体') || elementHtml.includes('宋体') || elementHtml.includes('黑体') || elementHtml.includes('仿宋')) {
-      console.log('检测到可能包含中文字体的元素:', elementHtml.substring(0, 200));
+    if (elementHtml.includes('仿宋') || elementHtml.includes('FangSong') || elementHtml.includes('fangsong')) {
+      console.log('检测到可能包含仿宋字体的元素:', elementHtml.substring(0, 200));
     }
 
     // 1. 基于元素标签的样式推断
@@ -329,7 +310,10 @@ export class WordHandler implements FileHandler {
     // 5. 提取子元素的样式信息
     this.extractChildElementStyles(element, styles);
 
-    console.log('最终提取的样式:', styles);
+    // 只保留仿宋字体相关的样式调试信息
+    if (this.isFangSongFont(JSON.stringify(styles))) {
+      console.log('仿宋字体调试 - 最终提取的样式:', styles);
+    }
     return Object.keys(styles).length > 0 ? styles : null;
   }
 
@@ -383,7 +367,7 @@ export class WordHandler implements FileHandler {
         break;
     }
     
-    console.log(`标签 ${tagName} 应用的样式:`, styles);
+    // 移除通用标签样式日志
   }
 
   /**
@@ -430,7 +414,7 @@ export class WordHandler implements FileHandler {
     });
     
     if (classList.length > 0) {
-      console.log(`类名 ${classList.join(', ')} 应用的样式:`, styles);
+      // 移除通用类名样式日志
     }
   }
 
@@ -440,8 +424,6 @@ export class WordHandler implements FileHandler {
   private extractInlineStyles(element: Element, styles: any): void {
     const inlineStyle = element.getAttribute('style');
     if (inlineStyle) {
-      console.log('内联样式:', inlineStyle);
-      
       // 解析内联样式
       const styleDeclarations = inlineStyle.split(';');
       styleDeclarations.forEach(declaration => {
@@ -457,11 +439,9 @@ export class WordHandler implements FileHandler {
             // 对字体族进行中文字体映射处理
             const originalFont = value;
             styles[camelCaseProperty] = this.mapChineseFontName(value);
-            console.log(`内联样式字体族映射: ${value} -> ${styles[camelCaseProperty]}`);
             
             // 特别处理楷体字体
             if (this.isKaiTiFont(originalFont)) {
-              console.log(`检测到楷体字体，添加特殊标记: ${originalFont}`);
               // 添加楷体字体标记类
               if (element.classList) {
                 element.classList.add('kaiti-font');
@@ -472,13 +452,15 @@ export class WordHandler implements FileHandler {
             
             // 特别处理仿宋字体
             if (this.isFangSongFont(originalFont)) {
-              console.log(`检测到仿宋字体，添加特殊标记: ${originalFont}`);
+              console.log(`仿宋字体调试 - 内联样式检测到仿宋字体: ${originalFont}`);
+              console.log(`仿宋字体调试 - 元素标签: ${element.tagName}, 文本内容: ${element.textContent?.substring(0, 50)}`);
               // 添加仿宋字体标记类
               if (element.classList) {
                 element.classList.add('fangsong-font', 'debug-fangsong');
               }
               // 强制设置仿宋字体 - 使用统一的字体族定义
               styles[camelCaseProperty] = '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif';
+              console.log(`仿宋字体调试 - 应用字体族: ${styles[camelCaseProperty]}`);
             }
           } else {
             styles[camelCaseProperty] = value;
@@ -662,7 +644,7 @@ export class WordHandler implements FileHandler {
     // 标题默认居中对齐
     if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tagName)) {
       // 检查是否是真正的标题（长度较短且可能包含标题特征）
-      if (textContent.length < 50 && this.isLikelyTitle(element, textContent)) {
+      if (textContent.length < 50 && TextAnalyzer.isLikelyTitle(element, textContent)) {
         styles.textAlign = 'center';
         console.log('标题默认居中对齐');
         return;
@@ -671,10 +653,10 @@ export class WordHandler implements FileHandler {
 
     // 段落根据语言特征设置对齐
     if (tagName === 'p') {
-      if (this.isChineseParagraph(textContent)) {
+      if (TextAnalyzer.isChineseParagraph(textContent)) {
         styles.textAlign = 'justify';
         console.log('中文段落默认两端对齐');
-      } else if (this.isEnglishParagraph(textContent)) {
+      } else if (TextAnalyzer.isEnglishParagraph(textContent)) {
         styles.textAlign = 'left';
         console.log('英文段落默认左对齐');
       } else {
@@ -849,7 +831,7 @@ export class WordHandler implements FileHandler {
     console.log('Word样式推断 - 文本长度:', textLength);
     
     // 1. 标题样式推断（基于结构特征而非具体内容）
-    if (this.isLikelyTitle(element, textContent)) {
+    if (TextAnalyzer.isLikelyTitle(element, textContent)) {
       this.applyTitleStyles(element, styles, textContent);
     }
     
@@ -859,12 +841,12 @@ export class WordHandler implements FileHandler {
     }
     
     // 3. 列表项样式推断
-    if (this.isLikelyListItem(textContent)) {
+    if (TextAnalyzer.isLikelyListItem(textContent)) {
       this.applyListItemStyles(styles, textContent);
     }
     
     // 4. 特殊格式推断（引用、注释等）
-    if (this.isLikelyQuote(textContent)) {
+    if (TextAnalyzer.isLikelyQuote(textContent)) {
       this.applyQuoteStyles(styles);
     }
 
@@ -878,42 +860,39 @@ export class WordHandler implements FileHandler {
    */
   private applyWordFontInference(element: Element, styles: any): void {
     const text = element.textContent || '';
-    console.log('Word字体推断 - 处理元素:', element.tagName, '文本:', text.substring(0, 30));
     
     // 检查是否已有字体族信息
     if (styles.fontFamily) {
-      console.log('Word字体推断 - 已有字体族:', styles.fontFamily);
+      // 如果是仿宋字体，记录调试信息
+      if (this.isFangSongFont(styles.fontFamily)) {
+        console.log('仿宋字体调试 - 已有仿宋字体族:', styles.fontFamily, '元素:', element.tagName, '文本:', text.substring(0, 30));
+      }
       return;
     }
     
     // 检查是否包含特殊字体标记（Word转换后可能保留的属性）
     const classList = element.className || '';
-    console.log('Word字体推断 - 类名:', classList);
     
     // 检查Word样式类名
     if (classList.includes('MsoNormal')) {
-      console.log('检测到Word标准样式');
+      // 静默处理
     }
     
     if (classList.includes('MsoTitle')) {
       styles.fontWeight = 'bold';
       styles.fontSize = '18px';
-      console.log('检测到Word标题样式');
     }
     
     if (classList.includes('MsoSubtitle')) {
       styles.fontWeight = '600';
       styles.fontSize = '14px';
-      console.log('检测到Word副标题样式');
     }
 
     // 由于docx-preview转换后通常包含更好的字体信息，优先使用原始字体
-    if (text && this.isChineseParagraph(text)) {
+    if (text && TextAnalyzer.isChineseParagraph(text)) {
       styles.fontFamily = '"Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "WenQuanYi Micro Hei", sans-serif';
-      console.log('Word字体推断 - 应用默认中文字体:', styles.fontFamily);
     } else if (text) {
       styles.fontFamily = '"Times New Roman", "Helvetica", "Arial", sans-serif';
-      console.log('Word字体推断 - 应用默认英文字体:', styles.fontFamily);
     }
   }
 
@@ -992,7 +971,6 @@ export class WordHandler implements FileHandler {
     // 模糊匹配
     for (const [key, value] of Object.entries(chineseFontMap)) {
       if (cleanFontName.includes(key) || key.includes(cleanFontName)) {
-        console.log(`中文字体模糊匹配: ${cleanFontName} -> ${value}`);
         return value;
       }
     }
@@ -1000,13 +978,11 @@ export class WordHandler implements FileHandler {
     // 如果包含中文字符，添加通用中文字体fallback
     if (/[\u4e00-\u9fff]/.test(cleanFontName)) {
       const fallbackFont = `"${cleanFontName}", "SimSun", "宋体", "Microsoft YaHei", "微软雅黑", serif`;
-      console.log(`中文字体添加fallback: ${cleanFontName} -> ${fallbackFont}`);
       return fallbackFont;
     }
     
     // 返回原字体名称，添加引号保护
     const quotedFont = `"${cleanFontName}"`;
-    console.log(`保持原字体名称: ${cleanFontName} -> ${quotedFont}`);
     return quotedFont;
   }
 
@@ -1043,7 +1019,6 @@ export class WordHandler implements FileHandler {
         const camelCaseProp = property.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
         if (!styles[camelCaseProp]) {
           styles[camelCaseProp] = value;
-          console.log(`从data-style提取样式 ${camelCaseProp}:`, value);
         }
       }
     });
@@ -1078,7 +1053,7 @@ export class WordHandler implements FileHandler {
     const ptMatch = wordSize.match(/(\d+(?:\.\d+)?)pt/);
     if (ptMatch) {
       const pt = parseFloat(ptMatch[1]);
-      return `${Math.round(pt * 1.33)}px`; // 1pt ≈ 1.33px
+      return `${Math.round(pt * 1.33)}px`;
     }
     
     return null;
@@ -1087,43 +1062,6 @@ export class WordHandler implements FileHandler {
   /**
    * 判断元素是否可能是标题
    */
-  private isLikelyTitle(element: Element, textContent: string): boolean {
-    // 基于结构特征判断
-    const structuralIndicators = [
-      textContent.length < 100,  // 标题通常较短
-      !textContent.includes('。'), // 中文标题通常不包含句号
-      !textContent.includes('.'), // 英文标题通常不包含句号
-      element.tagName === 'P',   // 在Word中标题通常转换为P标签
-      element.previousElementSibling === null || // 可能是第一个元素
-      element.nextElementSibling?.tagName === 'P' // 后面跟着段落
-    ];
-    
-    // 基于格式特征判断
-    const formatIndicators = [
-      /^[第\d一二三四五六七八九十]+[章节条款部分]/,  // 章节标识
-      /^[\d一二三四五六七八九十]+[、\.]/,           // 序号格式
-      /^\([一二三四五六七八九十\d]+\)/,            // 括号序号
-      /^[A-Za-z]+[\.、]/,                        // 字母序号
-      /^\d+\.\d+/,                              // 多级编号
-      /^附录[A-Z\d]/,                           // 附录标识
-      /^参考文献$/,                              // 特殊章节
-      /^致谢$/,                                 // 特殊章节
-      /^摘要$/,                                 // 特殊章节
-      /^Abstract$/i                             // 英文摘要
-    ];
-    
-    const hasStructuralFeatures = structuralIndicators.filter(Boolean).length >= 2;
-    const hasFormatFeatures = formatIndicators.some(pattern => pattern.test(textContent.trim()));
-    
-    const isTitle = hasStructuralFeatures || hasFormatFeatures;
-    
-    if (isTitle) {
-      console.log('推断为标题 - 结构特征:', hasStructuralFeatures, '格式特征:', hasFormatFeatures);
-    }
-    
-    return isTitle;
-  }
-
   /**
    * 应用标题样式
    */
@@ -1166,26 +1104,7 @@ export class WordHandler implements FileHandler {
    * 推断标题级别
    */
   private inferTitleLevel(textContent: string): number {
-    // 一级标题特征
-    if (/^第[一二三四五六七八九十\d]+[章部分]/.test(textContent) ||
-        /^[章部分][一二三四五六七八九十\d]+/.test(textContent) ||
-        /^摘要$|^Abstract$|^致谢$|^参考文献$|^附录/.test(textContent)) {
-      return 1;
-    }
-    
-    // 二级标题特征
-    if (/^第[一二三四五六七八九十\d]+节/.test(textContent) ||
-        /^[一二三四五六七八九十\d]+[、\.]\d*/.test(textContent)) {
-      return 2;
-    }
-    
-    // 三级标题特征
-    if (/^\([一二三四五六七八九十\d]+\)/.test(textContent) ||
-        /^\d+\.\d+/.test(textContent)) {
-      return 3;
-    }
-    
-    return 4; // 默认四级标题
+    return TextAnalyzer.inferTitleLevel(textContent);
   }
 
   /**
@@ -1197,7 +1116,7 @@ export class WordHandler implements FileHandler {
     styles.marginBottom = '12px';
     
     // 段落缩进处理（不设置对齐，由统一对齐处理逻辑决定）
-    if (this.isChineseParagraph(textContent)) {
+    if (TextAnalyzer.isChineseParagraph(textContent)) {
       styles.textIndent = '2em';
       console.log('应用中文段落缩进样式');
     }
@@ -1209,25 +1128,21 @@ export class WordHandler implements FileHandler {
     * 判断是否为中文段落
     */
    private isChineseParagraph(textContent: string): boolean {
-     const chineseChars = textContent.match(/[\u4e00-\u9fff]/g);
-     return !!(chineseChars && chineseChars.length > textContent.length * 0.3);
+     return TextAnalyzer.isChineseParagraph(textContent);
    }
 
    /**
     * 判断是否为英文段落
     */
    private isEnglishParagraph(textContent: string): boolean {
-     const englishChars = textContent.match(/[a-zA-Z]/g);
-     return !!(englishChars && englishChars.length > textContent.length * 0.5);
+     return TextAnalyzer.isEnglishParagraph(textContent);
    }
 
   /**
    * 判断是否可能是列表项
    */
   private isLikelyListItem(textContent: string): boolean {
-    return /^[•·▪▫◦‣⁃]\s/.test(textContent) ||
-           /^\d+[\.、]\s/.test(textContent) ||
-           /^[a-zA-Z][\.、]\s/.test(textContent);
+    return TextAnalyzer.isLikelyListItem(textContent);
   }
 
   /**
@@ -1239,7 +1154,7 @@ export class WordHandler implements FileHandler {
     styles.lineHeight = '1.6';
     
     // 检测列表项的缩进级别
-    const indentLevel = this.detectListIndentLevel(textContent);
+    const indentLevel = TextAnalyzer.detectListIndentLevel(textContent);
     if (indentLevel > 0) {
       const indentValue = indentLevel * 24; // 列表项缩进稍大一些
       styles.paddingLeft = `${indentValue}px`;
@@ -1265,28 +1180,14 @@ export class WordHandler implements FileHandler {
    * 检测列表项的缩进级别
    */
   private detectListIndentLevel(textContent: string): number {
-    // 检查前导空格
-    const leadingSpaces = textContent.match(/^(\s*)/);
-    if (leadingSpaces) {
-      const spaceCount = leadingSpaces[1].length;
-      return Math.floor(spaceCount / 4); // 每4个空格为一级缩进
-    }
-    
-    // 检查列表标记的复杂度来推断级别
-    if (textContent.match(/^\s*[a-z]\./)) return 2; // 小写字母，二级
-    if (textContent.match(/^\s*[A-Z]\./)) return 1; // 大写字母，一级
-    if (textContent.match(/^\s*[ivx]+\./)) return 3; // 罗马数字，三级
-    
-    return 0;
+    return TextAnalyzer.detectListIndentLevel(textContent);
   }
 
   /**
    * 判断是否可能是引用
    */
   private isLikelyQuote(textContent: string): boolean {
-    return textContent.startsWith('"') && textContent.endsWith('"') ||
-           textContent.startsWith('"') && textContent.endsWith('"') ||
-           textContent.startsWith('「') && textContent.endsWith('」');
+    return TextAnalyzer.isLikelyQuote(textContent);
   }
 
   /**
@@ -1308,7 +1209,7 @@ export class WordHandler implements FileHandler {
     const childElements = element.querySelectorAll('strong, b, em, i, u, span');
     
     if (childElements.length > 0) {
-      console.log('子元素样式检查:');
+      // 移除通用子元素样式检查日志
       
       // 检查粗体样式
       const boldElements = element.querySelectorAll('strong, b');
@@ -1317,7 +1218,7 @@ export class WordHandler implements FileHandler {
       
       if (boldText > totalText * 0.7) {
         styles.fontWeight = 'bold';
-        console.log('大部分内容为粗体，应用粗体样式');
+        // 移除通用粗体样式日志
       }
       
       // 检查斜体样式
@@ -1326,7 +1227,7 @@ export class WordHandler implements FileHandler {
       
       if (italicText > totalText * 0.7) {
         styles.fontStyle = 'italic';
-        console.log('大部分内容为斜体，应用斜体样式');
+        // 移除通用斜体样式日志
       }
 
       // 检查下划线样式
@@ -1335,7 +1236,7 @@ export class WordHandler implements FileHandler {
       
       if (underlineText > totalText * 0.7) {
         styles.textDecoration = 'underline';
-        console.log('大部分内容为下划线，应用下划线样式');
+        // 移除通用下划线样式日志
       }
 
       // 从子元素中提取字体样式
@@ -1343,7 +1244,10 @@ export class WordHandler implements FileHandler {
              if (child instanceof HTMLElement) {
                const childStyle = child.getAttribute('style');
                if (childStyle) {
-                 console.log(`子元素${index}内联样式:`, childStyle);
+                 // 只记录包含仿宋字体的子元素样式
+                 if (this.isFangSongFont(childStyle)) {
+                   console.log(`🎯 仿宋字体子元素${index}内联样式:`, childStyle);
+                 }
                  
                  // 提取字体相关样式
                  const fontProperties = ['font-family', 'font-size', 'color', 'background-color'];
@@ -1356,10 +1260,16 @@ export class WordHandler implements FileHandler {
                        if (prop === 'font-family') {
                          // 对字体族进行中文字体映射处理
                          styles[camelCaseProp] = this.mapChineseFontName(value);
-                         console.log(`从子元素提取并映射字体样式 ${camelCaseProp}: ${value} -> ${styles[camelCaseProp]}`);
+                         // 只记录仿宋字体的映射
+                         if (this.isFangSongFont(value)) {
+                           console.log(`🎯 从子元素提取并映射仿宋字体样式 ${camelCaseProp}: ${value} -> ${styles[camelCaseProp]}`);
+                         }
                        } else {
                          styles[camelCaseProp] = value;
-                         console.log(`从子元素提取字体样式 ${camelCaseProp}:`, value);
+                         // 只记录仿宋字体相关的其他样式
+                         if (this.isFangSongFont(childStyle)) {
+                           console.log(`🎯 从仿宋字体子元素提取样式 ${camelCaseProp}:`, value);
+                         }
                        }
                      }
                    }
@@ -1375,11 +1285,15 @@ export class WordHandler implements FileHandler {
                    if (!styles.fontFamily && childComputed.fontFamily && childComputed.fontFamily !== 'serif') {
                      const originalFont = childComputed.fontFamily;
                      styles.fontFamily = this.mapChineseFontName(childComputed.fontFamily);
-                     console.log('从子元素计算样式提取并映射fontFamily:', childComputed.fontFamily, '->', styles.fontFamily);
+                     
+                     // 只记录仿宋字体的映射
+                     if (this.isFangSongFont(originalFont)) {
+                       console.log('🎯 从子元素计算样式提取并映射仿宋字体fontFamily:', childComputed.fontFamily, '->', styles.fontFamily);
+                     }
                      
                      // 特别处理楷体字体
                      if (this.isKaiTiFont(originalFont)) {
-                       console.log(`从子元素检测到楷体字体: ${originalFont}`);
+                       // 移除楷体字体日志
                        // 添加楷体字体标记类
                        if (element.classList) {
                          element.classList.add('kaiti-font');
@@ -1390,7 +1304,10 @@ export class WordHandler implements FileHandler {
                    // 提取字体大小
                    if (!styles.fontSize && childComputed.fontSize && childComputed.fontSize !== '16px') {
                      styles.fontSize = childComputed.fontSize;
-                     console.log('从子元素计算样式提取fontSize:', childComputed.fontSize);
+                     // 只记录仿宋字体相关的字体大小
+                     if (this.isFangSongFont(childComputed.fontFamily)) {
+                       console.log('🎯 从仿宋字体子元素计算样式提取fontSize:', childComputed.fontSize);
+                     }
                    }
                  } catch (e) {
                    console.warn(`获取子元素${index}计算样式失败:`, e);

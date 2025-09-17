@@ -29,12 +29,11 @@
 }
 
 /* 超强制仿宋字体应用 - 覆盖所有可能的样式 */
-[style*="仿宋"]/* 仿宋字体样式强化 - 确保在所有情况下都能正确应用 */
-[style*="FangSong"] *,
-[style*="fangsong"] *,
-[style*="仿宋_GB2312"] *,
-[style*="FangSong_GB2312"] *,
-.fangsong-font *,
+[style*="仿宋"],
+[style*="FangSong"],
+[style*="fangsong"],
+[style*="仿宋_GB2312"],
+[style*="FangSong_GB2312"],
 .fangsong-font {
   font-family: var(--fangsong-font-family) !important;
   font-synthesis: none !important;
@@ -64,6 +63,29 @@ span[style*="FangSong_GB2312"] {
 .fangsong-font,
 .debug-fangsong,
 .debug-fangsong * {
+  font-family: var(--fangsong-font-family) !important;
+  font-synthesis: none !important;
+}
+
+/* 编辑器内容区域的字体样式强化 */
+.codex-editor [style*="仿宋"],
+.codex-editor [style*="FangSong"],
+.codex-editor [style*="fangsong"],
+.codex-editor [style*="仿宋_GB2312"],
+.codex-editor [style*="FangSong_GB2312"],
+.codex-editor .fangsong-font,
+.ce-paragraph [style*="仿宋"],
+.ce-paragraph [style*="FangSong"],
+.ce-paragraph [style*="fangsong"],
+.ce-paragraph [style*="仿宋_GB2312"],
+.ce-paragraph [style*="FangSong_GB2312"],
+.ce-paragraph .fangsong-font,
+.ce-header [style*="仿宋"],
+.ce-header [style*="FangSong"],
+.ce-header [style*="fangsong"],
+.ce-header [style*="仿宋_GB2312"],
+.ce-header [style*="FangSong_GB2312"],
+.ce-header .fangsong-font {
   font-family: var(--fangsong-font-family) !important;
   font-synthesis: none !important;
 }

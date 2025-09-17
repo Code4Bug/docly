@@ -20,11 +20,13 @@ export class PluginManager {
 
   /**
    * 注册插件
+   * @param plugin - 插件实例
    */
-  register(plugin: EditorPlugin): void {
+  registerPlugin(plugin: EditorPlugin): void {
     if (this.plugins.has(plugin.name)) {
       console.warn(`插件 ${plugin.name} 已存在，将被覆盖`);
     }
+    
     this.plugins.set(plugin.name, plugin);
   }
 
@@ -32,16 +34,17 @@ export class PluginManager {
    * 批量注册插件
    */
   registerMultiple(plugins: EditorPlugin[]): void {
-    plugins.forEach(plugin => this.register(plugin));
+    plugins.forEach(plugin => this.registerPlugin(plugin));
   }
 
   /**
    * 加载插件
+   * @param pluginName - 插件名称
    */
-  async load(pluginName: string): Promise<void> {
+  loadPlugin(pluginName: string): void {
     const plugin = this.plugins.get(pluginName);
     if (!plugin) {
-      throw new Error(`插件 ${pluginName} 未找到`);
+      throw new Error(`插件 ${pluginName} 不存在`);
     }
 
     if (this.loadedPlugins.has(pluginName)) {
@@ -54,9 +57,8 @@ export class PluginManager {
     }
 
     try {
-      await plugin.init(this.editor);
+      plugin.init(this.editor);
       this.loadedPlugins.add(pluginName);
-      console.log(`插件 ${pluginName} 加载成功`);
     } catch (error) {
       console.error(`插件 ${pluginName} 加载失败:`, error);
       throw error;
@@ -67,7 +69,7 @@ export class PluginManager {
    * 批量加载插件
    */
   async loadMultiple(pluginNames: string[]): Promise<void> {
-    const loadPromises = pluginNames.map(name => this.load(name));
+    const loadPromises = pluginNames.map(name => this.loadPlugin(name));
     await Promise.all(loadPromises);
   }
 
@@ -82,15 +84,20 @@ export class PluginManager {
 
   /**
    * 卸载插件
+   * @param pluginName - 插件名称
    */
-  unload(pluginName: string): void {
+  unloadPlugin(pluginName: string): void {
     if (!this.loadedPlugins.has(pluginName)) {
       console.warn(`插件 ${pluginName} 未加载`);
       return;
     }
 
-    this.loadedPlugins.delete(pluginName);
-    console.log(`插件 ${pluginName} 卸载成功`);
+    try {
+      this.loadedPlugins.delete(pluginName);
+    } catch (error) {
+      console.error(`插件 ${pluginName} 卸载失败:`, error);
+      throw error;
+    }
   }
 
   /**
@@ -123,22 +130,26 @@ export class PluginManager {
 
   /**
    * 执行插件命令
+   * @param pluginName - 插件名称
+   * @param command - 命令名称
+   * @param args - 命令参数
    */
-  executeCommand(pluginName: string, command: string, args?: any): void {
+  executeCommand(pluginName: string, command: string, ...args: any[]): any {
     const plugin = this.plugins.get(pluginName);
     if (!plugin) {
-      throw new Error(`插件 ${pluginName} 未找到`);
+      throw new Error(`插件 ${pluginName} 不存在`);
     }
 
     if (!this.loadedPlugins.has(pluginName)) {
       throw new Error(`插件 ${pluginName} 未加载`);
     }
 
-    if (plugin.command) {
-      plugin.command(command, args);
-    } else {
+    if (!plugin.command) {
       console.warn(`插件 ${pluginName} 不支持命令执行`);
+      return;
     }
+
+    return plugin.command(command, args);
   }
 
   /**
