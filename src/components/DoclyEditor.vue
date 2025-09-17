@@ -346,7 +346,6 @@ const initEditor = async (): Promise<void> => {
     await editorCore.value.init();
     editorStore.setEditorInstance(editorCore.value);
     
-    console.log('编辑器初始化成功');
   } catch (error) {
     console.error('编辑器初始化失败:', error);
     showMessage('编辑器初始化失败', 'error');

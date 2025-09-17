@@ -66,16 +66,16 @@ export const useEditorStore = defineStore('editor', () => {
    */
   const saveDocument = async (): Promise<void> => {
     if (!editorInstance.value) {
-      throw new Error('编辑器实例未初始化');
+      console.warn('编辑器实例不存在，无法保存');
+      return;
     }
 
-    isSaving.value = true;
     try {
+      isSaving.value = true;
       const data = await editorInstance.value.save();
       updateEditorData(data);
-      console.log('文档保存成功');
     } catch (error) {
-      console.error('文档保存失败:', error);
+      console.error('保存文档失败:', error);
       throw error;
     } finally {
       isSaving.value = false;
@@ -83,20 +83,20 @@ export const useEditorStore = defineStore('editor', () => {
   };
 
   /**
-   * 加载文档数据
+   * 加载文档
    */
   const loadDocument = async (data: EditorData): Promise<void> => {
     if (!editorInstance.value) {
-      throw new Error('编辑器实例未初始化');
+      console.warn('编辑器实例不存在，无法加载');
+      return;
     }
 
-    isLoading.value = true;
     try {
+      isLoading.value = true;
       await editorInstance.value.render(data);
       updateEditorData(data);
-      console.log('文档加载成功');
     } catch (error) {
-      console.error('文档加载失败:', error);
+      console.error('加载文档失败:', error);
       throw error;
     } finally {
       isLoading.value = false;

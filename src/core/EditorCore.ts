@@ -110,19 +110,18 @@ export class EditorCore implements EditorInstance {
       throw new Error('编辑器未初始化');
     }
 
-    // 调试：输出接收到的数据
-    console.log('EditorCore接收到的数据:', JSON.stringify(data, null, 2));
-    
-    // 处理带样式的数据
-    const processedData = this.processStyledData(data);
-    
-    // 调试：输出处理后的数据
-    console.log('处理后的数据:', JSON.stringify(processedData, null, 2));
-
-    await this.editor.render(processedData);
-    
-    // 渲染完成后应用样式
-    this.applyBlockStyles(processedData);
+    try {
+      // 处理带样式的数据
+      const processedData = this.processStyledData(data);
+      
+      await this.editor.render(processedData);
+      
+      // 渲染完成后应用样式
+      this.applyBlockStyles(processedData);
+    } catch (error) {
+      console.error('渲染数据失败:', error);
+      throw error;
+    }
   }
 
   /**
@@ -154,271 +153,200 @@ export class EditorCore implements EditorInstance {
 
   /**
    * 应用内联样式到文本
+   * @param text - 原始文本
+   * @param styles - 样式对象
+   * @returns 带样式的文本
    */
   private applyInlineStyles(text: string, styles: any): string {
-    if (!styles) return text;
+    if (!styles || typeof text !== 'string') {
+      return text;
+    }
+
+    // 检查是否包含HTML标签
+    const hasHtmlTags = /<[^>]+>/.test(text);
     
-    let styledText = text;
-    
-    // 如果文本没有HTML标签，需要包装
-    if (!text.includes('<') && !text.includes('>')) {
-      let wrapperTag = 'span';
-      let styleAttr = '';
+    if (hasHtmlTags) {
+      // 如果包含HTML标签，处理现有标签
+      return this.addFangsongClassToHtml(text, styles);
+    } else {
+      // 如果是纯文本，包装在span中
+      let styledText = text;
       
-      // 构建样式属性
-      const styleRules: string[] = [];
-      if (styles.color) styleRules.push(`color: ${styles.color}`);
-      if (styles.backgroundColor) styleRules.push(`background-color: ${styles.backgroundColor}`);
-      if (styles.fontSize) styleRules.push(`font-size: ${styles.fontSize}`);
-      if (styles.fontFamily) styleRules.push(`font-family: ${styles.fontFamily}`);
-      if (styles.fontWeight) styleRules.push(`font-weight: ${styles.fontWeight}`);
-      if (styles.fontStyle) styleRules.push(`font-style: ${styles.fontStyle}`);
-      if (styles.textDecoration) styleRules.push(`text-decoration: ${styles.textDecoration}`);
-      if (styles.textAlign) styleRules.push(`text-align: ${styles.textAlign}`);
-      
-      if (styleRules.length > 0) {
-        styleAttr = ` style="${styleRules.join('; ')}"`;
+      if (styles.fontFamily && this.isFangsongFont(styles.fontFamily)) {
+        styledText = `<span class="fangsong-font">${text}</span>`;
       }
       
-      styledText = `<${wrapperTag}${styleAttr}>${text}</${wrapperTag}>`;
+      return styledText;
     }
-    
+  }
+
+  /**
+   * 检查是否为仿宋字体
+   * @param fontFamily - 字体族名称
+   * @returns 是否为仿宋字体
+   */
+  private isFangsongFont(fontFamily: string): boolean {
+    const fangsongFonts = ['仿宋', '仿宋_GB2312', 'FangSong', 'FangSong_GB2312'];
+    return fangsongFonts.some(font => fontFamily.includes(font));
+  }
+
+  /**
+   * 为HTML文本添加仿宋字体类名
+   * @param text - HTML文本
+   * @param styles - 样式对象
+   * @returns 处理后的HTML文本
+   */
+  private addFangsongClassToHtml(text: string, styles: any): string {
+    if (!styles.fontFamily || !this.isFangsongFont(styles.fontFamily)) {
+      return text;
+    }
+
+    const styledText = text.replace(/<([^>]+)>/g, (match, tagContent) => {
+      if (tagContent.includes('class=')) {
+        return match.replace(/class="([^"]*)"/, 'class="$1 fangsong-font"');
+      } else {
+        return match.replace(tagContent, `${tagContent} class="fangsong-font"`);
+      }
+    });
+
     return styledText;
   }
 
   /**
-   * 应用块级样式到DOM元素
+   * 应用块级样式
+   * @param data - 编辑器数据
    */
   private applyBlockStyles(data: EditorData): void {
-    console.log('开始应用块级样式，数据:', data);
-    
-    // 使用更长的延迟确保DOM完全渲染
-    setTimeout(() => {
-      console.log('延迟后开始应用样式');
-      
-      data.blocks.forEach((block, index) => {
-        if (block.data && block.data.styles) {
-          console.log(`块${index + 1}的样式:`, block.data.styles);
-          console.log(`块${index + 1}的样式详情:`, JSON.stringify(block.data.styles, null, 2));
-          if (block.data.styles.fontFamily) {
-            console.log(`块${index + 1}检测到字体族:`, block.data.styles.fontFamily);
-          } else {
-            console.log(`块${index + 1}未检测到字体族信息，设置默认中文字体`);
-            block.data.styles.fontFamily = '"Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "WenQuanYi Micro Hei", sans-serif';
-          }
-          
-          // 多种方式查找DOM元素
-          let element = this.findBlockElement(index);
-          
-          if (!element) {
-            console.warn(`方法1未找到块${index + 1}的DOM元素，尝试其他方法`);
-            
-            // 方法2：通过编辑器容器查找
-            const editorElement = document.querySelector('.codex-editor');
-            if (editorElement) {
-              const blocks = editorElement.querySelectorAll('.ce-block');
-              if (blocks[index]) {
-                element = blocks[index] as HTMLElement;
-                console.log(`方法2找到块${index + 1}的DOM元素:`, element);
-              }
-            }
-          }
-          
-          if (!element) {
-            // 方法3：通过holder查找
-            const holderElement = typeof this.config.holder === 'string' 
-              ? document.getElementById(this.config.holder)
-              : this.config.holder;
-            
-            if (holderElement) {
-              const blocks = holderElement.querySelectorAll('.ce-block');
-              if (blocks[index]) {
-                element = blocks[index] as HTMLElement;
-                console.log(`方法3找到块${index + 1}的DOM元素:`, element);
-              }
-            }
-          }
-          
+    if (!data || !data.blocks) return;
+
+    data.blocks.forEach((block: any, index: number) => {
+      if (block.data && block.data.styles) {
+        // 减少延迟时间，提高响应速度
+        setTimeout(() => {
+          const element = this.findBlockElement(index);
           if (element) {
-            console.log(`成功找到块${index + 1}的DOM元素:`, element);
-            
-            // 查找内容元素
-            const contentElement = element.querySelector('.ce-paragraph, .ce-header, .ce-list, .ce-quote, .ce-code, .ce-table, [contenteditable="true"]');
-            
-            if (contentElement) {
-              console.log(`找到块${index + 1}的内容元素:`, contentElement);
-              this.applyStylesToElement(contentElement as HTMLElement, block.data.styles);
-            } else {
-              console.log(`未找到内容元素，直接应用到块元素:`, element);
-              this.applyStylesToElement(element, block.data.styles);
-            }
+            const contentElement = element.querySelector('.ce-paragraph, .ce-header, .cdx-block') || element;
+            this.applyStylesToElement(contentElement as HTMLElement, block.data.styles);
           } else {
-            console.error(`所有方法都未能找到块${index + 1}的DOM元素`);
+            console.warn(`未找到块${index + 1}的DOM元素`);
           }
-        }
-      });
-    }, 1000); // 增加延迟时间到1秒
+        }, 500);
+      }
+    });
   }
 
   /**
    * 查找块级元素
+   * @param index - 块索引
+   * @returns DOM元素或null
    */
   private findBlockElement(index: number): HTMLElement | null {
-    const editorElement = this.config.holder;
-    if (typeof editorElement === 'string') {
-      const container = document.getElementById(editorElement);
-      if (container) {
-        const blocks = container.querySelectorAll('.ce-block');
-        return blocks[index] as HTMLElement || null;
+    if (!this.editor) return null;
+
+    const holder = this.config.holder;
+    if (typeof holder === 'string') {
+      const container = document.getElementById(holder);
+      if (!container) return null;
+
+      // 尝试多种方法查找元素
+      const methods = [
+        () => container.querySelectorAll('.ce-block')[index] as HTMLElement,
+        () => container.querySelectorAll('.cdx-block')[index] as HTMLElement,
+        () => container.querySelectorAll('[data-cy="block"]')[index] as HTMLElement
+      ];
+
+      for (const method of methods) {
+        try {
+          const element = method();
+          if (element) return element;
+        } catch (e) {
+          // 静默处理查找失败
+        }
       }
     }
+
     return null;
   }
 
   /**
    * 应用样式到元素
+   * @param element - DOM元素
+   * @param styles - 样式对象
    */
   private applyStylesToElement(element: HTMLElement, styles: any): void {
-    if (!styles) return;
-    
-    console.log('开始应用样式到元素:', element, '样式:', styles);
-    
-    try {
-      // 确保元素存在且可以应用样式
-      if (!element || !element.style) {
-        console.warn('元素无效或不支持样式:', element);
-        return;
-      }
+    if (!element || !element.style) {
+      return;
+    }
 
-      // 字体样式
+    try {
+      // 字体相关样式
       if (styles.fontFamily) {
         element.style.fontFamily = styles.fontFamily;
-        console.log('应用fontFamily:', styles.fontFamily);
+        
+        // 仿宋字体特殊处理
+        if (this.isFangsongFont(styles.fontFamily)) {
+          element.classList.add('fangsong-font');
+          // 强制设置字体样式
+          element.style.setProperty('font-family', styles.fontFamily, 'important');
+        }
       }
-      if (styles.fontSize) {
-        element.style.fontSize = styles.fontSize;
-        console.log('应用fontSize:', styles.fontSize);
+
+      // 其他样式应用
+      const styleMap: { [key: string]: string } = {
+        fontSize: 'font-size',
+        fontWeight: 'font-weight',
+        fontStyle: 'font-style',
+        textDecoration: 'text-decoration',
+        color: 'color',
+        backgroundColor: 'background-color',
+        textAlign: 'text-align',
+        lineHeight: 'line-height',
+        marginTop: 'margin-top',
+        marginBottom: 'margin-bottom',
+        paddingTop: 'padding-top',
+        paddingBottom: 'padding-bottom',
+        textIndent: 'text-indent',
+        marginLeft: 'margin-left',
+        marginRight: 'margin-right',
+        paddingLeft: 'padding-left',
+        paddingRight: 'padding-right',
+        border: 'border',
+        borderTop: 'border-top',
+        borderBottom: 'border-bottom',
+        borderLeft: 'border-left',
+        borderRight: 'border-right'
+      };
+
+      // 特殊处理段落的paddingTop
+      if (styles.paddingTop && element.classList.contains('ce-paragraph')) {
+        const paddingValue = Math.min(parseFloat(styles.paddingTop), 12);
+        element.style.paddingTop = `${paddingValue}px`;
       }
-      if (styles.fontWeight) {
-        element.style.fontWeight = styles.fontWeight;
-        console.log('应用fontWeight:', styles.fontWeight);
-      }
-      if (styles.fontStyle) {
-        element.style.fontStyle = styles.fontStyle;
-        console.log('应用fontStyle:', styles.fontStyle);
-      }
-      if (styles.textDecoration) {
-        element.style.textDecoration = styles.textDecoration;
-        console.log('应用textDecoration:', styles.textDecoration);
-      }
-      
-      // 颜色样式
-      if (styles.color) {
-        element.style.color = styles.color;
-        console.log('应用color:', styles.color);
-      }
-      if (styles.backgroundColor) {
-        element.style.backgroundColor = styles.backgroundColor;
-        console.log('应用backgroundColor:', styles.backgroundColor);
-      }
-      
-      // 对齐方式 - 使用!important确保优先级
-      if (styles.textAlign || styles['text-align']) {
-        const textAlign = styles.textAlign || styles['text-align'];
-        element.style.setProperty('text-align', textAlign, 'important');
-        console.log('应用textAlign:', textAlign);
-      }
-      
-      // 行间距和段落间距 - 使用!important确保优先级
-      if (styles.lineHeight || styles['line-height']) {
-        const lineHeight = styles.lineHeight || styles['line-height'];
-        element.style.setProperty('line-height', lineHeight, 'important');
-        console.log('应用lineHeight:', lineHeight);
-      }
-      if (styles.marginTop) {
-        element.style.marginTop = styles.marginTop;
-        console.log('应用marginTop:', styles.marginTop);
-      }
-      if (styles.marginBottom) {
-        element.style.marginBottom = styles.marginBottom;
-        console.log('应用marginBottom:', styles.marginBottom);
-      }
-      if (styles.paddingTop) {
-        element.style.paddingTop = styles.paddingTop;
-        console.log('应用paddingTop:', styles.paddingTop);
-      }
-      if (styles.paddingBottom) {
-        element.style.paddingBottom = styles.paddingBottom;
-        console.log('应用paddingBottom:', styles.paddingBottom);
-      }
-      
-      // 缩进
-      if (styles.textIndent) {
-        element.style.textIndent = styles.textIndent;
-        console.log('应用textIndent:', styles.textIndent);
-      }
-      if (styles.marginLeft) {
-        element.style.marginLeft = styles.marginLeft;
-        console.log('应用marginLeft:', styles.marginLeft);
-      }
-      if (styles.marginRight) {
-        element.style.marginRight = styles.marginRight;
-        console.log('应用marginRight:', styles.marginRight);
-      }
-      if (styles.paddingLeft) {
-        element.style.paddingLeft = styles.paddingLeft;
-        console.log('应用paddingLeft:', styles.paddingLeft);
-      }
-      if (styles.paddingRight) {
-        element.style.paddingRight = styles.paddingRight;
-        console.log('应用paddingRight:', styles.paddingRight);
-      }
-      
-      // 边框样式
-      if (styles.border) {
-        element.style.border = styles.border;
-        console.log('应用border:', styles.border);
-      }
-      if (styles.borderTop) {
-        element.style.borderTop = styles.borderTop;
-        console.log('应用borderTop:', styles.borderTop);
-      }
-      if (styles.borderBottom) {
-        element.style.borderBottom = styles.borderBottom;
-        console.log('应用borderBottom:', styles.borderBottom);
-      }
-      if (styles.borderLeft) {
-        element.style.borderLeft = styles.borderLeft;
-        console.log('应用borderLeft:', styles.borderLeft);
-      }
-      if (styles.borderRight) {
-        element.style.borderRight = styles.borderRight;
-        console.log('应用borderRight:', styles.borderRight);
-      }
-      
-      // 应用其他CSS属性
-      Object.keys(styles).forEach(key => {
-        if (!['fontSize', 'fontFamily', 'fontWeight', 'fontStyle', 'textDecoration', 
-              'color', 'backgroundColor', 'textAlign', 'text-align', 'lineHeight', 'line-height',
-              'marginTop', 'marginBottom', 'paddingTop', 'paddingBottom',
-              'textIndent', 'marginLeft', 'marginRight', 'paddingLeft', 'paddingRight',
-              'border', 'borderTop', 'borderBottom', 'borderLeft', 'borderRight'].includes(key)) {
+
+      // 应用其他样式
+      Object.keys(styleMap).forEach(key => {
+        if (styles[key] && key !== 'paddingTop') {
           try {
-            // 转换驼峰命名为CSS属性名
-            const cssProperty = key.replace(/([A-Z])/g, '-$1').toLowerCase();
-            element.style.setProperty(cssProperty, styles[key]);
-            console.log(`应用${key}(${cssProperty}):`, styles[key]);
+            const cssProperty = styleMap[key];
+            (element.style as any)[cssProperty.replace(/-([a-z])/g, (g) => g[1].toUpperCase())] = styles[key];
           } catch (e) {
-            console.warn(`应用样式${key}失败:`, e);
+            // 静默处理样式应用失败
           }
         }
       });
 
-      console.log('样式应用完成，元素最终样式:', element.style.cssText);
-      
-      // 强制重新渲染
-      element.offsetHeight; // 触发重排
-      
+      // 应用其他自定义样式
+      Object.keys(styles).forEach(key => {
+        if (!styleMap[key] && key !== 'fontFamily') {
+          try {
+            const cssProperty = key.replace(/([A-Z])/g, '-$1').toLowerCase();
+            element.style.setProperty(cssProperty, styles[key]);
+          } catch (e) {
+            // 静默处理样式应用失败
+          }
+        }
+      });
+
     } catch (error) {
       console.warn('应用样式时发生错误:', error);
     }

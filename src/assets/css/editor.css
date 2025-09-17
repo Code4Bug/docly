@@ -13,12 +13,18 @@
 .ce-block__content {
   max-width: none;
   margin: 0;
+  /* 限制块内容的默认padding，避免累积 */
+  padding-top: 0 !important;
 }
 
 .ce-paragraph {
   line-height: 1.6;
   font-size: 16px;
   color: #333333;
+  /* 确保段落元素的padding不会过大 */
+  padding-top: 0 !important;
+  margin-top: 8px;
+  margin-bottom: 8px;
 }
 
 .ce-header {
