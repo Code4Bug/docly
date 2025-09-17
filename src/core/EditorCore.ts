@@ -164,13 +164,22 @@ export class EditorCore implements EditorInstance {
     if (!text.includes('<') && !text.includes('>')) {
       let wrapperTag = 'span';
       let styleAttr = '';
+      let classAttr = '';
       
       // 构建样式属性
       const styleRules: string[] = [];
       if (styles.color) styleRules.push(`color: ${styles.color}`);
       if (styles.backgroundColor) styleRules.push(`background-color: ${styles.backgroundColor}`);
       if (styles.fontSize) styleRules.push(`font-size: ${styles.fontSize}`);
-      if (styles.fontFamily) styleRules.push(`font-family: ${styles.fontFamily}`);
+      if (styles.fontFamily) {
+        styleRules.push(`font-family: ${styles.fontFamily}`);
+        
+        // 检查是否为仿宋字体，添加特殊类名确保样式生效
+        if (this.isFangSongFont(styles.fontFamily)) {
+          classAttr = ' class="fangsong-font debug-fangsong"';
+          console.log('检测到仿宋字体，添加特殊类名:', styles.fontFamily);
+        }
+      }
       if (styles.fontWeight) styleRules.push(`font-weight: ${styles.fontWeight}`);
       if (styles.fontStyle) styleRules.push(`font-style: ${styles.fontStyle}`);
       if (styles.textDecoration) styleRules.push(`text-decoration: ${styles.textDecoration}`);
@@ -180,10 +189,40 @@ export class EditorCore implements EditorInstance {
         styleAttr = ` style="${styleRules.join('; ')}"`;
       }
       
-      styledText = `<${wrapperTag}${styleAttr}>${text}</${wrapperTag}>`;
+      styledText = `<${wrapperTag}${classAttr}${styleAttr}>${text}</${wrapperTag}>`;
+    } else {
+      // 如果文本已经包含HTML标签，需要处理现有的标签
+      console.log('处理包含HTML标签的文本:', text, '样式:', styles);
+      
+      // 检查是否需要添加仿宋字体类名
+      if (styles.fontFamily && this.isFangSongFont(styles.fontFamily)) {
+        // 为现有的span标签添加仿宋字体类名
+        if (text.includes('<span')) {
+          styledText = text.replace(/<span([^>]*)>/g, (match, attrs) => {
+            if (attrs.includes('class=')) {
+              return match.replace(/class="([^"]*)"/, 'class="$1 fangsong-font debug-fangsong"');
+            } else {
+              return `<span${attrs} class="fangsong-font debug-fangsong">`;
+            }
+          });
+        } else {
+          // 包装整个文本
+          styledText = `<span class="fangsong-font debug-fangsong" style="font-family: ${styles.fontFamily}">${text}</span>`;
+        }
+        console.log('为HTML文本添加仿宋字体类名:', styledText);
+      }
     }
     
     return styledText;
+  }
+
+  /**
+   * 检查是否为仿宋字体
+   */
+  private isFangSongFont(fontFamily: string): boolean {
+    if (!fontFamily) return false;
+    const fangsongKeywords = ['仿宋', 'FangSong', 'fangsong', 'FANGSONG', '仿宋_GB2312', 'FangSong_GB2312'];
+    return fangsongKeywords.some(keyword => fontFamily.includes(keyword));
   }
 
   /**
@@ -290,10 +329,16 @@ export class EditorCore implements EditorInstance {
         return;
       }
 
-      // 字体样式
+      // 字体样式 - 特别处理仿宋字体
       if (styles.fontFamily) {
         element.style.fontFamily = styles.fontFamily;
         console.log('应用fontFamily:', styles.fontFamily);
+        
+        // 检查是否为仿宋字体，添加特殊类名确保样式生效
+        if (this.isFangSongFont(styles.fontFamily)) {
+          element.classList.add('fangsong-font', 'debug-fangsong');
+          console.log('为仿宋字体元素添加特殊类名');
+        }
       }
       if (styles.fontSize) {
         element.style.fontSize = styles.fontSize;
@@ -322,6 +367,12 @@ export class EditorCore implements EditorInstance {
         console.log('应用backgroundColor:', styles.backgroundColor);
       }
       
+      // 检查是否已经应用过样式，避免二次设置
+      if (element.dataset.stylesApplied === 'true') {
+        console.log('样式已应用，跳过重复设置:', element);
+        return;
+      }
+
       // 对齐方式 - 使用!important确保优先级
       if (styles.textAlign || styles['text-align']) {
         const textAlign = styles.textAlign || styles['text-align'];
@@ -335,6 +386,11 @@ export class EditorCore implements EditorInstance {
         element.style.setProperty('line-height', lineHeight, 'important');
         console.log('应用lineHeight:', lineHeight);
       }
+      
+      // 间距样式 - 修复padding-top过大问题
+      // 对于段落元素，优先使用margin而不是padding
+      const isParagraph = element.classList.contains('ce-paragraph');
+      
       if (styles.marginTop) {
         element.style.marginTop = styles.marginTop;
         console.log('应用marginTop:', styles.marginTop);
@@ -343,9 +399,22 @@ export class EditorCore implements EditorInstance {
         element.style.marginBottom = styles.marginBottom;
         console.log('应用marginBottom:', styles.marginBottom);
       }
+      
+      // 对于段落元素，限制paddingTop的最大值，避免过大
       if (styles.paddingTop) {
-        element.style.paddingTop = styles.paddingTop;
-        console.log('应用paddingTop:', styles.paddingTop);
+        let paddingValue = styles.paddingTop;
+        
+        if (isParagraph) {
+          // 解析数值，限制段落的paddingTop最大为12px
+          const numericValue = parseInt(paddingValue);
+          if (numericValue > 12) {
+            paddingValue = '12px';
+            console.log('限制段落paddingTop最大值为12px，原值:', styles.paddingTop);
+          }
+        }
+        
+        element.style.paddingTop = paddingValue;
+        console.log('应用paddingTop:', paddingValue);
       }
       if (styles.paddingBottom) {
         element.style.paddingBottom = styles.paddingBottom;
@@ -414,6 +483,9 @@ export class EditorCore implements EditorInstance {
         }
       });
 
+      // 标记样式已应用，避免重复设置
+      element.dataset.stylesApplied = 'true';
+      
       console.log('样式应用完成，元素最终样式:', element.style.cssText);
       
       // 强制重新渲染

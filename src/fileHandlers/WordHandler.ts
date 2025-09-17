@@ -1,4 +1,4 @@
-import mammoth from 'mammoth';
+import { renderAsync } from 'docx-preview';
 import Docxtemplater from 'docxtemplater';
 import type { FileHandler, EditorData } from '../types';
 
@@ -18,80 +18,127 @@ export class WordHandler implements FileHandler {
     }
 
     try {
-      // 使用mammoth将docx转换为HTML
+      // 使用docx-preview将docx转换为HTML
       const arrayBuffer = await file.arrayBuffer();
       
-      // 配置mammoth选项以保留更多样式信息，特别是字体信息
-      const options = {
-        arrayBuffer,
-        // 不使用任何样式映射，让mammoth保留原始样式
-        styleMap: [],
-        convertImage: mammoth.images.imgElement(function(image: any) {
-          return image.read("base64").then(function(imageBuffer: string) {
-            return {
-              src: "data:" + image.contentType + ";base64," + imageBuffer
-            };
-          });
-        }),
-        includeDefaultStyleMap: false, // 禁用默认样式映射，使用自定义配置
-        includeEmbeddedStyleMap: true,
-        // 保留样式信息
-        preserveEmptyParagraphs: true,
-        // 转换未知元素
-        ignoreEmptyParagraphs: false,
-        // 添加自定义转换器以保留字体信息
-        transformDocument: function(document: any) {
-          console.log('Mammoth文档转换前处理，保留字体信息');
-          return document;
+      // 创建一个临时容器来渲染文档
+      const container = document.createElement('div');
+      container.style.display = 'none';
+      document.body.appendChild(container);
+      
+      try {
+        // 使用docx-preview渲染文档
+         await renderAsync(arrayBuffer, container, undefined, {
+           className: 'docx-preview',
+           inWrapper: false,
+           ignoreWidth: false,
+           ignoreHeight: false,
+           ignoreFonts: false, // 确保不忽略字体信息
+           breakPages: false,
+           ignoreLastRenderedPageBreak: true,
+           experimental: false,
+           trimXmlDeclaration: true,
+           useBase64URL: false,
+           renderChanges: false,
+           renderComments: false,
+           renderEndnotes: false,
+           renderFootnotes: false,
+           renderHeaders: false,
+           renderFooters: false
+         });
+        
+        // 获取渲染后的HTML内容
+        const htmlContent = container.innerHTML;
+        
+        // 调试：输出转换后的HTML内容
+        console.log('docx-preview转换完成');
+        console.log('转换后的HTML长度:', htmlContent.length);
+        console.log('HTML前500字符:', htmlContent.substring(0, 500));
+        
+        // 检查是否有空的HTML内容
+        if (htmlContent.length === 0) {
+          console.warn('警告：转换后的HTML内容为空');
         }
-      };
-      
-      const result = await mammoth.convertToHtml(options);
-      
-      // 调试：输出转换后的HTML内容和消息
-      console.log('Mammoth转换完成');
-      console.log('转换后的HTML长度:', result.value.length);
-      console.log('转换消息:', result.messages);
-      console.log('转换消息数量:', result.messages.length);
-      console.log('转换消息详情:', JSON.stringify(result.messages, null, 2));
-      console.log('HTML前500字符:', result.value.substring(0, 500));
-      
-      // 检查是否有空的HTML内容
-      if (result.value.length === 0) {
-        console.warn('警告：转换后的HTML内容为空');
-      }
-      
-      // 检查HTML中是否包含style属性
-      const styleMatches = result.value.match(/style="[^"]*"/g);
-      console.log('找到的style属性数量:', styleMatches ? styleMatches.length : 0);
-      if (styleMatches && styleMatches.length > 0) {
-        console.log('前5个style属性:', styleMatches.slice(0, 5));
-      }
-      
-      // 检查是否包含font-family
-      const fontFamilyMatches = result.value.match(/font-family[^;"]*/g);
-      console.log('找到的font-family属性数量:', fontFamilyMatches ? fontFamilyMatches.length : 0);
-      if (fontFamilyMatches && fontFamilyMatches.length > 0) {
-        console.log('找到的font-family属性:', fontFamilyMatches);
-      }
-      
-      if (result.messages.length > 0) {
-        console.warn('Word文件转换警告:', result.messages);
-      }
+        
+        // 检查HTML中是否包含style属性
+        const styleMatches = htmlContent.match(/style="[^"]*"/g);
+        console.log('找到的style属性数量:', styleMatches ? styleMatches.length : 0);
+        if (styleMatches && styleMatches.length > 0) {
+          console.log('前5个style属性:', styleMatches.slice(0, 5));
+        }
+        
+        // 检查是否包含font-family
+        const fontFamilyMatches = htmlContent.match(/font-family[^;"]*/g);
+        console.log('找到的font-family属性数量:', fontFamilyMatches ? fontFamilyMatches.length : 0);
+        if (fontFamilyMatches && fontFamilyMatches.length > 0) {
+          console.log('找到的font-family属性:', fontFamilyMatches);
+          // 特别检查楷体相关字体
+          const kaitiMatches = fontFamilyMatches.filter(font => 
+            font.includes('楷体') || font.includes('KaiTi') || font.includes('Kai')
+          );
+          if (kaitiMatches.length > 0) {
+            console.log('发现楷体字体:', kaitiMatches);
+          }
+        }
+        
+        // 在转换前先处理HTML中的楷体字体
+        let processedHtml = htmlContent;
+        
+        // 查找并标记所有包含楷体字体的元素
+        const kaitiRegex = /(font-family[^;]*(?:楷体|KaiTi|kaiti)[^;"]*)/gi;
+        if (kaitiRegex.test(htmlContent)) {
+          console.log('在HTML中发现楷体字体，进行预处理');
+          // 为包含楷体的元素添加特殊类名
+          processedHtml = htmlContent.replace(
+            /(<[^>]*style="[^"]*(?:楷体|KaiTi|kaiti)[^"]*"[^>]*>)/gi,
+            (match) => {
+              if (match.includes('class="')) {
+                return match.replace('class="', 'class="kaiti-font debug-kaiti ');
+              } else {
+                return match.replace('>', ' class="kaiti-font debug-kaiti">');
+              }
+            }
+          );
+          console.log('楷体字体预处理完成');
+        }
 
-      // 将HTML转换为编辑器数据格式
-      const editorData = this.htmlToEditorData(result.value);
-      
-      // 调试：输出编辑器数据
-      console.log('转换后的编辑器数据:', JSON.stringify(editorData, null, 2));
-      console.log('编辑器数据块数量:', editorData.blocks.length);
-      
-      // 检查是否有空的编辑器数据
-      if (editorData.blocks.length === 0) {
-        console.warn('警告：转换后的编辑器数据为空');
+        // 查找并标记所有包含仿宋字体的元素
+        const fangsongRegex = /(font-family[^;]*(?:仿宋|FangSong|fangsong)[^;"]*)/gi;
+        if (fangsongRegex.test(processedHtml)) {
+          console.log('在HTML中发现仿宋字体，进行预处理');
+          // 为包含仿宋的元素添加特殊类名
+          processedHtml = processedHtml.replace(
+            /(<[^>]*style="[^"]*(?:仿宋|FangSong|fangsong)[^"]*"[^>]*>)/gi,
+            (match) => {
+              if (match.includes('class="')) {
+                return match.replace('class="', 'class="fangsong-font debug-fangsong ');
+              } else {
+                return match.replace('>', ' class="fangsong-font debug-fangsong">');
+              }
+            }
+          );
+          console.log('仿宋字体预处理完成');
+        }
+
+        // 将HTML转换为编辑器数据格式
+        const editorData = this.htmlToEditorData(processedHtml);
+        
+        // 调试：输出编辑器数据
+        console.log('转换后的编辑器数据:', JSON.stringify(editorData, null, 2));
+        console.log('编辑器数据块数量:', editorData.blocks.length);
+        
+        // 检查是否有空的编辑器数据
+        if (editorData.blocks.length === 0) {
+          console.warn('警告：转换后的编辑器数据为空');
+        }
+        
+        return editorData;
+        
+      } finally {
+        // 清理临时容器
+        document.body.removeChild(container);
       }
       
-      return editorData;
     } catch (error) {
       console.error('Word文件导入失败:', error);
       throw new Error('Word文件导入失败，请检查文件格式');
@@ -138,9 +185,6 @@ export class WordHandler implements FileHandler {
     return container;
   }
 
-  /**
-   * 将HTML转换为编辑器数据格式
-   */
   /**
    * 将HTML转换为编辑器数据格式
    * 保留Word文档中的样式信息
@@ -266,7 +310,7 @@ export class WordHandler implements FileHandler {
     
     // 检查元素是否包含中文字体相关的属性或样式
     const elementHtml = element.outerHTML;
-    if (elementHtml.includes('方正') || elementHtml.includes('楷体') || elementHtml.includes('宋体') || elementHtml.includes('黑体')) {
+    if (elementHtml.includes('方正') || elementHtml.includes('楷体') || elementHtml.includes('宋体') || elementHtml.includes('黑体') || elementHtml.includes('仿宋')) {
       console.log('检测到可能包含中文字体的元素:', elementHtml.substring(0, 200));
     }
 
@@ -411,8 +455,31 @@ export class WordHandler implements FileHandler {
           }
           if (property === 'font-family') {
             // 对字体族进行中文字体映射处理
+            const originalFont = value;
             styles[camelCaseProperty] = this.mapChineseFontName(value);
             console.log(`内联样式字体族映射: ${value} -> ${styles[camelCaseProperty]}`);
+            
+            // 特别处理楷体字体
+            if (this.isKaiTiFont(originalFont)) {
+              console.log(`检测到楷体字体，添加特殊标记: ${originalFont}`);
+              // 添加楷体字体标记类
+              if (element.classList) {
+                element.classList.add('kaiti-font');
+              }
+              // 强制设置楷体字体
+              styles[camelCaseProperty] = '"KaiTi_GB2312", "KaiTi", "楷体", "STKaiti", "DFKai-SB", serif';
+            }
+            
+            // 特别处理仿宋字体
+            if (this.isFangSongFont(originalFont)) {
+              console.log(`检测到仿宋字体，添加特殊标记: ${originalFont}`);
+              // 添加仿宋字体标记类
+              if (element.classList) {
+                element.classList.add('fangsong-font', 'debug-fangsong');
+              }
+              // 强制设置仿宋字体 - 使用统一的字体族定义
+              styles[camelCaseProperty] = '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif';
+            }
           } else {
             styles[camelCaseProperty] = value;
           }
@@ -807,7 +874,7 @@ export class WordHandler implements FileHandler {
 
   /**
    * 应用Word文档字体样式推断
-   * 由于mammoth转换后通常不包含字体信息，直接应用默认中文字体
+   * 由于docx-preview转换后通常包含更好的字体信息，优先使用原始字体
    */
   private applyWordFontInference(element: Element, styles: any): void {
     const text = element.textContent || '';
@@ -840,7 +907,7 @@ export class WordHandler implements FileHandler {
       console.log('检测到Word副标题样式');
     }
 
-    // 由于mammoth转换后通常不包含字体信息，直接应用默认中文字体
+    // 由于docx-preview转换后通常包含更好的字体信息，优先使用原始字体
     if (text && this.isChineseParagraph(text)) {
       styles.fontFamily = '"Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "WenQuanYi Micro Hei", sans-serif';
       console.log('Word字体推断 - 应用默认中文字体:', styles.fontFamily);
@@ -857,6 +924,8 @@ export class WordHandler implements FileHandler {
     // 清理字体名称，移除引号和多余空格
     const cleanFontName = fontName.replace(/['"]/g, '').trim();
     
+    console.log('开始字体映射处理:', cleanFontName);
+    
     // 中文字体映射表
     const chineseFontMap: { [key: string]: string } = {
       // 方正字体系列
@@ -865,11 +934,13 @@ export class WordHandler implements FileHandler {
       '方正小标宋': '"FZXiaoBiaoSong-B05S", "SimSun", "宋体", serif',
       'FZXiaoBiaoSong-B05S': '"FZXiaoBiaoSong-B05S", "SimSun", "宋体", serif',
       
-      // 楷体系列
-      '楷体_GB2312': '"KaiTi", "楷体", "STKaiti", serif',
-      '楷体': '"KaiTi", "楷体", "STKaiti", serif',
-      'KaiTi': '"KaiTi", "楷体", "STKaiti", serif',
-      'STKaiti': '"STKaiti", "楷体", "KaiTi", serif',
+      // 楷体系列 - 增强支持
+      '楷体_GB2312': '"KaiTi_GB2312", "KaiTi", "楷体", "STKaiti", "DFKai-SB", serif',
+      'KaiTi_GB2312': '"KaiTi_GB2312", "KaiTi", "楷体", "STKaiti", "DFKai-SB", serif',
+      '楷体': '"KaiTi", "楷体", "KaiTi_GB2312", "STKaiti", "DFKai-SB", serif',
+      'KaiTi': '"KaiTi", "楷体", "KaiTi_GB2312", "STKaiti", "DFKai-SB", serif',
+      'STKaiti': '"STKaiti", "楷体", "KaiTi", "KaiTi_GB2312", "DFKai-SB", serif',
+      'DFKai-SB': '"DFKai-SB", "KaiTi", "楷体", "KaiTi_GB2312", "STKaiti", serif',
       
       // 宋体系列
       '宋体': '"SimSun", "宋体", serif',
@@ -883,11 +954,11 @@ export class WordHandler implements FileHandler {
       '微软雅黑': '"Microsoft YaHei", "微软雅黑", "SimHei", "黑体", sans-serif',
       'Microsoft YaHei': '"Microsoft YaHei", "微软雅黑", "SimHei", "黑体", sans-serif',
       
-      // 仿宋系列
-      '仿宋': '"FangSong", "仿宋", serif',
-      'FangSong': '"FangSong", "仿宋", serif',
-      '仿宋_GB2312': '"FangSong_GB2312", "FangSong", "仿宋", serif',
-      'FangSong_GB2312': '"FangSong_GB2312", "FangSong", "仿宋", serif',
+      // 仿宋系列 - 修正映射顺序，优先使用本地字体文件
+      '仿宋': '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif',
+      'FangSong': '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif',
+      '仿宋_GB2312': '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif',
+      'FangSong_GB2312': '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif',
       
       // 隶书系列
       '隶书': '"LiSu", "隶书", serif',
@@ -900,8 +971,22 @@ export class WordHandler implements FileHandler {
     
     // 检查是否有直接映射
     if (chineseFontMap[cleanFontName]) {
-      console.log(`中文字体映射: ${cleanFontName} -> ${chineseFontMap[cleanFontName]}`);
+      console.log(`中文字体直接映射: ${cleanFontName} -> ${chineseFontMap[cleanFontName]}`);
       return chineseFontMap[cleanFontName];
+    }
+    
+    // 特殊处理楷体相关字体的模糊匹配
+    if (this.isKaiTiFont(cleanFontName)) {
+      const kaitiFont = '"KaiTi_GB2312", "KaiTi", "楷体", "STKaiti", "DFKai-SB", serif';
+      console.log(`楷体字体特殊处理: ${cleanFontName} -> ${kaitiFont}`);
+      return kaitiFont;
+    }
+
+    // 特殊处理仿宋相关字体的模糊匹配
+    if (this.isFangSongFont(cleanFontName)) {
+      const fangsongFont = '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif';
+      console.log(`仿宋字体特殊处理: ${cleanFontName} -> ${fangsongFont}`);
+      return fangsongFont;
     }
     
     // 模糊匹配
@@ -923,6 +1008,28 @@ export class WordHandler implements FileHandler {
     const quotedFont = `"${cleanFontName}"`;
     console.log(`保持原字体名称: ${cleanFontName} -> ${quotedFont}`);
     return quotedFont;
+  }
+
+  /**
+   * 检测是否为楷体相关字体
+   */
+  private isKaiTiFont(fontName: string): boolean {
+    const kaitiKeywords = ['楷体', 'KaiTi', 'Kai', '楷', 'kaiti', 'KAITI'];
+    return kaitiKeywords.some(keyword => 
+      fontName.toLowerCase().includes(keyword.toLowerCase()) ||
+      fontName.includes(keyword)
+    );
+  }
+
+  /**
+   * 检测是否为仿宋相关字体
+   */
+  private isFangSongFont(fontName: string): boolean {
+    const fangsongKeywords = ['仿宋', 'FangSong', 'fangsong', 'FANGSONG', '仿宋_GB2312', 'FangSong_GB2312'];
+    return fangsongKeywords.some(keyword => 
+      fontName.toLowerCase().includes(keyword.toLowerCase()) ||
+      fontName.includes(keyword)
+    );
   }
 
   /**
@@ -1266,8 +1373,18 @@ export class WordHandler implements FileHandler {
                    
                    // 提取字体族
                    if (!styles.fontFamily && childComputed.fontFamily && childComputed.fontFamily !== 'serif') {
+                     const originalFont = childComputed.fontFamily;
                      styles.fontFamily = this.mapChineseFontName(childComputed.fontFamily);
                      console.log('从子元素计算样式提取并映射fontFamily:', childComputed.fontFamily, '->', styles.fontFamily);
+                     
+                     // 特别处理楷体字体
+                     if (this.isKaiTiFont(originalFont)) {
+                       console.log(`从子元素检测到楷体字体: ${originalFont}`);
+                       // 添加楷体字体标记类
+                       if (element.classList) {
+                         element.classList.add('kaiti-font');
+                       }
+                     }
                    }
                    
                    // 提取字体大小

@@ -1,0 +1,185 @@
+/* 字体文件声明 */
+@font-face {
+  font-family: "楷体_GB2312";
+  src: url("./fonts/楷体_GB2312.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "仿宋_GB2312";
+  src: url("./fonts/仿宋_GB2312.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "方正小标宋简体";
+  src: url("./fonts/方正小标宋简体.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* 全局强制仿宋字体应用 - 最高优先级 */
+* {
+  --fangsong-font-family: "仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif;
+}
+
+/* 超强制仿宋字体应用 - 覆盖所有可能的样式 */
+[style*="仿宋"]/* 仿宋字体样式强化 - 确保在所有情况下都能正确应用 */
+[style*="FangSong"] *,
+[style*="fangsong"] *,
+[style*="仿宋_GB2312"] *,
+[style*="FangSong_GB2312"] *,
+.fangsong-font *,
+.fangsong-font {
+  font-family: var(--fangsong-font-family) !important;
+  font-synthesis: none !important;
+}
+
+/* 内联样式中的仿宋字体 - 增强优先级 */
+span[style*="仿宋"],
+span[style*="FangSong"],
+span[style*="fangsong"],
+span[style*="仿宋_GB2312"],
+span[style*="FangSong_GB2312"] {
+  font-family: var(--fangsong-font-family) !important;
+}
+
+/* 确保仿宋字体在混合文本中的正确显示 */
+.fangsong-font {
+  font-family: var(--fangsong-font-family) !important;
+}
+
+/* 超强制仿宋字体应用 - 覆盖所有可能的样式 */
+[style*="仿宋"] *,
+[style*="FangSong"] *,
+[style*="fangsong"] *,
+[style*="仿宋_GB2312"] *,
+[style*="FangSong_GB2312"] *,
+.fangsong-font *,
+.fangsong-font,
+.debug-fangsong,
+.debug-fangsong * {
+  font-family: var(--fangsong-font-family) !important;
+  font-synthesis: none !important;
+}
+.kaiti-font {
+  font-family: "楷体_GB2312", "KaiTi", "楷体", "STKaiti", "DFKai-SB", serif !important;
+  /* 确保楷体字体的正确渲染 */
+  font-feature-settings: normal;
+  text-rendering: optimizeLegibility;
+}
+
+/* 仿宋字体增强样式 - 使用CSS变量确保一致性 */
+.fangsong-font {
+  font-family: var(--fangsong-font-family) !important;
+  /* 确保仿宋字体的正确渲染 */
+  font-feature-settings: normal;
+  text-rendering: optimizeLegibility;
+}
+
+/* 针对不同操作系统的楷体字体优化 */
+@media screen and (-webkit-min-device-pixel-ratio: 0) {
+  /* WebKit 浏览器 */
+  .kaiti-font {
+    font-family: "楷体_GB2312", "KaiTi", "楷体", "STKaiti", "DFKai-SB", "Kaiti SC", serif !important;
+  }
+  
+  .fangsong-font {
+    font-family: var(--fangsong-font-family) !important;
+  }
+}
+
+/* macOS 系统楷体字体优化 */
+@supports (-webkit-appearance: none) {
+  .kaiti-font {
+    font-family: "楷体_GB2312", "STKaiti", "Kaiti SC", "KaiTi", "楷体", "DFKai-SB", serif !important;
+  }
+  
+  .fangsong-font {
+    font-family: var(--fangsong-font-family) !important;
+  }
+}
+
+/* Windows 系统楷体字体优化 */
+@media screen and (-ms-high-contrast: active), (-ms-high-contrast: none) {
+  .kaiti-font {
+    font-family: "楷体_GB2312", "KaiTi", "楷体", "DFKai-SB", serif !important;
+  }
+  
+  .fangsong-font {
+    font-family: var(--fangsong-font-family) !important;
+  }
+}
+
+/* 楷体字体的字重和样式调整 */
+.kaiti-font {
+  font-weight: normal;
+  font-style: normal;
+  letter-spacing: 0.02em;
+}
+
+/* 仿宋字体的字重和样式调整 */
+.fangsong-font {
+  font-weight: normal;
+  font-style: normal;
+  letter-spacing: 0.02em;
+}
+
+/* 确保楷体在不同尺寸下的可读性 */
+.kaiti-font.small {
+  font-size: 12px;
+  letter-spacing: 0.03em;
+}
+
+.kaiti-font.medium {
+  font-size: 14px;
+  letter-spacing: 0.02em;
+}
+
+.kaiti-font.large {
+  font-size: 16px;
+  letter-spacing: 0.01em;
+}
+
+/* 强制应用楷体字体的通用样式 */
+[style*="楷体"], [style*="KaiTi"], [style*="kaiti"] {
+  font-family: "楷体_GB2312", "KaiTi", "楷体", "STKaiti", "DFKai-SB", serif !important;
+}
+
+/* 强制应用仿宋字体的通用样式 */
+[style*="仿宋"], [style*="FangSong"], [style*="fangsong"], [style*="仿宋_GB2312"], [style*="FangSong_GB2312"] {
+  font-family: var(--fangsong-font-family) !important;
+}
+
+/* 调试用：高亮显示楷体字体元素 */
+.debug-kaiti {
+  background-color: rgba(255, 255, 0, 0.2);
+  border: 1px dashed #ff0000;
+}
+
+/* 调试用：高亮显示仿宋字体元素 */
+.debug-fangsong {
+  background-color: rgba(0, 255, 255, 0.2);
+  border: 1px dashed #0000ff;
+}
+
+/* 确保楷体字体在编辑器中正确显示 */
+.docx-preview [style*="楷体"],
+.docx-preview [style*="KaiTi"],
+.docx-preview .kaiti-font {
+  font-family: "楷体_GB2312", "KaiTi", "楷体", "STKaiti", "DFKai-SB", serif !important;
+}
+
+/* 确保仿宋字体在编辑器中正确显示 */
+.docx-preview [style*="仿宋"],
+.docx-preview [style*="FangSong"],
+.docx-preview [style*="仿宋_GB2312"],
+.docx-preview [style*="FangSong_GB2312"],
+.docx-preview .fangsong-font {
+  font-family: var(--fangsong-font-family) !important;
+}
