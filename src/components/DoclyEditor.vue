@@ -275,12 +275,141 @@
             </svg>
           </button>
         </div>
+
+        <!-- 批注功能区域 -->
+        <div class="toolbar-section">
+          <button 
+            @click="toggleAnnotationMode" 
+            class="toolbar-btn"
+            :class="{ active: isAnnotationMode }"
+            @mouseenter="showTooltip($event, '添加批注')"
+            @mouseleave="hideTooltip"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M9,22A1,1 0 0,1 8,21V18H4A2,2 0 0,1 2,16V4C2,2.89 2.9,2 4,2H20A2,2 0 0,1 22,4V16A2,2 0 0,1 20,18H13.9L10.2,21.71C10,21.9 9.75,22 9.5,22H9M10,16V19.08L13.08,16H20V4H4V16H10M6,7H18V9H6V7M6,11H16V13H6V11Z"/>
+            </svg>
+          </button>
+          <button 
+            @click="showAnnotationList" 
+            class="toolbar-btn"
+            @mouseenter="showTooltip($event, '批注列表')"
+            @mouseleave="hideTooltip"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M3,5H9V11H3V5M5,7V9H7V7H5M11,7H21V9H11V7M11,15H21V17H11V15M5,20L1.5,16.5L2.91,15.09L5,17.17L9.59,12.59L11,14L5,20Z"/>
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
 
     <!-- 编辑器容器 -->
     <div class="docly-editor-container">
-      <div class="docly-editor-holder" ref="editorRef"></div>
+      <div 
+        class="docly-editor-holder" 
+        ref="editorRef"
+        @mouseup="handleTextSelection"
+      ></div>
+      
+      <!-- 批注面板 -->
+      <div v-if="showAnnotationPanel" class="annotation-panel">
+        <div class="annotation-panel-header">
+           <h3>批注列表 ({{ annotations.length }})</h3>
+           <div class="panel-actions">
+             <button 
+               @click="deleteResolvedAnnotations" 
+               class="action-btn small"
+               :disabled="annotations.filter(a => a.resolved).length === 0"
+             >
+               清理已解决
+             </button>
+             <button 
+               @click="exportAnnotations" 
+               class="action-btn small"
+               :disabled="annotations.length === 0"
+             >
+               导出
+             </button>
+             <button @click="showAnnotationPanel = false" class="close-btn">
+               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                 <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/>
+               </svg>
+             </button>
+           </div>
+         </div>
+        <div class="annotation-list">
+          <div 
+            v-for="annotation in annotations" 
+            :key="annotation.id"
+            class="annotation-item"
+            :class="{ resolved: annotation.resolved }"
+          >
+            <div class="annotation-header">
+              <span class="annotation-author">{{ annotation.author }}</span>
+              <span class="annotation-time">{{ new Date(annotation.timestamp).toLocaleString() }}</span>
+            </div>
+            <div class="annotation-text">
+              <strong>选中文本：</strong>{{ annotation.text }}
+            </div>
+            <div class="annotation-content">
+              {{ annotation.content }}
+            </div>
+            <div class="annotation-actions">
+               <button 
+                 @click="editAnnotation(annotation.id)"
+                 class="action-btn edit"
+               >
+                 编辑
+               </button>
+               <button 
+                 @click="resolveAnnotation(annotation.id)"
+                 class="action-btn"
+                 :class="{ resolved: annotation.resolved }"
+               >
+                 {{ annotation.resolved ? '取消解决' : '标记解决' }}
+               </button>
+               <button 
+                 @click="deleteAnnotation(annotation.id)"
+                 class="action-btn delete"
+               >
+                 删除
+               </button>
+             </div>
+          </div>
+          <div v-if="annotations.length === 0" class="no-annotations">
+            暂无批注
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 批注创建弹窗 -->
+    <div v-if="isAnnotationMode && selectedText" class="annotation-modal">
+      <div class="annotation-modal-content">
+        <div class="annotation-modal-header">
+          <h3>{{ selectedAnnotation ? '编辑批注' : '添加批注' }}</h3>
+          <button @click="cancelAnnotation" class="close-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/>
+            </svg>
+          </button>
+        </div>
+        <div class="selected-text">
+          <strong>选中文本：</strong>{{ selectedText }}
+        </div>
+        <textarea 
+          v-model="annotationInput"
+          placeholder="请输入批注内容..."
+          class="annotation-textarea"
+          rows="4"
+        ></textarea>
+        <div class="annotation-modal-actions">
+          <button @click="cancelAnnotation" class="btn-cancel">取消</button>
+          <button @click="confirmAnnotation" class="btn-confirm">
+            {{ selectedAnnotation ? '更新' : '确认' }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- 状态栏 -->
@@ -375,6 +504,26 @@ const tooltip = ref({
   x: 0,
   y: 0
 });
+
+// 批注相关状态
+const isAnnotationMode = ref(false);
+const annotations = ref<Array<{
+  id: string;
+  text: string;
+  content: string;
+  author: string;
+  timestamp: number;
+  position: {
+    startOffset: number;
+    endOffset: number;
+    blockId: string;
+  };
+  resolved: boolean;
+}>>([]);
+const showAnnotationPanel = ref(false);
+const selectedAnnotation = ref<string | null>(null);
+const annotationInput = ref('');
+const selectedText = ref('');
 
 // Store
 const editorStore = useEditorStore();
@@ -1198,6 +1347,198 @@ const showTooltip = (event: MouseEvent, text: string): void => {
  */
 const hideTooltip = (): void => {
   tooltip.value.visible = false;
+};
+
+/**
+ * 切换批注模式
+ */
+const toggleAnnotationMode = (): void => {
+  isAnnotationMode.value = !isAnnotationMode.value;
+  if (isAnnotationMode.value) {
+    showMessage('批注模式已开启，请选择文本添加批注', 'info');
+  } else {
+    showMessage('批注模式已关闭', 'info');
+  }
+};
+
+/**
+ * 显示批注列表
+ */
+const showAnnotationList = (): void => {
+  showAnnotationPanel.value = !showAnnotationPanel.value;
+  if (showAnnotationPanel.value) {
+    showMessage('批注列表已打开', 'info');
+  }
+};
+
+/**
+ * 创建批注
+ * @param {string} selectedText - 选中的文本
+ * @param {string} content - 批注内容
+ */
+const createAnnotation = (selectedText: string, content: string): void => {
+  if (!selectedText.trim() || !content.trim()) {
+    showMessage('请选择文本并输入批注内容', 'warning');
+    return;
+  }
+
+  const annotation = {
+    id: `annotation-${Date.now()}`,
+    text: selectedText,
+    content: content,
+    author: '当前用户', // 可以从用户系统获取
+    timestamp: Date.now(),
+    position: {
+      startOffset: 0, // 需要根据实际选择位置计算
+      endOffset: selectedText.length,
+      blockId: 'current-block' // 需要获取当前块ID
+    },
+    resolved: false
+  };
+
+  annotations.value.push(annotation);
+  showMessage('批注已添加', 'success');
+  
+  // 关闭批注模式
+  isAnnotationMode.value = false;
+};
+
+/**
+ * 删除批注
+ * @param {string} annotationId - 批注ID
+ */
+const deleteAnnotation = (annotationId: string): void => {
+  const index = annotations.value.findIndex(a => a.id === annotationId);
+  if (index > -1) {
+    annotations.value.splice(index, 1);
+    showMessage('批注已删除', 'success');
+  }
+};
+
+/**
+  * 标记批注为已解决
+  * @param {string} annotationId - 批注ID
+  */
+ const resolveAnnotation = (annotationId: string): void => {
+   const annotation = annotations.value.find(a => a.id === annotationId);
+   if (annotation) {
+     annotation.resolved = !annotation.resolved;
+     showMessage(annotation.resolved ? '批注已标记为已解决' : '批注已标记为未解决', 'success');
+   }
+ };
+
+/**
+  * 取消批注创建/编辑
+  */
+ const cancelAnnotation = (): void => {
+   selectedText.value = '';
+   annotationInput.value = '';
+   selectedAnnotation.value = null;
+   isAnnotationMode.value = false;
+ };
+
+/**
+  * 确认创建批注
+  */
+ const confirmAnnotation = (): void => {
+   if (selectedText.value && annotationInput.value.trim()) {
+     if (selectedAnnotation.value) {
+       // 更新现有批注
+       updateAnnotation(selectedAnnotation.value, annotationInput.value);
+       selectedAnnotation.value = null;
+     } else {
+       // 创建新批注
+       createAnnotation(selectedText.value, annotationInput.value);
+     }
+     selectedText.value = '';
+     annotationInput.value = '';
+   } else {
+     showMessage('请输入批注内容', 'warning');
+   }
+ };
+
+/**
+  * 处理文本选择事件
+  */
+ const handleTextSelection = (): void => {
+   if (!isAnnotationMode.value) return;
+   
+   const selection = window.getSelection();
+   if (selection && selection.toString().trim()) {
+     selectedText.value = selection.toString().trim();
+   }
+ };
+
+/**
+ * 编辑批注
+ * @param {string} annotationId - 批注ID
+ */
+const editAnnotation = (annotationId: string): void => {
+  const annotation = annotations.value.find(a => a.id === annotationId);
+  if (annotation) {
+    selectedAnnotation.value = annotationId;
+    annotationInput.value = annotation.content;
+    selectedText.value = annotation.text;
+    isAnnotationMode.value = true;
+    showMessage('编辑模式已开启', 'info');
+  }
+};
+
+/**
+ * 更新批注内容
+ * @param {string} annotationId - 批注ID
+ * @param {string} newContent - 新的批注内容
+ */
+const updateAnnotation = (annotationId: string, newContent: string): void => {
+  const annotation = annotations.value.find(a => a.id === annotationId);
+  if (annotation && newContent.trim()) {
+    annotation.content = newContent.trim();
+    annotation.timestamp = Date.now(); // 更新时间戳
+    showMessage('批注已更新', 'success');
+  }
+};
+
+/**
+ * 批量删除已解决的批注
+ */
+const deleteResolvedAnnotations = (): void => {
+  const resolvedCount = annotations.value.filter(a => a.resolved).length;
+  if (resolvedCount === 0) {
+    showMessage('没有已解决的批注', 'info');
+    return;
+  }
+  
+  annotations.value = annotations.value.filter(a => !a.resolved);
+  showMessage(`已删除 ${resolvedCount} 个已解决的批注`, 'success');
+};
+
+/**
+ * 导出批注数据
+ */
+const exportAnnotations = (): void => {
+  if (annotations.value.length === 0) {
+    showMessage('没有批注可导出', 'info');
+    return;
+  }
+  
+  const exportData = {
+    annotations: annotations.value,
+    exportTime: new Date().toISOString(),
+    totalCount: annotations.value.length,
+    resolvedCount: annotations.value.filter(a => a.resolved).length
+  };
+  
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `annotations-${new Date().toISOString().split('T')[0]}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  
+  showMessage('批注数据已导出', 'success');
 };
 
 // 生命周期
@@ -2121,5 +2462,290 @@ onUnmounted(() => {
 .docly-editor.dark-theme .custom-tooltip {
   background: #999;
   color: #333;
+}
+
+/* 批注面板样式 */
+.annotation-panel {
+  position: fixed;
+  right: 20px;
+  top: 100px;
+  width: 320px;
+  max-height: 500px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.annotation-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.annotation-panel-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.panel-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.action-btn.small {
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+  background: white;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.action-btn.small:hover:not(:disabled) {
+  background: #f0f0f0;
+  border-color: #ccc;
+}
+
+.action-btn.small:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  color: #666;
+  transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: #333;
+}
+
+.annotation-list {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.annotation-item {
+  padding: 12px;
+  border: 1px solid #e8eaed;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  background: white;
+  transition: all 0.2s ease;
+}
+
+.annotation-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.annotation-item.resolved {
+  opacity: 0.7;
+  background: #f8f9fa;
+}
+
+.annotation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.annotation-author {
+  font-weight: 600;
+  font-size: 12px;
+  color: #1a73e8;
+}
+
+.annotation-time {
+  font-size: 11px;
+  color: #666;
+}
+
+.annotation-text {
+  font-size: 12px;
+  color: #333;
+  margin-bottom: 6px;
+  padding: 6px;
+  background: #f1f3f4;
+  border-radius: 4px;
+}
+
+.annotation-content {
+  font-size: 13px;
+  color: #333;
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
+.annotation-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.action-btn {
+  padding: 4px 8px;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  background: white;
+  color: #333;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.action-btn:hover {
+  background: #f8f9fa;
+}
+
+.action-btn.resolved {
+  background: #e8f0fe;
+  color: #1a73e8;
+  border-color: #1a73e8;
+}
+
+.action-btn.delete {
+  color: #d93025;
+  border-color: #d93025;
+}
+
+.action-btn.delete:hover {
+  background: #fce8e6;
+}
+
+.no-annotations {
+  text-align: center;
+  color: #666;
+  font-size: 13px;
+  padding: 20px;
+}
+
+/* 批注创建弹窗样式 */
+.annotation-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.annotation-modal-content {
+  background: white;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.annotation-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.annotation-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.selected-text {
+  padding: 16px 20px;
+  background: #f1f3f4;
+  border-bottom: 1px solid #e0e0e0;
+  font-size: 14px;
+  color: #333;
+}
+
+.annotation-textarea {
+  width: 100%;
+  padding: 16px 20px;
+  border: none;
+  resize: vertical;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  outline: none;
+  min-height: 100px;
+}
+
+.annotation-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 20px;
+  background: #f8f9fa;
+  border-top: 1px solid #e0e0e0;
+}
+
+.btn-cancel,
+.btn-confirm {
+  padding: 8px 16px;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-cancel {
+  background: white;
+  color: #333;
+}
+
+.btn-cancel:hover {
+  background: #f8f9fa;
+}
+
+.btn-confirm {
+  background: #1a73e8;
+  color: white;
+  border-color: #1a73e8;
+}
+
+.btn-confirm:hover {
+  background: #1557b0;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .annotation-panel {
+    right: 10px;
+    width: 280px;
+    top: 80px;
+  }
+  
+  .annotation-modal-content {
+    width: 95%;
+    margin: 20px;
+  }
 }
 </style>
