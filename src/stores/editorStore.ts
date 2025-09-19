@@ -110,7 +110,6 @@ export const useEditorStore = defineStore('editor', () => {
       updateEditorData(data);
       console.log('文档加载完成，当前编辑器数据:', editorData.value);
       console.log('editorData.value是否为null:', editorData.value === null);
-      console.log('editorData.value内容:', JSON.stringify(editorData.value, null, 2));
     } catch (error) {
       console.error('加载文档失败，详细错误信息:', error);
       console.error('错误堆栈:', error.stack);

@@ -1,7 +1,8 @@
-import { renderAsync } from 'docx-preview';
+import { renderAsync, parseAsync } from 'docx-preview';
 import Docxtemplater from 'docxtemplater';
-import type { FileHandler, EditorData } from '../types';
+import type { FileHandler, EditorData, Comment, CommentRange } from '../types';
 import { TextAnalyzer } from '../utils/TextAnalyzer';
+import { extractCommentsFromDocument } from './WordHandlerComments';
 
 /**
  * Word文件处理器
@@ -31,6 +32,15 @@ export class WordHandler implements FileHandler {
       document.body.appendChild(container);
       
       try {
+        // 先解析文档获取批注数据
+        const document = await parseAsync(arrayBuffer, {
+          renderComments: true, // 解析时需要启用批注解析
+          experimental: false,
+          trimXmlDeclaration: true
+        });
+        
+        console.log('文档解析完成，批注数量:', document.commentsPart?.comments?.length || 0);
+        
         // 使用docx-preview渲染文档
          await renderAsync(arrayBuffer, container, undefined, {
            className: 'docx-preview',
@@ -43,8 +53,8 @@ export class WordHandler implements FileHandler {
            experimental: false,
            trimXmlDeclaration: true,
            useBase64URL: false,
-           renderChanges: false,
-           renderComments: false,
+           renderChanges: true,
+           renderComments: false, // 禁用批注在正文中的渲染
            renderEndnotes: false,
            renderFootnotes: false,
            renderHeaders: false,
@@ -84,9 +94,9 @@ export class WordHandler implements FileHandler {
             /(<[^>]*style="[^"]*(?:楷体|KaiTi|kaiti)[^"]*"[^>]*>)/gi,
             (match) => {
               if (match.includes('class="')) {
-                return match.replace('class="', 'class="kaiti-font debug-kaiti ');
+                return match.replace('class="', 'class="kaiti-font ');
               } else {
-                return match.replace('>', ' class="kaiti-font debug-kaiti">');
+                return match.replace('>', ' class="kaiti-font ">');
               }
             }
           );
@@ -108,9 +118,9 @@ export class WordHandler implements FileHandler {
             /(<[^>]*style="[^"]*(?:仿宋|FangSong|fangsong)[^"]*"[^>]*>)/gi,
             (match) => {
               if (match.includes('class="')) {
-                return match.replace('class="', 'class="fangsong-font debug-fangsong ');
+                return match.replace('class="', 'class="fangsong-font ');
               } else {
-                return match.replace('>', ' class="fangsong-font debug-fangsong">');
+                return match.replace('>', ' class="fangsong-font ">');
               }
             }
           );
@@ -120,7 +130,12 @@ export class WordHandler implements FileHandler {
         // 将HTML转换为编辑器数据格式
         const editorData = this.htmlToEditorData(processedHtml);
         
-        console.log('转换完成，编辑器数据:', JSON.stringify(editorData, null, 2));
+        // 解析批注信息并关联到相应的块
+        const comments = extractCommentsFromDocument(document);
+        console.log('提取到的批注数量:', comments.length);
+        
+        // 将批注关联到对应的文本块
+        this.associateCommentsWithBlocks(editorData, comments);
         
         // 检查是否有空的编辑器数据
         if (editorData.blocks.length === 0) {
@@ -487,7 +502,7 @@ export class WordHandler implements FileHandler {
               console.log(`仿宋字体调试 - 元素标签: ${element.tagName}, 文本内容: ${element.textContent?.substring(0, 50)}`);
               // 添加仿宋字体标记类
               if (element.classList) {
-                element.classList.add('fangsong-font', 'debug-fangsong');
+                element.classList.add('fangsong-font');
               }
               // 强制设置仿宋字体 - 使用统一的字体族定义
               styles[camelCaseProperty] = '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif';
@@ -1676,5 +1691,101 @@ export class WordHandler implements FileHandler {
         generate: (options: any) => new ArrayBuffer(0)
       })
     };
+  }
+
+
+  /**
+   * 提取Word文档中的批注信息
+   * @param container - 包含渲染后HTML的容器元素
+   * @returns 批注数组
+   */
+  private extractComments(container: HTMLElement): Comment[] {
+    const comments: Comment[] = [];
+    
+    console.log('开始提取批注，容器HTML长度:', container.innerHTML.length);
+    
+    // 由于禁用了renderComments，需要直接从docx文档中解析批注
+    // 这里我们需要访问docx-preview的内部数据结构
+    // 但由于API限制，我们先返回空数组，批注功能通过编辑器自身的批注系统实现
+    
+    console.log('批注提取完成，总数量:', comments.length);
+    return comments;
+  }
+
+  /**
+   * 将批注关联到对应的文本块
+   * @param editorData - 编辑器数据
+   * @param comments - 批注数组
+   */
+  private associateCommentsWithBlocks(editorData: EditorData, comments: Comment[]): void {
+    if (comments.length === 0) return;
+    
+    // 为每个块添加相关的批注
+    editorData.blocks.forEach((block, blockIndex) => {
+      const blockText = block.data.text || '';
+      const blockComments: Comment[] = [];
+      
+      // 查找与当前块文本相关的批注
+      comments.forEach(comment => {
+        const commentText = comment.range.text.trim();
+        const blockTextTrimmed = blockText.trim();
+        
+        // 改进的文本匹配策略
+        let isMatch = false;
+        
+        // 1. 精确匹配
+        if (blockTextTrimmed.includes(commentText) || commentText.includes(blockTextTrimmed)) {
+          isMatch = true;
+        }
+        // 2. 模糊匹配（去除标点符号和空格）
+        else {
+          const normalizeText = (text: string) => text.replace(/[\s\p{P}]/gu, '').toLowerCase();
+          const normalizedBlock = normalizeText(blockTextTrimmed);
+          const normalizedComment = normalizeText(commentText);
+          
+          if (normalizedBlock && normalizedComment && 
+              (normalizedBlock.includes(normalizedComment) || 
+               normalizedComment.includes(normalizedBlock))) {
+            isMatch = true;
+          }
+        }
+        
+        if (isMatch) {
+          // 创建块级别的批注副本
+          const blockComment: Comment = {
+            ...comment,
+            id: `${comment.id}_block_${blockIndex}`,
+            range: {
+              startOffset: Math.max(0, blockTextTrimmed.indexOf(commentText)),
+              endOffset: Math.min(blockTextTrimmed.length, 
+                blockTextTrimmed.indexOf(commentText) + commentText.length),
+              text: commentText
+            }
+          };
+          
+          blockComments.push(blockComment);
+        }
+      });
+      
+      // 如果找到相关批注，添加到块数据中
+      if (blockComments.length > 0) {
+        block.comments = blockComments;
+      }
+    });
+    
+    // 将未关联的批注保存到 EditorData 的元数据中，不创建独立的块
+    const unassociatedComments = comments.filter(comment => 
+      !editorData.blocks.some(block => 
+        block.comments?.some(bc => bc.content === comment.content)
+      )
+    );
+    
+    // 将所有批注（包括未关联的）保存到 EditorData 的 comments 属性中
+    if (!editorData.comments) {
+      editorData.comments = [];
+    }
+    editorData.comments.push(...comments);
+    
+    console.log(`批注处理完成: 总计 ${comments.length} 个批注，其中 ${unassociatedComments.length} 个未关联到具体文本块`);
   }
 }

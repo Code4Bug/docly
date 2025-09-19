@@ -292,7 +292,8 @@
           <button 
             @click="showAnnotationList" 
             class="toolbar-btn"
-            @mouseenter="showTooltip($event, '批注列表')"
+            :class="{ active: showAnnotationPanel }"
+            @mouseenter="showTooltip($event, showAnnotationPanel ? '隐藏批注列表' : '显示批注列表')"
             @mouseleave="hideTooltip"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -304,22 +305,23 @@
     </div>
 
     <!-- 编辑器容器 -->
-    <div class="docly-editor-container">
+    <div class="docly-editor-container" :class="{ 'with-sidebar': showAnnotationPanel }">
       <div 
         class="docly-editor-holder" 
         ref="editorRef"
         @mouseup="handleTextSelection"
       ></div>
       
-      <!-- 批注面板 -->
-      <div v-if="showAnnotationPanel" class="annotation-panel">
-        <div class="annotation-panel-header">
+      <!-- 批注侧边栏 -->
+      <div v-if="showAnnotationPanel" class="annotation-sidebar">
+        <div class="annotation-sidebar-header">
            <h3>批注列表 ({{ annotations.length }})</h3>
-           <div class="panel-actions">
+           <div class="sidebar-actions">
              <button 
                @click="deleteResolvedAnnotations" 
                class="action-btn small"
                :disabled="annotations.filter(a => a.resolved).length === 0"
+               title="清理已解决的批注"
              >
                清理已解决
              </button>
@@ -327,10 +329,11 @@
                @click="exportAnnotations" 
                class="action-btn small"
                :disabled="annotations.length === 0"
+               title="导出批注列表"
              >
                导出
              </button>
-             <button @click="showAnnotationPanel = false" class="close-btn">
+             <button @click="showAnnotationPanel = false" class="close-btn" title="关闭侧边栏">
                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                  <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/>
                </svg>
@@ -757,12 +760,61 @@ const handleImport = async (event: Event): Promise<void> => {
     const editorData = await wordHandler.value.import(file);
     console.log('导入成功，数据块数量:', editorData.blocks.length);
     
+    // 处理导入的批注数据
+    const importedComments: any[] = [];
+    
+    // 首先从 EditorData.comments 中读取批注（新的存储方式）
+    if (editorData.comments && editorData.comments.length > 0) {
+      editorData.comments.forEach((comment, index) => {
+        importedComments.push({
+          id: comment.id || `imported_${Date.now()}_${index}`,
+          content: comment.content,
+          author: comment.author || comment.user || '文档作者',
+          text: comment.range?.text || comment.content?.substring(0, 50) || '未知文本',
+          timestamp: typeof comment.timestamp === 'number' ? comment.timestamp : Date.now(),
+          resolved: false,
+          blockIndex: -1 // 表示这是独立的批注
+        });
+      });
+    }
+    
+    // 然后从块中提取关联的批注（保持向后兼容）
+    if (editorData.blocks) {
+      editorData.blocks.forEach((block, blockIndex) => {
+        if (block.comments && block.comments.length > 0) {
+          block.comments.forEach(comment => {
+            // 避免重复添加已经在 EditorData.comments 中的批注
+            const existingComment = importedComments.find(c => c.id === comment.id);
+            if (!existingComment) {
+              importedComments.push({
+                id: comment.id || `block_${Date.now()}_${blockIndex}`,
+                content: comment.content,
+                author: comment.author || comment.user || '文档作者',
+                text: comment.range?.text || block.data.text?.substring(0, 50) || '未知文本',
+                timestamp: typeof comment.timestamp === 'number' ? comment.timestamp : Date.now(),
+                resolved: false,
+                blockIndex: blockIndex
+              });
+            }
+          });
+        }
+      });
+    }
+    
+    // 合并导入的批注到现有批注列表
+    if (importedComments.length > 0) {
+      annotations.value.push(...importedComments);
+      showMessage(`文档导入成功，发现 ${importedComments.length} 个批注`, 'success');
+      console.log('导入的批注:', importedComments);
+    } else {
+      showMessage('文档导入成功', 'success');
+    }
+    
     console.log('准备调用 editorStore.loadDocument...');
     await editorStore.loadDocument(editorData);
     console.log('editorStore.loadDocument 调用完成');
     console.log('文档已加载到编辑器store，当前编辑器数据:', editorStore.editorData);
     
-    showMessage('文档导入成功', 'success');
   } catch (error) {
     console.error('导入失败，详细错误信息:', error);
     console.error('错误类型:', typeof error);
@@ -1368,6 +1420,8 @@ const showAnnotationList = (): void => {
   showAnnotationPanel.value = !showAnnotationPanel.value;
   if (showAnnotationPanel.value) {
     showMessage('批注列表已打开', 'info');
+  } else {
+    showMessage('批注列表已关闭', 'info');
   }
 };
 
@@ -2464,38 +2518,42 @@ onUnmounted(() => {
   color: #333;
 }
 
-/* 批注面板样式 */
-.annotation-panel {
+/* 批注侧边栏样式 */
+.annotation-sidebar {
   position: fixed;
-  right: 20px;
-  top: 100px;
-  width: 320px;
-  max-height: 500px;
+  right: 0;
+  top: 60px;
+  width: 350px;
+  height: calc(100vh - 100px);
   background: white;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-left: 1px solid #e0e0e0;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
   z-index: 1000;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
+  transform: translateX(0);
+  transition: transform 0.3s ease;
 }
 
-.annotation-panel-header {
+.annotation-sidebar-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
+  padding: 16px 20px;
   background: #f8f9fa;
   border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
 }
 
-.annotation-panel-header h3 {
+.annotation-sidebar-header h3 {
   margin: 0;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   color: #333;
 }
 
-.panel-actions {
+.sidebar-actions {
   display: flex;
   gap: 8px;
   align-items: center;
@@ -2538,22 +2596,23 @@ onUnmounted(() => {
 }
 
 .annotation-list {
-  max-height: 400px;
+  flex: 1;
   overflow-y: auto;
-  padding: 8px;
+  padding: 16px 20px;
 }
 
 .annotation-item {
-  padding: 12px;
+  padding: 16px;
   border: 1px solid #e8eaed;
-  border-radius: 6px;
-  margin-bottom: 8px;
+  border-radius: 8px;
+  margin-bottom: 12px;
   background: white;
   transition: all 0.2s ease;
 }
 
 .annotation-item:hover {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-color: #dadce0;
 }
 
 .annotation-item.resolved {
@@ -2565,12 +2624,12 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .annotation-author {
   font-weight: 600;
-  font-size: 12px;
+  font-size: 13px;
   color: #1a73e8;
 }
 
@@ -2582,22 +2641,24 @@ onUnmounted(() => {
 .annotation-text {
   font-size: 12px;
   color: #333;
-  margin-bottom: 6px;
-  padding: 6px;
+  margin-bottom: 8px;
+  padding: 8px;
   background: #f1f3f4;
-  border-radius: 4px;
+  border-radius: 6px;
+  border-left: 3px solid #1a73e8;
 }
 
 .annotation-content {
-  font-size: 13px;
+  font-size: 14px;
   color: #333;
-  line-height: 1.4;
-  margin-bottom: 8px;
+  line-height: 1.5;
+  margin-bottom: 12px;
 }
 
 .annotation-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .action-btn {
@@ -2633,8 +2694,9 @@ onUnmounted(() => {
 .no-annotations {
   text-align: center;
   color: #666;
-  font-size: 13px;
-  padding: 20px;
+  font-size: 14px;
+  padding: 40px 20px;
+  font-style: italic;
 }
 
 /* 批注创建弹窗样式 */
