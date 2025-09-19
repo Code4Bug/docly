@@ -57,7 +57,10 @@ export const useEditorStore = defineStore('editor', () => {
    * 更新编辑器数据
    */
   const updateEditorData = (data: EditorData) => {
+    console.log('updateEditorData 被调用，传入数据:', data);
+    console.log('更新前 editorData.value:', editorData.value);
     editorData.value = data;
+    console.log('更新后 editorData.value:', editorData.value);
     hasUnsavedChanges.value = false;
   };
 
@@ -86,17 +89,31 @@ export const useEditorStore = defineStore('editor', () => {
    * 加载文档
    */
   const loadDocument = async (data: EditorData): Promise<void> => {
+    console.log('editorStore.loadDocument 开始加载文档，数据:', data);
+    console.log('检查编辑器实例状态:', {
+      hasInstance: !!editorInstance.value,
+      instanceType: typeof editorInstance.value,
+      instanceValue: editorInstance.value
+    });
+    
     if (!editorInstance.value) {
       console.warn('编辑器实例不存在，无法加载');
+      console.warn('editorInstance.value 为:', editorInstance.value);
       return;
     }
 
     try {
       isLoading.value = true;
+      console.log('调用编辑器实例的render方法...');
       await editorInstance.value.render(data);
+      console.log('编辑器render完成，更新编辑器数据...');
       updateEditorData(data);
+      console.log('文档加载完成，当前编辑器数据:', editorData.value);
+      console.log('editorData.value是否为null:', editorData.value === null);
+      console.log('editorData.value内容:', JSON.stringify(editorData.value, null, 2));
     } catch (error) {
-      console.error('加载文档失败:', error);
+      console.error('加载文档失败，详细错误信息:', error);
+      console.error('错误堆栈:', error.stack);
       throw error;
     } finally {
       isLoading.value = false;

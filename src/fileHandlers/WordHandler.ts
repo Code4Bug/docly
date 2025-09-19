@@ -14,13 +14,16 @@ export class WordHandler implements FileHandler {
    * 将.docx文件转换为编辑器数据格式
    */
   async import(file: File): Promise<EditorData> {
-    if (!file.name.endsWith('.docx')) {
+    console.log('WordHandler.import 开始处理文件:', file.name, '大小:', file.size);
+    
+    if (!file.name.toLowerCase().endsWith('.docx')) {
       throw new Error('仅支持.docx格式的Word文件');
     }
 
     try {
       // 使用docx-preview将docx转换为HTML
       const arrayBuffer = await file.arrayBuffer();
+      console.log('文件读取完成，ArrayBuffer大小:', arrayBuffer.byteLength);
       
       // 创建一个临时容器来渲染文档
       const container = document.createElement('div');
@@ -48,15 +51,17 @@ export class WordHandler implements FileHandler {
            renderFooters: false
          });
         
+        console.log('docx-preview渲染完成');
+        
         // 获取渲染后的HTML内容
         const htmlContent = container.innerHTML;
-        
-        // 调试：输出转换后的HTML内容
-        console.log('docx-preview转换完成');
+        console.log('HTML内容长度:', htmlContent.length);
+        console.log('HTML内容预览:', htmlContent.substring(0, 500) + '...');
         
         // 检查是否有空的HTML内容
         if (htmlContent.length === 0) {
-          console.warn('警告：转换后的HTML内容为空');
+          console.warn('警告：转换后的HTML内容为空，可能是不支持的文档格式');
+          throw new Error('文档内容为空或格式不支持');
         }
         
         // 检查是否包含font-family
@@ -115,9 +120,12 @@ export class WordHandler implements FileHandler {
         // 将HTML转换为编辑器数据格式
         const editorData = this.htmlToEditorData(processedHtml);
         
+        console.log('转换完成，编辑器数据:', JSON.stringify(editorData, null, 2));
+        
         // 检查是否有空的编辑器数据
         if (editorData.blocks.length === 0) {
           console.warn('警告：转换后的编辑器数据为空');
+          console.log('原始HTML内容:', processedHtml);
         }
         
         return editorData;
@@ -139,26 +147,32 @@ export class WordHandler implements FileHandler {
    */
   async export(data: EditorData): Promise<File> {
     try {
+      // 检查数据有效性
+      if (!data || !data.blocks || data.blocks.length === 0) {
+        throw new Error('没有可导出的内容');
+      }
+
+      console.log('开始导出Word文档，数据块数量:', data.blocks.length);
+
       // 将编辑器数据转换为HTML
       const html = this.editorDataToHtml(data);
+      console.log('转换后的HTML:', html);
       
-      // 创建Word文档模板
-      const docxTemplate = this.createDocxTemplate(html);
-      
-      // 生成Word文件
-      const buffer = docxTemplate.getZip().generate({ type: 'arraybuffer' });
+      // 创建简化的Word文档内容
+      const wordContent = this.createSimpleWordDocument(html);
       
       // 创建File对象
-      const blob = new Blob([buffer], { 
+      const blob = new Blob([wordContent], { 
         type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
       });
       
       const fileName = `document_${Date.now()}.docx`;
+      console.log('Word文档创建成功:', fileName);
       return new File([blob], fileName, { type: blob.type });
       
     } catch (error) {
       console.error('Word文件导出失败:', error);
-      throw new Error('Word文件导出失败');
+      throw new Error(`Word文件导出失败: ${error.message}`);
     }
   }
 
@@ -178,18 +192,7 @@ export class WordHandler implements FileHandler {
    * 保留Word文档中的样式信息
    */
   private htmlToEditorData(html: string): EditorData {
-    console.log('开始HTML到编辑器数据转换');
-    // 移除通用HTML长度日志
-    
-    // 仿宋字体调试 - 检查输入HTML中是否包含仿宋字体
-    const fangsongCheck = /(?:仿宋|FangSong|fangsong)/gi;
-    if (fangsongCheck.test(html)) {
-      console.log('仿宋字体调试 - 输入HTML包含仿宋字体相关内容');
-      const fangsongMatches = html.match(/[^<>]*(?:仿宋|FangSong|fangsong)[^<>]*/gi);
-      if (fangsongMatches) {
-        console.log('仿宋字体调试 - 发现的仿宋字体片段:', fangsongMatches.slice(0, 5));
-      }
-    }
+    console.log('开始HTML到编辑器数据转换，HTML长度:', html.length);
     
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
@@ -197,9 +200,13 @@ export class WordHandler implements FileHandler {
 
     // 遍历所有子节点，保持原有顺序
     const bodyChildren = Array.from(doc.body.children);
+    console.log('找到的HTML元素数量:', bodyChildren.length);
     
     bodyChildren.forEach((element, index) => {
       const tagName = element.tagName.toLowerCase();
+      const textContent = element.textContent?.trim() || '';
+      
+      console.log(`处理元素 ${index}: ${tagName}, 文本内容: "${textContent.substring(0, 100)}..."`);
       
       // 处理标题
       if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tagName)) {
@@ -213,11 +220,12 @@ export class WordHandler implements FileHandler {
             styles: this.extractElementStyles(element)
           }
         };
+        console.log('创建标题块:', block);
         blocks.push(block);
       }
       // 处理段落
       else if (tagName === 'p') {
-        if (element.textContent?.trim()) {
+        if (textContent) {
           const block = {
             id: `paragraph_${index}`,
             type: 'paragraph',
@@ -226,6 +234,22 @@ export class WordHandler implements FileHandler {
               styles: this.extractElementStyles(element)
             }
           };
+          console.log('创建段落块:', block);
+          blocks.push(block);
+        }
+      }
+      // 处理div元素（docx-preview可能生成div）
+      else if (tagName === 'div') {
+        if (textContent) {
+          const block = {
+            id: `paragraph_${index}`,
+            type: 'paragraph',
+            data: {
+              text: this.extractStyledText(element),
+              styles: this.extractElementStyles(element)
+            }
+          };
+          console.log('创建div段落块:', block);
           blocks.push(block);
         }
       }
@@ -235,7 +259,7 @@ export class WordHandler implements FileHandler {
           text: this.extractStyledText(li),
           styles: this.extractElementStyles(li)
         }));
-        blocks.push({
+        const block = {
           id: `list_${index}`,
           type: 'list',
           data: {
@@ -243,38 +267,44 @@ export class WordHandler implements FileHandler {
             items: items,
             styles: this.extractElementStyles(element)
           }
-        });
+        };
+        console.log('创建列表块:', block);
+        blocks.push(block);
       }
-      // 处理表格
-      else if (tagName === 'table') {
-        const rows = Array.from(element.querySelectorAll('tr')).map(tr => {
-          return Array.from(tr.querySelectorAll('td, th')).map(cell => ({
-            text: this.extractStyledText(cell),
-            styles: this.extractElementStyles(cell)
-          }));
-        });
-        blocks.push({
-          id: `table_${index}`,
-          type: 'table',
-          data: {
-            rows: rows,
-            styles: this.extractElementStyles(element)
-          }
-        });
-      }
-      // 处理其他块级元素
-      else if (element.textContent?.trim()) {
-        blocks.push({
-          id: `block_${index}`,
+      // 处理其他包含文本的元素
+      else if (textContent) {
+        const block = {
+          id: `paragraph_${index}`,
           type: 'paragraph',
           data: {
             text: this.extractStyledText(element),
             styles: this.extractElementStyles(element)
           }
-        });
+        };
+        console.log('创建通用段落块:', block);
+        blocks.push(block);
       }
     });
 
+    console.log('转换完成，生成的块数量:', blocks.length);
+    
+    // 如果没有生成任何块，尝试从整个body提取文本
+    if (blocks.length === 0 && doc.body.textContent?.trim()) {
+      console.log('没有找到结构化内容，从body提取纯文本');
+      const bodyText = doc.body.textContent.trim();
+      const block = {
+        id: 'fallback_paragraph',
+        type: 'paragraph',
+        data: {
+          text: bodyText,
+          styles: {}
+        }
+      };
+      console.log('创建回退段落块:', block);
+      blocks.push(block);
+    }
+
+    console.log('HTML转换完成，生成数据块数量:', blocks.length);
     return {
       time: Date.now(),
       blocks: blocks,
@@ -438,7 +468,8 @@ export class WordHandler implements FileHandler {
           if (property === 'font-family') {
             // 对字体族进行中文字体映射处理
             const originalFont = value;
-            styles[camelCaseProperty] = this.mapChineseFontName(value);
+            const mappedFont = this.mapChineseFontName(value);
+            styles[camelCaseProperty] = mappedFont;
             
             // 特别处理楷体字体
             if (this.isKaiTiFont(originalFont)) {
@@ -450,9 +481,9 @@ export class WordHandler implements FileHandler {
               styles[camelCaseProperty] = '"KaiTi_GB2312", "KaiTi", "楷体", "STKaiti", "DFKai-SB", serif';
             }
             
-            // 特别处理仿宋字体
-            if (this.isFangSongFont(originalFont)) {
-              console.log(`仿宋字体调试 - 内联样式检测到仿宋字体: ${originalFont}`);
+            // 特别处理仿宋字体或映射为仿宋的字体
+            if (this.isFangSongFont(originalFont) || mappedFont.includes('仿宋')) {
+              console.log(`仿宋字体调试 - 检测到仿宋字体: 原始=${originalFont}, 映射=${mappedFont}`);
               console.log(`仿宋字体调试 - 元素标签: ${element.tagName}, 文本内容: ${element.textContent?.substring(0, 50)}`);
               // 添加仿宋字体标记类
               if (element.classList) {
@@ -461,6 +492,26 @@ export class WordHandler implements FileHandler {
               // 强制设置仿宋字体 - 使用统一的字体族定义
               styles[camelCaseProperty] = '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif';
               console.log(`仿宋字体调试 - 应用字体族: ${styles[camelCaseProperty]}`);
+              
+              // 传播仿宋字体到子元素
+              this.propagateFangSongToChildren(element);
+            }
+            
+            // 对于段落元素，只有当段落本身没有明确的中文字体设置时，才传播仿宋字体
+            if (element.tagName.toLowerCase() === 'p' && mappedFont.includes('仿宋')) {
+              // 检查段落是否有明确的中文字体设置（排除英文字体组合）
+              const hasExplicitChineseFont = /[\u4e00-\u9fff]/.test(originalFont) && 
+                                           !this.isFangSongFont(originalFont) &&
+                                           !originalFont.includes('Times New Roman') &&
+                                           !originalFont.includes('Arial') &&
+                                           !originalFont.includes('Calibri');
+              
+              if (!hasExplicitChineseFont) {
+                console.log(`段落级别仿宋字体传播: ${element.tagName}, 映射字体: ${mappedFont}`);
+                this.propagateFangSongToChildren(element);
+              } else {
+                console.log(`段落有明确中文字体设置，跳过传播: ${originalFont}`);
+              }
             }
           } else {
             styles[camelCaseProperty] = value;
@@ -905,8 +956,43 @@ export class WordHandler implements FileHandler {
     
     console.log('开始字体映射处理:', cleanFontName);
     
+    // 处理复合字体（如 "Times New Roman", 黑体）
+    if (cleanFontName.includes(',')) {
+      const fontParts = cleanFontName.split(',').map(part => part.trim().replace(/['"]/g, ''));
+      console.log('检测到复合字体:', fontParts);
+      
+      // 优先处理中文字体
+      const chineseFontPart = fontParts.find(part => 
+        this.isFangSongFont(part) || 
+        this.isKaiTiFont(part) || 
+        /[\u4e00-\u9fff]/.test(part)
+      );
+      
+      if (chineseFontPart) {
+        console.log(`复合字体中发现中文字体: ${chineseFontPart}`);
+        // 递归处理中文字体部分
+        const mappedChineseFont = this.mapChineseFontName(chineseFontPart);
+        console.log(`复合字体映射结果: ${mappedChineseFont}`);
+        return mappedChineseFont;
+      }
+      
+      // 如果没有中文字体，检查是否应该应用默认中文字体
+      // 对于纯英文字体的复合字体，返回仿宋作为默认中文字体
+      console.log('复合字体中未发现中文字体，应用默认仿宋字体');
+      return '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif';
+    }
+    
     // 中文字体映射表
-    const chineseFontMap: { [key: string]: string } = {
+    const result = this.processSingleFont(cleanFontName);
+    console.log(`单一字体映射结果: ${cleanFontName} -> ${result}`);
+    return result;
+  }
+
+  /**
+   * 中文字体映射表
+   */
+  private get chineseFontMap(): { [key: string]: string } {
+    return {
       // 方正字体系列
       '方正小标宋简体': '"FZXiaoBiaoSong-B05S", "SimSun", "宋体", serif',
       '方正小标宋_GBK': '"FZXiaoBiaoSong-B05S", "SimSun", "宋体", serif',
@@ -933,11 +1019,12 @@ export class WordHandler implements FileHandler {
       '微软雅黑': '"Microsoft YaHei", "微软雅黑", "SimHei", "黑体", sans-serif',
       'Microsoft YaHei': '"Microsoft YaHei", "微软雅黑", "SimHei", "黑体", sans-serif',
       
-      // 仿宋系列 - 修正映射顺序，优先使用本地字体文件
-      '仿宋': '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif',
-      'FangSong': '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif',
+      // 仿宋系列 - 优化映射顺序，确保仿宋_GB2312优先
       '仿宋_GB2312': '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif',
       'FangSong_GB2312': '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif',
+      '仿宋': '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif',
+      'FangSong': '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif',
+      'STFangsong': '"仿宋_GB2312", "FangSong_GB2312", "STFangsong", "FangSong", "仿宋", serif',
       
       // 隶书系列
       '隶书': '"LiSu", "隶书", serif',
@@ -947,11 +1034,23 @@ export class WordHandler implements FileHandler {
       '幼圆': '"YouYuan", "幼圆", sans-serif',
       'YouYuan': '"YouYuan", "幼圆", sans-serif'
     };
-    
+  }
+
+  /**
+   * 处理单一字体映射
+   */
+  private processSingleFont(cleanFontName: string): string {
     // 检查是否有直接映射
-    if (chineseFontMap[cleanFontName]) {
-      console.log(`中文字体直接映射: ${cleanFontName} -> ${chineseFontMap[cleanFontName]}`);
-      return chineseFontMap[cleanFontName];
+    if (this.chineseFontMap[cleanFontName]) {
+      console.log(`中文字体直接映射: ${cleanFontName} -> ${this.chineseFontMap[cleanFontName]}`);
+      return this.chineseFontMap[cleanFontName];
+    }
+    
+    // 特殊处理仿宋相关字体的模糊匹配
+    if (this.isFangSongFont(cleanFontName)) {
+      const fangsongFont = '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif';
+      console.log(`仿宋字体特殊处理: ${cleanFontName} -> ${fangsongFont}`);
+      return fangsongFont;
     }
     
     // 特殊处理楷体相关字体的模糊匹配
@@ -960,16 +1059,9 @@ export class WordHandler implements FileHandler {
       console.log(`楷体字体特殊处理: ${cleanFontName} -> ${kaitiFont}`);
       return kaitiFont;
     }
-
-    // 特殊处理仿宋相关字体的模糊匹配
-    if (this.isFangSongFont(cleanFontName)) {
-      const fangsongFont = '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif';
-      console.log(`仿宋字体特殊处理: ${cleanFontName} -> ${fangsongFont}`);
-      return fangsongFont;
-    }
     
     // 模糊匹配
-    for (const [key, value] of Object.entries(chineseFontMap)) {
+    for (const [key, value] of Object.entries(this.chineseFontMap)) {
       if (cleanFontName.includes(key) || key.includes(cleanFontName)) {
         return value;
       }
@@ -1001,11 +1093,124 @@ export class WordHandler implements FileHandler {
    * 检测是否为仿宋相关字体
    */
   private isFangSongFont(fontName: string): boolean {
-    const fangsongKeywords = ['仿宋', 'FangSong', 'fangsong', 'FANGSONG', '仿宋_GB2312', 'FangSong_GB2312'];
-    return fangsongKeywords.some(keyword => 
-      fontName.toLowerCase().includes(keyword.toLowerCase()) ||
-      fontName.includes(keyword)
-    );
+    // 清理字体名称，移除引号和多余空格
+    const cleanFontName = fontName.replace(/['"]/g, '').trim();
+    
+    // 仿宋字体关键词，按优先级排序
+    const fangsongKeywords = [
+      '仿宋_GB2312',     // 最高优先级
+      'FangSong_GB2312', 
+      '仿宋',
+      'FangSong',
+      'fangsong',
+      'FANGSONG',
+      'STFangsong'
+    ];
+    
+    // 精确匹配优先
+    if (fangsongKeywords.includes(cleanFontName)) {
+      console.log(`仿宋字体精确匹配: ${cleanFontName}`);
+      return true;
+    }
+    
+    // 模糊匹配
+    const isMatch = fangsongKeywords.some(keyword => {
+      const lowerKeyword = keyword.toLowerCase();
+      const lowerFontName = cleanFontName.toLowerCase();
+      return lowerFontName.includes(lowerKeyword) || 
+             lowerKeyword.includes(lowerFontName) ||
+             cleanFontName.includes(keyword);
+    });
+    
+    if (isMatch) {
+      console.log(`仿宋字体模糊匹配: ${cleanFontName}`);
+    }
+    
+    return isMatch;
+  }
+
+  /**
+   * 将仿宋字体传播到子元素，处理复合字体和字体继承
+   */
+  /**
+   * 将仿宋字体传播到子元素
+   * 处理复合字体和英文字体的映射
+   */
+  private propagateFangSongToChildren(element: Element): void {
+    const children = element.querySelectorAll('*');
+    console.log(`开始传播仿宋字体到 ${children.length} 个子元素`);
+    
+    children.forEach((child, index) => {
+      // 检查子元素是否已有字体设置
+      const childStyle = child.getAttribute('style') || '';
+      const hasOwnFont = childStyle.includes('font-family');
+      
+      console.log(`处理子元素 ${index + 1}: ${child.tagName}, 有字体设置: ${hasOwnFont}`);
+      
+      if (hasOwnFont) {
+        // 如果子元素有字体设置，检查是否需要映射为仿宋
+        const fontFamilyMatch = childStyle.match(/font-family:\s*([^;]+)/);
+        if (fontFamilyMatch) {
+          const currentFont = fontFamilyMatch[1].trim();
+          console.log(`子元素当前字体: ${currentFont}`);
+          
+          // 检查是否为明确的中文字体（黑体、宋体等），如果是则保留
+          const isExplicitChineseFont = /[\u4e00-\u9fff]/.test(currentFont) && 
+                                       !this.isFangSongFont(currentFont) &&
+                                       !currentFont.includes('Times New Roman') &&
+                                       !currentFont.includes('Arial') &&
+                                       !currentFont.includes('Calibri');
+          
+          if (isExplicitChineseFont) {
+            console.log(`保留明确的中文字体设置: ${currentFont}`);
+            return; // 跳过这个子元素，保留其原有字体
+          }
+          
+          // 处理复合字体，如 "Times New Roman", 黑体
+          if (currentFont.includes(',')) {
+            const mappedFont = this.mapChineseFontName(currentFont);
+            if (mappedFont !== currentFont && mappedFont.includes('仿宋')) {
+              // 替换字体
+              const newStyle = childStyle.replace(/font-family:\s*[^;]+/, `font-family: ${mappedFont}`);
+              child.setAttribute('style', newStyle);
+              child.classList.add('fangsong-mapped');
+              console.log(`映射复合字体到仿宋: ${currentFont} -> ${mappedFont}`);
+            }
+          }
+          // 处理单一的英文字体，如 "Times New Roman"
+          else if (currentFont.includes('Times New Roman') || 
+                   currentFont.includes('Arial') || 
+                   currentFont.includes('Calibri') ||
+                   currentFont.includes('sans-serif') ||
+                   currentFont.includes('serif')) {
+            const fangsongFont = '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif';
+            const newStyle = childStyle.replace(/font-family:\s*[^;]+/, `font-family: ${fangsongFont}`);
+            child.setAttribute('style', newStyle);
+            child.classList.add('fangsong-mapped');
+            console.log(`映射英文字体到仿宋: ${currentFont} -> ${fangsongFont}`);
+          }
+          // 处理已经是中文字体但不是仿宋的情况 - 只处理非明确中文字体
+          else if (/[\u4e00-\u9fff]/.test(currentFont) && 
+                   !this.isFangSongFont(currentFont) &&
+                   (currentFont.includes('Times New Roman') || 
+                    currentFont.includes('Arial') || 
+                    currentFont.includes('Calibri'))) {
+            const fangsongFont = '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif';
+            const newStyle = childStyle.replace(/font-family:\s*[^;]+/, `font-family: ${fangsongFont}`);
+            child.setAttribute('style', newStyle);
+            child.classList.add('fangsong-mapped');
+            console.log(`映射中文字体到仿宋: ${currentFont} -> ${fangsongFont}`);
+          }
+        }
+      } else {
+        // 如果子元素没有自己的字体设置，继承仿宋字体
+        const currentStyle = childStyle ? childStyle + '; ' : '';
+        const fangsongFont = '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif';
+        child.setAttribute('style', `${currentStyle}font-family: ${fangsongFont}`);
+        child.classList.add('fangsong-inherited');
+        console.log(`传播仿宋字体到子元素: ${child.tagName}`);
+      }
+    });
   }
 
   /**
@@ -1321,29 +1526,23 @@ export class WordHandler implements FileHandler {
   /**
    * 提取带样式的文本内容
    */
+  /**
+   * 提取带样式的文本内容，用于EditorJS
+   * 返回HTML内容以保持样式信息
+   */
   private extractStyledText(element: Element): string {
-    // 保留HTML标签以维持样式
-    let html = element.innerHTML;
+    // 获取HTML内容而不是纯文本，以保持样式
+    const htmlContent = element.innerHTML || '';
+    console.log('提取HTML内容:', htmlContent.substring(0, 200) + '...');
     
-    // 清理不必要的属性，但保留样式相关的
-    html = html.replace(/<(\w+)([^>]*?)>/g, (match, tag, attrs) => {
-      // 保留重要的样式标签和属性
-      const importantTags = ['strong', 'b', 'em', 'i', 'u', 's', 'span', 'a'];
-      if (importantTags.includes(tag.toLowerCase())) {
-        // 保留style属性
-        const styleMatch = attrs.match(/style="([^"]*?)"/);
-        const hrefMatch = attrs.match(/href="([^"]*?)"/);
-        
-        let newAttrs = '';
-        if (styleMatch) newAttrs += ` style="${styleMatch[1]}"`;
-        if (hrefMatch) newAttrs += ` href="${hrefMatch[1]}"`;
-        
-        return `<${tag}${newAttrs}>`;
-      }
-      return match;
-    });
+    // 如果没有HTML内容，回退到纯文本
+    if (!htmlContent.trim()) {
+      const textContent = element.textContent || '';
+      console.log('回退到纯文本内容:', textContent.substring(0, 200) + '...');
+      return textContent.trim();
+    }
     
-    return html;
+    return htmlContent.trim();
   }
 
   /**
@@ -1356,29 +1555,35 @@ export class WordHandler implements FileHandler {
       switch (block.type) {
         case 'header':
           const level = block.data.level || 2;
-          html += `<h${level}>${block.data.text}</h${level}>`;
+          html += `<h${level}>${this.escapeHtml(block.data.text || '')}</h${level}>`;
           break;
         case 'paragraph':
-          html += `<p>${block.data.text}</p>`;
+          html += `<p>${this.escapeHtml(block.data.text || '')}</p>`;
           break;
         case 'list':
           const tag = block.data.style === 'ordered' ? 'ol' : 'ul';
-          const items = block.data.items.map((item: string) => `<li>${item}</li>`).join('');
+          const items = (block.data.items || []).map((item: string) => 
+            `<li>${this.escapeHtml(item)}</li>`
+          ).join('');
           html += `<${tag}>${items}</${tag}>`;
           break;
         case 'quote':
-          html += `<blockquote><p>${block.data.text}</p><cite>${block.data.caption || ''}</cite></blockquote>`;
+          html += `<blockquote><p>${this.escapeHtml(block.data.text || '')}</p>`;
+          if (block.data.caption) {
+            html += `<cite>${this.escapeHtml(block.data.caption)}</cite>`;
+          }
+          html += `</blockquote>`;
           break;
         case 'code':
-          html += `<pre><code>${block.data.code}</code></pre>`;
+          html += `<pre><code>${this.escapeHtml(block.data.code || '')}</code></pre>`;
           break;
         case 'table':
           if (block.data.content && Array.isArray(block.data.content)) {
-            html += '<table border="1">';
+            html += '<table border="1" style="border-collapse: collapse; width: 100%;">';
             block.data.content.forEach((row: string[]) => {
               html += '<tr>';
               row.forEach(cell => {
-                html += `<td>${cell}</td>`;
+                html += `<td style="padding: 8px; border: 1px solid #ccc;">${this.escapeHtml(cell || '')}</td>`;
               });
               html += '</tr>';
             });
@@ -1387,13 +1592,60 @@ export class WordHandler implements FileHandler {
           break;
         default:
           // 处理未知类型的块
-          if (block.data.text) {
-            html += `<p>${block.data.text}</p>`;
+          if (block.data && block.data.text) {
+            html += `<p>${this.escapeHtml(block.data.text)}</p>`;
           }
       }
     });
 
-    return html;
+    return html || '<p>空文档</p>';
+  }
+
+  /**
+   * HTML转义函数
+   */
+  private escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  /**
+   * 创建简化的Word文档内容
+   */
+  private createSimpleWordDocument(html: string): string {
+    // 移除HTML标签，保留文本内容
+    const textContent = html.replace(/<[^>]*>/g, '\n').replace(/\n+/g, '\n').trim();
+    
+    // 创建基础的Word文档XML结构
+    const wordXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r>
+        <w:t>${this.escapeXml(textContent || '这是一个新文档')}</w:t>
+      </w:r>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="11906" w:h="16838"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>
+    </w:sectPr>
+  </w:body>
+</w:document>`;
+
+    return wordXml;
+  }
+
+  /**
+   * XML转义函数
+   */
+  private escapeXml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
   }
 
   /**

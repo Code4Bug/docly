@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>仿宋字体复合字体处理测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .original-problem {
+            background-color: #fff3cd;
+        }
+        .fixed-result {
+            background-color: #d4edda;
+        }
+        .font-mapping-test {
+            background-color: #e2e3e5;
+        }
+        .font-propagation-test {
+            background-color: #f8d7da;
+        }
+        .debug-info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+            padding: 5px;
+            background-color: #f8f9fa;
+            border-left: 3px solid #007bff;
+        }
+        .fangsong-font {
+            border: 2px solid green !important;
+        }
+        .fangsong-inherited {
+            border: 1px dashed blue !important;
+        }
+        .fangsong-mapped {
+            border: 1px dotted red !important;
+        }
+    </style>
+</head>
+<body>
+    <h1>仿宋字体复合字体处理测试</h1>
+    
+    <div class="test-section original-problem">
+        <div class="test-title">原始问题示例</div>
+        <p style="text-indent: 31.6pt;" data-empty="false">
+            <span style="font-family: 黑体; font-weight: normal; min-height: 16pt; font-size: 16pt;">第一条</span>
+            <span style="font-family: 仿宋_GB2312; min-height: 16pt; font-size: 16pt;">　为了惩罚</span>
+            <span style="font-family: 汉仪程行简; min-height: 16pt; font-size: 16pt;">犯罪，</span>
+            <span style="font-family: 汉仪程行简; color: rgb(0, 176, 80); min-height: 16pt; font-size: 16pt;">保护人</span>
+            <span style="font-family: 仿宋_GB2312; color: rgb(0, 176, 80); min-height: 16pt; font-size: 16pt;">民</span>
+            <span style="font-family: 仿宋_GB2312; min-height: 16pt; font-size: 16pt;">，根据宪法，结合我国同犯罪作斗争的具体经验及实际情况，制定本法。</span>
+        </p>
+        
+        <p style="text-indent: 31.6pt;" data-empty="false">
+            <span style="font-family: &quot;Times New Roman&quot;, 黑体; min-height: 16pt; font-size: 16pt;">第二条</span>
+            <span style="font-family: &quot;Times New Roman&quot;; min-height: 16pt; font-size: 16pt;">　中华人民共和国刑法的任务，是用刑罚同一切犯罪行为作斗争，以保卫国家安全，保卫人民民主专政的政权和社会主义制度，保护国有财产和劳动群众集体所有的财产，保护公民私人所有的财产，保护公民的人身权利、民主权利和其他权利，维护社会秩序、经济秩序，保障社会主义建设事业的顺利进行。</span>
+        </p>
+        <div class="debug-info">
+            问题：第二段的复合字体 "Times New Roman", 黑体 和单独的 "Times New Roman" 导致仿宋字体丢失
+        </div>
+    </div>
+
+    <div class="test-section fixed-result">
+        <div class="test-title">修复后效果</div>
+        <div id="fixed-content"></div>
+        <div class="debug-info">
+            修复：通过增强的字体映射和传播机制，复合字体应该被正确映射为仿宋字体
+        </div>
+    </div>
+
+    <div class="test-section font-mapping-test">
+        <div class="test-title">字体映射测试</div>
+        <div id="mapping-test-content"></div>
+        <div class="debug-info">
+            测试各种复合字体的映射效果
+        </div>
+    </div>
+
+    <div class="test-section font-propagation-test">
+        <div class="test-title">字体传播测试</div>
+        <div id="propagation-test-content"></div>
+        <div class="debug-info">
+            测试字体传播到子元素的效果
+        </div>
+    </div>
+
+    <script>
+        // 模拟 FontTestHandler 类
+        class FontTestHandler {
+            constructor() {
+                this.chineseFontMap = {
+                    '黑体': '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif',
+                    'SimHei': '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif',
+                    '微软雅黑': '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif',
+                    'Microsoft YaHei': '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif',
+                    '宋体': '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif',
+                    'SimSun': '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif'
+                };
+            }
+
+            mapChineseFontName(fontName) {
+                if (!fontName) return fontName;
+                
+                const cleanFontName = fontName.replace(/['"]/g, '').trim();
+                console.log('映射字体:', cleanFontName);
+                
+                // 处理复合字体（包含逗号的字体名称）
+                if (cleanFontName.includes(',')) {
+                    const fontParts = cleanFontName.split(',').map(part => part.trim());
+                    console.log('复合字体部分:', fontParts);
+                    
+                    // 检查是否有中文字体部分
+                    const chineseFontPart = fontParts.find(part => 
+                        /[\u4e00-\u9fff]/.test(part) || this.chineseFontMap[part]
+                    );
+                    
+                    if (chineseFontPart) {
+                        // 如果有中文字体，优先处理中文字体部分
+                        const mappedFont = this.processSingleFont(chineseFontPart);
+                        console.log('映射中文字体部分:', chineseFontPart, '->', mappedFont);
+                        return mappedFont;
+                    } else {
+                        // 如果没有中文字体，应用默认仿宋字体
+                        console.log('复合字体无中文部分，应用默认仿宋字体');
+                        return '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif';
+                    }
+                }
+                
+                // 处理单一字体
+                return this.processSingleFont(cleanFontName);
+            }
+
+            processSingleFont(cleanFontName) {
+                // 检查是否为中文字体或需要映射的字体
+                if (this.chineseFontMap[cleanFontName]) {
+                    return this.chineseFontMap[cleanFontName];
+                }
+                
+                // 检查是否包含中文字符
+                if (/[\u4e00-\u9fff]/.test(cleanFontName)) {
+                    // 如果是中文字体但不在映射表中，映射为仿宋
+                    return '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif';
+                }
+                
+                // 对于英文字体，也映射为仿宋（根据需求）
+                if (cleanFontName.includes('Times New Roman') || 
+                    cleanFontName.includes('Arial') || 
+                    cleanFontName.includes('Calibri')) {
+                    return '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif';
+                }
+                
+                return cleanFontName;
+            }
+
+            isFangSongFont(fontName) {
+                if (!fontName) return false;
+                const cleanFontName = fontName.toLowerCase().replace(/['"]/g, '').trim();
+                const fangSongKeywords = ['fangsong', '仿宋', 'fangsung', 'stfangsong'];
+                return fangSongKeywords.some(keyword => cleanFontName.includes(keyword));
+            }
+
+            propagateFangSongToChildren(element) {
+                const children = element.querySelectorAll('*');
+                children.forEach(child => {
+                    const childStyle = child.getAttribute('style') || '';
+                    const hasOwnFont = childStyle.includes('font-family');
+                    
+                    if (hasOwnFont) {
+                        const fontFamilyMatch = childStyle.match(/font-family:\s*([^;]+)/);
+                        if (fontFamilyMatch) {
+                            const currentFont = fontFamilyMatch[1].trim();
+                            console.log('检查子元素字体:', currentFont);
+                            
+                            if (currentFont.includes(',')) {
+                                const mappedFont = this.mapChineseFontName(currentFont);
+                                if (mappedFont !== currentFont) {
+                                    const newStyle = childStyle.replace(/font-family:\s*[^;]+/, `font-family: ${mappedFont}`);
+                                    child.setAttribute('style', newStyle);
+                                    child.classList.add('fangsong-mapped');
+                                    console.log('映射复合字体到仿宋:', currentFont, '->', mappedFont);
+                                }
+                            } else if (currentFont.includes('Times New Roman') || 
+                                      currentFont.includes('Arial') || 
+                                      currentFont.includes('Calibri')) {
+                                const fangsongFont = '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif';
+                                const newStyle = childStyle.replace(/font-family:\s*[^;]+/, `font-family: ${fangsongFont}`);
+                                child.setAttribute('style', newStyle);
+                                child.classList.add('fangsong-mapped');
+                                console.log('映射英文字体到仿宋:', currentFont, '->', fangsongFont);
+                            }
+                        }
+                    } else {
+                        const currentStyle = childStyle ? childStyle + '; ' : '';
+                        const fangsongFont = '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif';
+                        child.setAttribute('style', `${currentStyle}font-family: ${fangsongFont}`);
+                        child.classList.add('fangsong-inherited');
+                        console.log('传播仿宋字体到子元素:', child.tagName);
+                    }
+                });
+            }
+
+            processElement(element) {
+                const style = element.getAttribute('style');
+                if (style && style.includes('font-family')) {
+                    const fontFamilyMatch = style.match(/font-family:\s*([^;]+)/);
+                    if (fontFamilyMatch) {
+                        const originalFont = fontFamilyMatch[1].trim();
+                        const mappedFont = this.mapChineseFontName(originalFont);
+                        
+                        if (this.isFangSongFont(originalFont) || mappedFont.includes('仿宋')) {
+                            console.log(`检测到仿宋字体: 原始=${originalFont}, 映射=${mappedFont}`);
+                            element.classList.add('fangsong-font', 'debug-fangsong');
+                            const newStyle = style.replace(/font-family:\s*[^;]+/, `font-family: ${mappedFont}`);
+                            element.setAttribute('style', newStyle);
+                            this.propagateFangSongToChildren(element);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 测试函数
+        function testFontMapping() {
+            const handler = new FontTestHandler();
+            const testCases = [
+                '"Times New Roman", 黑体',
+                '"Times New Roman"',
+                '黑体',
+                '微软雅黑',
+                '仿宋_GB2312',
+                'Arial, 宋体',
+                'Calibri, SimHei'
+            ];
+
+            let html = '<h4>字体映射测试结果：</h4>';
+            testCases.forEach(font => {
+                const mapped = handler.mapChineseFontName(font);
+                html += `<p><strong>原始:</strong> ${font} <br><strong>映射:</strong> ${mapped}</p>`;
+            });
+
+            document.getElementById('mapping-test-content').innerHTML = html;
+        }
+
+        function testFontPropagation() {
+            const handler = new FontTestHandler();
+            
+            const html = `
+                <h4>字体传播测试：</h4>
+                <div style="font-family: 'Times New Roman', 黑体;">
+                    <span>父元素使用复合字体</span>
+                    <div>
+                        <span>子元素1</span>
+                        <span style="font-family: Arial;">子元素2（有自己的字体）</span>
+                        <span>子元素3</span>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('propagation-test-content').innerHTML = html;
+            
+            // 处理传播测试中的元素
+            const testDiv = document.querySelector('#propagation-test-content div[style]');
+            if (testDiv) {
+                handler.processElement(testDiv);
+            }
+        }
+
+        function processFixedContent() {
+            const handler = new FontTestHandler();
+            
+            // 复制原始内容
+            const originalContent = document.querySelector('.original-problem').innerHTML;
+            document.getElementById('fixed-content').innerHTML = originalContent;
+            
+            // 处理所有带有 font-family 样式的元素
+            const styledElements = document.querySelectorAll('#fixed-content [style*="font-family"]');
+            console.log(`找到 ${styledElements.length} 个带有字体样式的元素`);
+            
+            styledElements.forEach((element, index) => {
+                const style = element.getAttribute('style');
+                const fontMatch = style.match(/font-family:\s*([^;]+)/);
+                if (fontMatch) {
+                    const originalFont = fontMatch[1].trim();
+                    console.log(`处理元素 ${index + 1}: 原始字体 = ${originalFont}`);
+                    
+                    // 映射字体
+                    const mappedFont = handler.mapChineseFontName(originalFont);
+                    console.log(`映射结果: ${originalFont} -> ${mappedFont}`);
+                    
+                    // 应用映射后的字体
+                    const newStyle = style.replace(/font-family:\s*[^;]+/, `font-family: ${mappedFont}`);
+                    element.setAttribute('style', newStyle);
+                    
+                    // 如果映射为仿宋字体，添加标记类并传播
+                    if (mappedFont.includes('仿宋')) {
+                        element.classList.add('fangsong-font');
+                        console.log(`检测到仿宋字体，开始传播到子元素`);
+                        handler.propagateFangSongToChildren(element);
+                    }
+                }
+            });
+            
+            // 特别处理段落元素
+            const paragraphs = document.querySelectorAll('#fixed-content p');
+            paragraphs.forEach((p, index) => {
+                console.log(`检查段落 ${index + 1}`);
+                const style = p.getAttribute('style') || '';
+                if (style.includes('font-family')) {
+                    const fontMatch = style.match(/font-family:\s*([^;]+)/);
+                    if (fontMatch) {
+                        const font = fontMatch[1].trim();
+                        const mappedFont = handler.mapChineseFontName(font);
+                        if (mappedFont.includes('仿宋')) {
+                            console.log(`段落级别仿宋字体传播: 原始=${font}, 映射=${mappedFont}`);
+                            handler.propagateFangSongToChildren(p);
+                        }
+                    }
+                }
+            });
+        }
+
+        // 页面加载完成后执行测试
+        window.addEventListener('DOMContentLoaded', function() {
+            console.log('开始字体处理测试...');
+            processFixedContent();
+            testFontMapping();
+            testFontPropagation();
+            console.log('字体处理测试完成');
+        });
+    </script>
+</body>
+</html>
