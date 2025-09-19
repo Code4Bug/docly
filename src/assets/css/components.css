@@ -309,7 +309,8 @@
 }
 
 .docly-editor-holder {
-  max-width: 800px;
+  max-width: 1920px;
+  width: 100%;
   margin: 0 auto;
   background-color: #ffffff;
   border-radius: 8px;
