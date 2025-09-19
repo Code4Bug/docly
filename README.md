@@ -8,31 +8,33 @@ Docly 是一款基于 Vue 3 + Vite 的现代化在线文档编辑器，专注于
 - 强大的富文本编辑功能（基于 Editor.js）
 - 完整的 Word 文档导入导出支持
 - 高级文本分析与样式保持功能
-- 智能字体处理（支持楷体、仿宋等中文字体）
+- 智能字体处理（支持楷体、仿宋、小标宋等中文字体）
 - 插件化架构，易于扩展
 - 响应式设计，支持多设备
 - 实时保存与状态管理
 - 文档预览功能
 - 批注系统支持
+- 多种编辑器工具（标题、段落、列表、引用、表格、代码块、图片）
+- 自定义字体样式和格式化选项
+- 文档结构化编辑和导航
 
 ## 技术栈
 
-- **前端框架**: Vue 3.5+ + Vite 5.4+
-- **编辑器核心**: Editor.js 2.31+
-- **状态管理**: Pinia 3.0+
-- **UI 组件库**: Naive UI 2.43+
-- **文件处理**: docxtemplater 3.66+ (Word导出) + docx-preview 0.3+ (Word预览)
-- **工具库**: @vueuse/core 13.9+ (Vue组合式工具)
+- **前端框架**: Vue 3.5.18 + Vite 5.4.20
+- **编辑器核心**: Editor.js 2.31.0
+- **状态管理**: Pinia 3.0.3
+- **UI 组件库**: Naive UI 2.43.1
+- **文件处理**: docxtemplater 3.66.3 (Word导出) + docx-preview 0.3.6 (Word预览)
+- **工具库**: @vueuse/core 13.9.0 (Vue组合式工具)
 - **类型支持**: TypeScript
-- **构建工具**: Vite + @vitejs/plugin-vue
+- **构建工具**: Vite + @vitejs/plugin-vue 5.2.4
 
 ## 项目结构
 
 ```
 src/
 ├── components/          # Vue 组件
-│   ├── DoclyEditor.vue  # 主编辑器组件
-│   └── HelloWorld.vue   # 示例组件
+│   └── DoclyEditor.vue  # 主编辑器组件
 ├── core/               # 编辑器核心
 │   └── EditorCore.ts   # 编辑器核心类，提供完整的编辑器功能
 ├── plugins/            # 插件系统
@@ -47,7 +49,15 @@ src/
 │   └── TextAnalyzer.ts # 文本分析工具，支持样式提取和字体处理
 ├── assets/             # 静态资源
 │   ├── css/            # 样式文件
+│   │   ├── components.css  # 组件样式
+│   │   ├── editor.css      # 编辑器样式
+│   │   ├── fonts.css       # 字体样式定义
+│   │   ├── global.css      # 全局样式
+│   │   └── style.css       # 主样式文件
 │   ├── fonts/          # 字体文件
+│   │   ├── 仿宋_GB2312.ttf    # 仿宋字体
+│   │   ├── 方正小标宋简体.ttf   # 小标宋字体
+│   │   └── 楷体_GB2312.ttf    # 楷体字体
 │   ├── favicon.ico     # 网站图标
 │   └── logo.png        # 项目Logo
 ├── App.vue             # 根组件
@@ -60,6 +70,7 @@ src/
 
 - Node.js 16.0+ 
 - npm 7.0+ 或 yarn 1.22+
+- 现代浏览器（Chrome 88+, Firefox 85+, Safari 14+, Edge 88+）
 
 ### 安装依赖
 
@@ -289,15 +300,19 @@ npm run analyze
 
 ### Q: 如何添加自定义字体支持？
 
-A: 在 `src/assets/fonts/` 目录下添加字体文件，然后在 `src/assets/css/fonts.css` 中定义字体样式。
+A: 在 <mcfolder name="fonts" path="src/assets/fonts/"></mcfolder> 目录下添加字体文件，然后在 <mcfile name="fonts.css" path="src/assets/css/fonts.css"></mcfile> 中定义字体样式。
 
 ### Q: 如何扩展 Word 文档的导入支持？
 
-A: 修改 `src/fileHandlers/WordHandler.ts` 中的 `htmlToEditorData` 方法，添加对新元素类型的处理逻辑。
+A: 修改 <mcfile name="WordHandler.ts" path="src/fileHandlers/WordHandler.ts"></mcfile> 中的 `htmlToEditorData` 方法，添加对新元素类型的处理逻辑。
 
 ### Q: 如何自定义编辑器工具栏？
 
-A: 在 `EditorCore` 初始化时配置 `plugins` 参数，启用或禁用特定的编辑器工具。
+A: 在 <mcsymbol name="EditorCore" filename="EditorCore.ts" path="src/core/EditorCore.ts" startline="1" type="class"></mcsymbol> 初始化时配置 `plugins` 参数，启用或禁用特定的编辑器工具。
+
+### Q: 支持哪些中文字体？
+
+A: 项目内置支持楷体、仿宋、方正小标宋简体等中文字体，字体文件位于 <mcfolder name="fonts" path="src/assets/fonts/"></mcfolder> 目录。
 
 ## 许可证
 

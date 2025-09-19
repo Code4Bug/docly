@@ -24,3 +24,5 @@ dist-ssr
 *.sw?
 
 .vscode
+
+docx_proto_files

@@ -1,24 +1,41 @@
-/* 按钮样式 */
+/* 按钮基础样式 */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 8px 16px;
+  margin: 0;
   border: 1px solid #d9d9d9;
   border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  text-decoration: none;
-  background: #ffffff;
+  background-color: #ffffff;
   color: #333333;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
   min-height: 32px;
+  white-space: nowrap;
 }
 
 .btn:hover {
   border-color: #409eff;
   color: #409eff;
+  background-color: #ecf5ff;
+}
+
+.btn:active,
+.btn.active {
+  border-color: #409eff;
+  color: #ffffff;
+  background-color: #409eff;
+}
+
+.btn:focus {
+  outline: none;
+  border-color: #409eff;
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
 }
 
 .btn:disabled {
@@ -26,43 +43,63 @@
   cursor: not-allowed;
   border-color: #d9d9d9;
   color: #999999;
-}
-
-.btn-primary {
-  background-color: #409eff;
-  border-color: #409eff;
-  color: #ffffff;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background-color: #66b1ff;
-  border-color: #66b1ff;
-}
-
-.btn-secondary {
   background-color: #f5f5f5;
-  border-color: #d9d9d9;
-  color: #333333;
 }
 
-.btn-secondary:hover:not(:disabled) {
-  background-color: #e6f7ff;
+/* 主要按钮样式 */
+.btn-primary {
   border-color: #409eff;
-  color: #409eff;
-}
-
-.btn-outline {
-  background-color: transparent;
-  border-color: #409eff;
-  color: #409eff;
-}
-
-.btn-outline:hover:not(:disabled) {
-  background-color: #409eff;
   color: #ffffff;
+  background-color: #409eff;
 }
 
-/* 格式化按钮特殊样式 */
+.btn-primary:hover {
+  border-color: #66b1ff;
+  background-color: #66b1ff;
+}
+
+.btn-primary:active {
+  border-color: #3a8ee6;
+  background-color: #3a8ee6;
+}
+
+/* 成功按钮样式 */
+.btn-success {
+  border-color: #67c23a;
+  color: #ffffff;
+  background-color: #67c23a;
+}
+
+.btn-success:hover {
+  border-color: #85ce61;
+  background-color: #85ce61;
+}
+
+/* 警告按钮样式 */
+.btn-warning {
+  border-color: #e6a23c;
+  color: #ffffff;
+  background-color: #e6a23c;
+}
+
+.btn-warning:hover {
+  border-color: #ebb563;
+  background-color: #ebb563;
+}
+
+/* 危险按钮样式 */
+.btn-danger {
+  border-color: #f56c6c;
+  color: #ffffff;
+  background-color: #f56c6c;
+}
+
+.btn-danger:hover {
+  border-color: #f78989;
+  background-color: #f78989;
+}
+
+/* 格式化按钮样式 */
 .format-btn {
   min-width: 32px;
   padding: 6px 8px;
@@ -70,23 +107,23 @@
   font-weight: bold;
 }
 
-/* 对齐按钮特殊样式 */
+/* 对齐按钮样式 */
 .align-btn {
   min-width: 32px;
   padding: 6px 8px;
   font-size: 16px;
-  font-weight: bold;
-  font-family: monospace;
 }
 
-/* 按钮组 */
+/* 按钮组样式 */
 .button-group {
   display: flex;
-  gap: 0;
+  border-radius: 6px;
+  overflow: hidden;
 }
 
 .button-group .btn {
   border-radius: 0;
+  border-right: none;
 }
 
 .button-group .btn:first-child {
@@ -130,13 +167,18 @@
   box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
 }
 
-/* 工具栏样式 */
+/* 工具栏样式 - WPS风格 */
 .docly-toolbar {
-  padding: 12px 16px;
-  background-color: #ffffff;
-  border-bottom: 1px solid #e0e0e0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 8px 12px;
+  background: linear-gradient(to bottom, #f8f9fa 0%, #f1f3f4 100%);
+  border-bottom: 1px solid #dadce0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   overflow-x: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  min-height: 44px;
 }
 
 .toolbar-group {
@@ -151,6 +193,106 @@
   height: 24px;
   background-color: #e0e0e0;
   flex-shrink: 0;
+}
+
+/* 工具栏区域分组 */
+.toolbar-section {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-right: 1px solid #e8eaed;
+  margin-right: 6px;
+}
+
+.toolbar-section:last-child {
+  border-right: none;
+  margin-right: 0;
+}
+
+/* 工具栏按钮样式 - WPS风格 */
+.toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 8px;
+  margin: 0;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: #3c4043;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-width: 28px;
+  height: 28px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.toolbar-btn:hover {
+  background: rgba(60, 64, 67, 0.08);
+  border-color: rgba(60, 64, 67, 0.12);
+}
+
+.toolbar-btn:active,
+.toolbar-btn.active {
+  background: rgba(26, 115, 232, 0.12);
+  border-color: rgba(26, 115, 232, 0.2);
+  color: #1a73e8;
+}
+
+.toolbar-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+}
+
+.toolbar-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: transparent;
+  border-color: transparent;
+}
+
+/* SVG图标样式 */
+.toolbar-btn svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+/* 选择框样式 - WPS风格 */
+.form-select,
+.compact-select {
+  padding: 4px 20px 4px 8px;
+  border: 1px solid #dadce0;
+  border-radius: 3px;
+  background: white;
+  color: #3c4043;
+  font-size: 12px;
+  height: 28px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  background-size: 12px;
+}
+
+.form-select:hover,
+.compact-select:hover {
+  border-color: #1a73e8;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.form-select:focus,
+.compact-select:focus {
+  outline: none;
+  border-color: #1a73e8;
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
 }
 
 /* 上传包装器 */
@@ -229,6 +371,34 @@
 
 /* 响应式设计 */
 @media (max-width: 768px) {
+  .docly-toolbar {
+    padding: 4px 8px;
+    gap: 4px;
+    flex-wrap: wrap;
+    min-height: 40px;
+  }
+  
+  .toolbar-section {
+    gap: 2px;
+    padding: 0 4px;
+    margin-right: 4px;
+    border-right: none;
+  }
+  
+  .toolbar-btn {
+    padding: 3px 6px;
+    font-size: 11px;
+    min-width: 24px;
+    height: 24px;
+  }
+  
+  .form-select,
+  .compact-select {
+    font-size: 11px;
+    height: 24px;
+    padding: 2px 16px 2px 6px;
+  }
+  
   .toolbar-group {
     gap: 8px;
   }

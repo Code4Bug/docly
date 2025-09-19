@@ -37,7 +37,8 @@ export class EditorCore implements EditorInstance {
         class: Paragraph,
         inlineToolbar: true,
         config: {
-          placeholder: '输入内容...'
+          placeholder: '输入内容...',
+          preserveBlank: true
         }
       },
       list: {
@@ -106,18 +107,26 @@ export class EditorCore implements EditorInstance {
    * 支持样式信息的渲染
    */
   async render(data: EditorData): Promise<void> {
+    console.log('EditorCore.render 开始渲染数据:', data);
+    
     if (!this.editor) {
       throw new Error('编辑器未初始化');
     }
 
     try {
       // 处理带样式的数据
+      console.log('处理带样式的数据...');
       const processedData = this.processStyledData(data);
+      console.log('处理后的数据:', processedData);
       
+      console.log('调用EditorJS的render方法...');
       await this.editor.render(processedData);
+      console.log('EditorJS render完成');
       
       // 渲染完成后应用样式
+      console.log('应用块样式...');
       this.applyBlockStyles(processedData);
+      console.log('EditorCore.render 完成');
     } catch (error) {
       console.error('渲染数据失败:', error);
       throw error;
@@ -217,20 +226,28 @@ export class EditorCore implements EditorInstance {
    * @param data - 编辑器数据
    */
   private applyBlockStyles(data: EditorData): void {
+    console.log('applyBlockStyles 开始应用样式，数据:', data);
     if (!data || !data.blocks) return;
 
     data.blocks.forEach((block: any, index: number) => {
+      console.log(`处理块 ${index}:`, block);
       if (block.data && block.data.styles) {
+        console.log(`块 ${index} 有样式信息:`, block.data.styles);
         // 减少延迟时间，提高响应速度
         setTimeout(() => {
           const element = this.findBlockElement(index);
+          console.log(`块 ${index} 找到的DOM元素:`, element);
           if (element) {
             const contentElement = element.querySelector('.ce-paragraph, .ce-header, .cdx-block') || element;
+            console.log(`块 ${index} 内容元素:`, contentElement);
             this.applyStylesToElement(contentElement as HTMLElement, block.data.styles);
+            console.log(`块 ${index} 样式应用完成`);
           } else {
             console.warn(`未找到块${index + 1}的DOM元素`);
           }
         }, 500);
+      } else {
+        console.log(`块 ${index} 没有样式信息`);
       }
     });
   }
@@ -274,13 +291,16 @@ export class EditorCore implements EditorInstance {
    * @param styles - 样式对象
    */
   private applyStylesToElement(element: HTMLElement, styles: any): void {
+    console.log('applyStylesToElement 开始应用样式到元素:', element, '样式:', styles);
     if (!element || !element.style) {
+      console.warn('元素无效或没有style属性');
       return;
     }
 
     try {
       // 字体相关样式
       if (styles.fontFamily) {
+        console.log('应用字体:', styles.fontFamily);
         element.style.fontFamily = styles.fontFamily;
         
         // 仿宋字体特殊处理
@@ -321,6 +341,7 @@ export class EditorCore implements EditorInstance {
       if (styles.paddingTop && element.classList.contains('ce-paragraph')) {
         const paddingValue = Math.min(parseFloat(styles.paddingTop), 12);
         element.style.paddingTop = `${paddingValue}px`;
+        console.log('应用段落paddingTop:', paddingValue + 'px');
       }
 
       // 应用其他样式
@@ -328,9 +349,11 @@ export class EditorCore implements EditorInstance {
         if (styles[key] && key !== 'paddingTop') {
           try {
             const cssProperty = styleMap[key];
-            (element.style as any)[cssProperty.replace(/-([a-z])/g, (g) => g[1].toUpperCase())] = styles[key];
+            const camelCaseProperty = cssProperty.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+            (element.style as any)[camelCaseProperty] = styles[key];
+            console.log(`应用样式 ${key}:`, styles[key]);
           } catch (e) {
-            // 静默处理样式应用失败
+            console.warn(`应用样式 ${key} 失败:`, e);
           }
         }
       });
@@ -341,12 +364,14 @@ export class EditorCore implements EditorInstance {
           try {
             const cssProperty = key.replace(/([A-Z])/g, '-$1').toLowerCase();
             element.style.setProperty(cssProperty, styles[key]);
+            console.log(`应用自定义样式 ${key}:`, styles[key]);
           } catch (e) {
-            // 静默处理样式应用失败
+            console.warn(`应用自定义样式 ${key} 失败:`, e);
           }
         }
       });
 
+      console.log('样式应用完成，最终元素样式:', element.style.cssText);
     } catch (error) {
       console.warn('应用样式时发生错误:', error);
     }
