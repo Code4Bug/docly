@@ -66,7 +66,7 @@ export class WordHandler implements FileHandler {
         // 获取渲染后的HTML内容
         const htmlContent = container.innerHTML;
         console.log('HTML内容长度:', htmlContent.length);
-        console.log('HTML内容预览:', htmlContent.substring(0, 500) + '...');
+        // console.log('HTML内容预览:', htmlContent.substring(0, 500) + '...');
         
         // 检查是否有空的HTML内容
         if (htmlContent.length === 0) {
@@ -480,6 +480,12 @@ export class WordHandler implements FileHandler {
           if (property === 'text-align') {
             return;
           }
+          // 处理text-align-last属性
+          if (property === 'text-align-last') {
+            styles.textAlignLast = value;
+            console.log('从内联样式提取text-align-last:', value);
+            return;
+          }
           if (property === 'font-family') {
             // 对字体族进行中文字体映射处理
             const originalFont = value;
@@ -539,7 +545,7 @@ export class WordHandler implements FileHandler {
     if (element instanceof HTMLElement && element.style) {
       const allStyles = [
         'fontWeight', 'fontSize', 'fontFamily', 'fontStyle', 
-        'color', 'backgroundColor', 'textDecoration', 'textAlign', 
+        'color', 'backgroundColor', 'textDecoration', 'textAlign', 'textAlignLast',
         'lineHeight', 'textIndent', 'letterSpacing', 'wordSpacing',
         // 添加缩进相关样式
         'paddingLeft', 'paddingRight', 'marginLeft', 'marginRight',
@@ -721,7 +727,8 @@ export class WordHandler implements FileHandler {
     if (tagName === 'p') {
       if (TextAnalyzer.isChineseParagraph(textContent)) {
         styles.textAlign = 'justify';
-        console.log('中文段落默认两端对齐');
+        styles.textAlignLast = 'justify';
+        console.log('中文段落默认两端对齐，包括最后一行');
       } else if (TextAnalyzer.isEnglishParagraph(textContent)) {
         styles.textAlign = 'left';
         console.log('英文段落默认左对齐');
@@ -1138,7 +1145,7 @@ export class WordHandler implements FileHandler {
     });
     
     if (isMatch) {
-      console.log(`仿宋字体模糊匹配: ${cleanFontName}`);
+      // console.log(`仿宋字体模糊匹配: ${cleanFontName}`);
     }
     
     return isMatch;
@@ -1466,7 +1473,7 @@ export class WordHandler implements FileHandler {
                if (childStyle) {
                  // 只记录包含仿宋字体的子元素样式
                  if (this.isFangSongFont(childStyle)) {
-                   console.log(`🎯 仿宋字体子元素${index}内联样式:`, childStyle);
+                  //  console.log(`🎯 仿宋字体子元素${index}内联样式:`, childStyle);
                  }
                  
                  // 提取字体相关样式

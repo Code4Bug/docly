@@ -84,7 +84,258 @@ export class EditorCore implements EditorInstance {
     });
 
     await this.editor.isReady;
+    this.setupKeyboardHandlers();
     this.emit('ready');
+  }
+  
+  /**
+   * 设置键盘事件处理器
+   * 主要处理回车键行为
+   */
+  private setupKeyboardHandlers(): void {
+    if (!this.editor || !this.config.holder) return;
+    
+    const holder = typeof this.config.holder === 'string' 
+      ? document.getElementById(this.config.holder) 
+      : this.config.holder;
+      
+    if (!holder) return;
+    
+    holder.addEventListener('keydown', this.handleKeyDown.bind(this));
+  }
+  
+  /**
+   * 处理键盘按键事件
+   * @param event - 键盘事件对象
+   */
+  private handleKeyDown(event: KeyboardEvent): void {
+    // 处理回车键
+    if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey) {
+      this.handleEnterKey(event);
+    }
+  }
+  
+  /**
+   * 处理回车键行为
+   * @param event - 键盘事件对象
+   */
+  private handleEnterKey(event: KeyboardEvent): void {
+    const selection = window.getSelection();
+    console.log('handleEnterKey', selection)
+    if (!selection || selection.rangeCount === 0) {
+      return
+    };
+    
+    const range = selection.getRangeAt(0);
+    console.log('range', range)
+    const currentNode = range.startContainer;
+    console.log('currentNode', currentNode)
+    const currentBlock = this.findParentBlock(currentNode as Node);
+    
+    if (!currentBlock) return;
+    
+    const isAtEndOfLine = this.isCaretAtEndOfLine(selection, currentBlock);
+    
+    if (isAtEndOfLine) {
+      // 当光标位于行末时，直接让默认行为创建新行
+      return;
+    } else {
+      // 当光标位于行内时，在光标位置分段文本
+      event.preventDefault();
+      this.splitTextAtCursor(selection, currentBlock);
+    }
+  }
+  
+  /**
+   * 查找包含节点的块级元素
+   * @param node - DOM节点
+   * @returns 块级元素或null
+   */
+  private findParentBlock(node: Node): HTMLElement | null {
+    let current: Node | null = node;
+    
+    // 向上查找直到找到块级元素
+    while (current && current.nodeType === Node.TEXT_NODE) {
+      current = current.parentNode;
+    }
+    
+    // 继续向上查找直到找到编辑器的块级元素
+    while (current && current instanceof HTMLElement) {
+      if (current.classList.contains('ce-block') || 
+          current.classList.contains('cdx-block') ||
+          current.classList.contains('ce-paragraph') ||
+          current.classList.contains('ce-header')) {
+        return current as HTMLElement;
+      }
+      current = current.parentNode;
+    }
+    
+    return null;
+  }
+  
+  /**
+   * 判断光标是否在行末
+   * @param selection - 当前选区
+   * @param block - 块级元素
+   * @returns 是否在行末
+   */
+  private isCaretAtEndOfLine(selection: Selection, block: HTMLElement): boolean {
+    const range = selection.getRangeAt(0);
+    const contentElement = (block.querySelector('.ce-paragraph, .ce-header, .cdx-block') as HTMLElement) || block;
+    
+    // 获取内容元素的文本内容
+    const textContent = contentElement.textContent || '';
+    
+    // 如果是文本节点，检查光标是否在文本末尾
+    if (range.startContainer.nodeType === Node.TEXT_NODE) {
+      return range.startOffset === range.startContainer.textContent?.length;
+    }
+    
+    // 如果不是文本节点，检查是否没有子节点或光标在最后一个子节点之后
+    return range.startOffset === contentElement.childNodes.length;
+  }
+  
+  /**
+   * 在光标位置分段文本
+   * @param selection - 当前选区
+   * @param block - 块级元素
+   */
+  private splitTextAtCursor(selection: Selection, block: HTMLElement): void {
+    if (!this.editor) return;
+    
+    const range = selection.getRangeAt(0);
+    const contentElement = (block.querySelector('.ce-paragraph, .ce-header, .cdx-block') as HTMLElement) || block;
+    
+    // 获取当前块的索引
+    const blockIndex = this.getBlockIndex(block);
+    if (blockIndex === -1) return;
+    
+    // 保存光标前后的文本内容
+    const beforeText = this.getTextBeforeCursor(range, contentElement);
+    const afterText = this.getTextAfterCursor(range, contentElement);
+    
+    // 更新当前块的内容为光标前的文本
+    this.updateBlockContent(blockIndex, beforeText);
+    
+    // 在当前块后插入新块，内容为光标后的文本
+    this.insertBlockAfter(blockIndex, afterText);
+    
+    // 将光标移动到新块的开始位置
+    setTimeout(() => {
+      this.moveCursorToBlockStart(blockIndex + 1);
+    }, 0);
+  }
+  
+  /**
+   * 获取块的索引
+   * @param block - 块级元素
+   * @returns 块索引，如果未找到则返回-1
+   */
+  private getBlockIndex(block: HTMLElement): number {
+    if (!this.editor) return -1;
+    
+    try {
+      const blocks = this.editor.blocks.getBlocksCount();
+      for (let i = 0; i < blocks; i++) {
+        const blockElement = this.findBlockElement(i);
+        if (blockElement === block || blockElement?.contains(block)) {
+          return i;
+        }
+      }
+    } catch (error) {
+      console.error('获取块索引失败:', error);
+    }
+    
+    return -1;
+  }
+  
+  /**
+   * 获取光标前的文本
+   * @param range - 当前范围
+   * @param element - 内容元素
+   * @returns 光标前的文本
+   */
+  private getTextBeforeCursor(range: Range, element: HTMLElement): string {
+    const tempRange = range.cloneRange();
+    tempRange.setStart(element, 0);
+    return tempRange.toString();
+  }
+  
+  /**
+   * 获取光标后的文本
+   * @param range - 当前范围
+   * @param element - 内容元素
+   * @returns 光标后的文本
+   */
+  private getTextAfterCursor(range: Range, element: HTMLElement): string {
+    const tempRange = range.cloneRange();
+    tempRange.setEndAfter(element.lastChild || element);
+    return tempRange.toString();
+  }
+  
+  /**
+   * 更新块内容
+   * @param index - 块索引
+   * @param content - 新内容
+   */
+  private async updateBlockContent(index: number, content: string): Promise<void> {
+    if (!this.editor) return;
+    
+    try {
+      const block = await this.editor.blocks.getBlockByIndex(index);
+      if (block) {
+        await this.editor.blocks.update(block.id, { text: content });
+      }
+    } catch (error) {
+      console.error('更新块内容失败:', error);
+    }
+  }
+  
+  /**
+   * 在指定块后插入新块
+   * @param index - 块索引
+   * @param content - 新块内容
+   */
+  private async insertBlockAfter(index: number, content: string): Promise<void> {
+    if (!this.editor) return;
+    
+    try {
+      // 确保在当前块之后插入新块，而不是在文档末尾
+      await this.editor.blocks.insert('paragraph', { text: content }, {}, index + 1, false, true);
+    } catch (error) {
+      console.error('插入块失败:', error);
+    }
+  }
+  
+  /**
+   * 将光标移动到指定块的开始位置
+   * @param index - 块索引
+   */
+  private async moveCursorToBlockStart(index: number): Promise<void> {
+    if (!this.editor) return;
+    
+    try {
+      // 获取块元素
+      const blockElement = this.findBlockElement(index);
+      if (!blockElement) return;
+      
+      // 获取内容元素
+      const contentElement = (blockElement.querySelector('.ce-paragraph, .ce-header, .cdx-block') as HTMLElement) || blockElement;
+      
+      // 创建新的范围并设置到内容元素的开始位置
+      const range = document.createRange();
+      range.setStart(contentElement, 0);
+      range.collapse(true);
+      
+      // 应用选区
+      const selection = window.getSelection();
+      if (selection) {
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+    } catch (error) {
+      console.error('移动光标失败:', error);
+    }
   }
 
   /**

@@ -48,8 +48,17 @@ export const useEditorStore = defineStore('editor', () => {
     editorInstance.value = instance;
     
     // 监听编辑器变化
-    instance.on('change', () => {
+    instance.on('change', async () => {
       hasUnsavedChanges.value = true;
+      
+      // 自动同步编辑器数据
+      try {
+        const currentData = await instance.save();
+        console.log('自动同步编辑器数据:', currentData);
+        editorData.value = currentData;
+      } catch (error) {
+        console.warn('自动同步编辑器数据失败:', error);
+      }
     });
   };
 
