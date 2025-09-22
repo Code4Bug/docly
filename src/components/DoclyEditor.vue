@@ -2213,6 +2213,8 @@ onUnmounted(() => {
   grid-template-columns: repeat(4, 1fr);
   gap: 6px;
   margin-bottom: 12px;
+  position: relative;
+  z-index: 9999;
 }
 
 .color-preset {

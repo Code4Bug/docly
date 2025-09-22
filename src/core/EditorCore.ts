@@ -388,6 +388,7 @@ export class EditorCore implements EditorInstance {
    * 处理带样式的数据
    */
   private processStyledData(data: EditorData): EditorData {
+    console.log('block 长度:', data.blocks.length);
     const processedBlocks = data.blocks.map(block => {
       // 保持原有数据结构，但确保样式信息被保留
       const processedBlock = { ...block };

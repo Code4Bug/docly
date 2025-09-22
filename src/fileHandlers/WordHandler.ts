@@ -11,6 +11,107 @@ import { extractCommentsFromDocument } from './WordHandlerComments';
 export class WordHandler implements FileHandler {
   
   /**
+   * 将元素按段落分割成多个Block
+   * 处理元素内包含的多个段落（通过换行符或<br>标签分割）
+   */
+  private splitElementIntoParagraphs(element: Element, index: number): any[] {
+    const blocks: any[] = [];
+    const htmlContent = element.innerHTML || '';
+    const textContent = element.textContent?.trim() || '';
+    
+    // 如果没有内容，返回空数组
+    if (!textContent) {
+      return blocks;
+    }
+    
+    // 检查是否包含<br>标签或换行符
+    const hasBrTags = htmlContent.includes('<br>') || htmlContent.includes('<br/>') || htmlContent.includes('<br />');
+    const hasNewlines = textContent.includes('\n');
+    
+    if (hasBrTags || hasNewlines) {
+      // 分割HTML内容
+      let parts: string[] = [];
+      
+      if (hasBrTags) {
+        // 按<br>标签分割
+        parts = htmlContent.split(/<br\s*\/?>/i);
+      } else {
+        // 按换行符分割纯文本
+        parts = textContent.split('\n');
+      }
+      
+      // 为每个非空部分创建一个段落块
+      parts.forEach((part, partIndex) => {
+        const trimmedPart = part.trim();
+        if (trimmedPart) {
+          // 如果是HTML内容，需要清理可能的HTML标签
+          const cleanText = hasBrTags ? this.cleanHtmlText(trimmedPart) : trimmedPart;
+          
+          if (cleanText) {
+            const block = {
+              id: `paragraph_${Date.now()}_${index}_${partIndex}`,
+              type: 'paragraph',
+              data: {
+                text: cleanText,
+                styles: this.extractElementStyles(element)
+              }
+            };
+            console.log('创建分割段落块:', block);
+            blocks.push(block);
+          }
+        }
+      });
+    } else {
+      // 没有分割标记，创建单个段落块
+      const block = {
+        id: `paragraph_${Date.now()}_${index}`,
+        type: 'paragraph',
+        data: {
+          text: this.extractStyledText(element),
+          styles: this.extractElementStyles(element)
+        }
+      };
+      console.log('创建单个段落块:', block);
+      blocks.push(block);
+    }
+    
+    return blocks;
+  }
+
+  /**
+   * 将纯文本按段落分割
+   * 通过双换行符或单换行符分割文本
+   */
+  private splitTextIntoParagraphs(text: string): string[] {
+    // 首先尝试按双换行符分割（标准段落分隔）
+    let paragraphs = text.split(/\n\s*\n/);
+    
+    // 如果没有双换行符，按单换行符分割
+    if (paragraphs.length === 1) {
+      paragraphs = text.split('\n');
+    }
+    
+    // 过滤空段落并清理空白字符
+    return paragraphs
+      .map(p => p.trim())
+      .filter(p => p.length > 0);
+  }
+
+  /**
+   * 清理HTML文本，移除多余的标签但保留基本格式
+   */
+  private cleanHtmlText(htmlText: string): string {
+    // 创建临时元素来解析HTML
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlText;
+    
+    // 获取纯文本内容
+    const textContent = tempDiv.textContent || tempDiv.innerText || '';
+    
+    return textContent.trim();
+  }
+
+  /**
    * 导入Word文件
    * 将.docx文件转换为编辑器数据格式
    */
@@ -207,7 +308,8 @@ export class WordHandler implements FileHandler {
    * 保留Word文档中的样式信息
    */
   private htmlToEditorData(html: string): EditorData {
-    console.log('开始HTML到编辑器数据转换，HTML长度:', html.length);
+    console.log('htmlToEditorData 开始处理HTML:', html.substring(0, 200) + '...');
+    console.log('HTML总长度:', html.length);
     
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
@@ -216,6 +318,7 @@ export class WordHandler implements FileHandler {
     // 遍历所有子节点，保持原有顺序
     const bodyChildren = Array.from(doc.body.children);
     console.log('找到的HTML元素数量:', bodyChildren.length);
+    console.log('子元素标签名:', bodyChildren.map(el => el.tagName.toLowerCase()));
     
     bodyChildren.forEach((element, index) => {
       const tagName = element.tagName.toLowerCase();
@@ -227,7 +330,7 @@ export class WordHandler implements FileHandler {
       if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tagName)) {
         const level = parseInt(element.tagName.charAt(1));
         const block = {
-          id: `heading_${index}`,
+          id: `heading_${Date.now()}_${index}`,
           type: 'header',
           data: {
             text: this.extractStyledText(element),
@@ -241,31 +344,21 @@ export class WordHandler implements FileHandler {
       // 处理段落
       else if (tagName === 'p') {
         if (textContent) {
-          const block = {
-            id: `paragraph_${index}`,
-            type: 'paragraph',
-            data: {
-              text: this.extractStyledText(element),
-              styles: this.extractElementStyles(element)
-            }
-          };
-          console.log('创建段落块:', block);
-          blocks.push(block);
+          console.log(`调用 splitElementIntoParagraphs 处理 p 元素`);
+          // 检查段落内是否包含多个段落（通过换行符分割）
+          const paragraphBlocks = this.splitElementIntoParagraphs(element, index);
+          console.log(`splitElementIntoParagraphs 返回了 ${paragraphBlocks.length} 个段落块`);
+          blocks.push(...paragraphBlocks);
         }
       }
       // 处理div元素（docx-preview可能生成div）
       else if (tagName === 'div') {
         if (textContent) {
-          const block = {
-            id: `paragraph_${index}`,
-            type: 'paragraph',
-            data: {
-              text: this.extractStyledText(element),
-              styles: this.extractElementStyles(element)
-            }
-          };
-          console.log('创建div段落块:', block);
-          blocks.push(block);
+          console.log(`调用 splitElementIntoParagraphs 处理 div 元素`);
+          // 检查div内是否包含多个段落
+          const paragraphBlocks = this.splitElementIntoParagraphs(element, index);
+          console.log(`splitElementIntoParagraphs 返回了 ${paragraphBlocks.length} 个段落块`);
+          blocks.push(...paragraphBlocks);
         }
       }
       // 处理列表
@@ -275,7 +368,7 @@ export class WordHandler implements FileHandler {
           styles: this.extractElementStyles(li)
         }));
         const block = {
-          id: `list_${index}`,
+          id: `list_${Date.now()}_${index}`,
           type: 'list',
           data: {
             style: tagName === 'ul' ? 'unordered' : 'ordered',
@@ -288,38 +381,43 @@ export class WordHandler implements FileHandler {
       }
       // 处理其他包含文本的元素
       else if (textContent) {
-        const block = {
-          id: `paragraph_${index}`,
-          type: 'paragraph',
-          data: {
-            text: this.extractStyledText(element),
-            styles: this.extractElementStyles(element)
-          }
-        };
-        console.log('创建通用段落块:', block);
-        blocks.push(block);
+        console.log(`调用 splitElementIntoParagraphs 处理其他元素: ${tagName}`);
+        // 对于其他元素，也尝试分割段落
+        const paragraphBlocks = this.splitElementIntoParagraphs(element, index);
+        console.log(`splitElementIntoParagraphs 返回了 ${paragraphBlocks.length} 个段落块`);
+        blocks.push(...paragraphBlocks);
       }
     });
 
-    console.log('转换完成，生成的块数量:', blocks.length);
+    console.log('处理完所有子元素，当前块数量:', blocks.length);
     
-    // 如果没有生成任何块，尝试从整个body提取文本
+    // 如果没有生成任何块，尝试从整个body提取文本并分割段落
     if (blocks.length === 0 && doc.body.textContent?.trim()) {
-      console.log('没有找到结构化内容，从body提取纯文本');
+      console.log('没有找到结构化内容，从body提取纯文本并分割段落');
       const bodyText = doc.body.textContent.trim();
-      const block = {
-        id: 'fallback_paragraph',
-        type: 'paragraph',
-        data: {
-          text: bodyText,
-          styles: {}
+      console.log('从body提取的文本:', bodyText.substring(0, 200));
+      const paragraphs = this.splitTextIntoParagraphs(bodyText);
+      console.log(`splitTextIntoParagraphs 返回了 ${paragraphs.length} 个段落`);
+      
+      paragraphs.forEach((paragraph, idx) => {
+        if (paragraph.trim()) {
+          const block = {
+            id: `fallback_paragraph_${Date.now()}_${idx}`,
+            type: 'paragraph',
+            data: {
+              text: paragraph.trim(),
+              styles: {}
+            }
+          };
+          console.log('创建回退段落块:', block);
+          blocks.push(block);
         }
-      };
-      console.log('创建回退段落块:', block);
-      blocks.push(block);
+      });
     }
 
-    console.log('HTML转换完成，生成数据块数量:', blocks.length);
+    console.log('最终生成的块数量:', blocks.length);
+    console.log('最终生成的块:', blocks.map(b => ({ type: b.type, id: b.id, textPreview: b.data.text?.substring(0, 50) })));
+    
     return {
       time: Date.now(),
       blocks: blocks,
