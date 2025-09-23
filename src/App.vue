@@ -1,7 +1,7 @@
 <template>
   <div class="app-container">
     <header class="app-header">
-      <h1>Docly - 在线文档编辑器</h1>
+      <h1>Docly - 文档编辑器</h1>
     </header>
     <main class="app-main">
       <DoclyEditor />

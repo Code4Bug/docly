@@ -47,15 +47,7 @@ export interface EditorData {
   time: number;
   blocks: Block[];
   version: string;
-}
-
-/**
- * 编辑器块数据结构
- */
-export interface Block {
-  id?: string;
-  type: string;
-  data: any;
+  comments?: Comment[];
 }
 
 /**
@@ -77,6 +69,33 @@ export interface Comment {
   timestamp: number;
   range: TextRange;
   replies?: Comment[];
+  // 新增字段用于Word文档批注
+  author?: string;
+  date?: string;
+  initials?: string;
+  parentId?: string;
+  resolved?: boolean;
+}
+
+/**
+ * 批注范围信息
+ */
+export interface CommentRange {
+  blockId: string;
+  startOffset: number;
+  endOffset: number;
+  text: string;
+}
+
+/**
+ * 编辑器块数据结构
+ */
+export interface Block {
+  id?: string;
+  type: string;
+  data: any;
+  // 新增批注字段
+  comments?: Comment[];
 }
 
 /**

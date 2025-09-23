@@ -1,7 +1,7 @@
 /* 字体文件声明 */
 @font-face {
   font-family: "楷体_GB2312";
-  src: url("./fonts/楷体_GB2312.ttf") format("truetype");
+  src: url("../fonts/楷体_GB2312.ttf") format("truetype");
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -9,7 +9,7 @@
 
 @font-face {
   font-family: "仿宋_GB2312";
-  src: url("./fonts/仿宋_GB2312.ttf") format("truetype");
+  src: url("../fonts/仿宋_GB2312.ttf") format("truetype");
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -17,7 +17,7 @@
 
 @font-face {
   font-family: "方正小标宋简体";
-  src: url("./fonts/方正小标宋简体.ttf") format("truetype");
+  src: url("../fonts/方正小标宋简体.ttf") format("truetype");
   font-weight: normal;
   font-style: normal;
   font-display: swap;

@@ -14,18 +14,25 @@
     "@editorjs/editorjs": "^2.31.0",
     "@editorjs/header": "^2.8.8",
     "@editorjs/image": "^2.10.3",
+    "@editorjs/inline-code": "^1.5.2",
     "@editorjs/list": "^2.0.8",
+    "@editorjs/marker": "^1.4.0",
     "@editorjs/paragraph": "^2.11.7",
     "@editorjs/quote": "^2.7.6",
     "@editorjs/table": "^2.4.5",
+    "@editorjs/underline": "^1.2.1",
     "@vueuse/core": "^13.9.0",
+    "docx": "^9.5.1",
     "docx-preview": "^0.3.6",
     "docxtemplater": "^3.66.3",
+    "file-saver": "^2.0.5",
+    "jszip": "^3.10.1",
     "naive-ui": "^2.43.1",
     "pinia": "^3.0.3",
     "vue": "^3.5.18"
   },
   "devDependencies": {
+    "@types/file-saver": "^2.0.7",
     "@vitejs/plugin-vue": "^5.2.4",
     "vite": "^5.4.20"
   }

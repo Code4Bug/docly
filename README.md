@@ -13,20 +13,39 @@ Docly 是一款基于 Vue 3 + Vite 的现代化在线文档编辑器，专注于
 - 响应式设计，支持多设备
 - 实时保存与状态管理
 - 文档预览功能
-- 批注系统支持
-- 多种编辑器工具（标题、段落、列表、引用、表格、代码块、图片）
+- 完整的批注系统支持
+- 多种编辑器工具（标题、段落、列表、引用、表格、代码块、图片、下划线、标记等）
 - 自定义字体样式和格式化选项
 - 文档结构化编辑和导航
+- 颜色选择器和主题支持
+- 编辑器状态栏显示
+- 工具提示系统
+- 组合式API架构设计
 
 ## 技术栈
 
 - **前端框架**: Vue 3.5.18 + Vite 5.4.20
-- **编辑器核心**: Editor.js 2.31.0
+- **编辑器核心**: Editor.js 2.31.0 + 多个官方插件
+  - @editorjs/header 2.8.8 (标题)
+  - @editorjs/paragraph 2.11.7 (段落)
+  - @editorjs/list 2.0.8 (列表)
+  - @editorjs/quote 2.7.6 (引用)
+  - @editorjs/table 2.4.5 (表格)
+  - @editorjs/code 2.9.3 (代码块)
+  - @editorjs/image 2.10.3 (图片)
+  - @editorjs/marker 1.4.0 (标记)
+  - @editorjs/underline 1.2.1 (下划线)
+  - @editorjs/inline-code 1.5.2 (行内代码)
 - **状态管理**: Pinia 3.0.3
 - **UI 组件库**: Naive UI 2.43.1
-- **文件处理**: docxtemplater 3.66.3 (Word导出) + docx-preview 0.3.6 (Word预览)
+- **文件处理**: 
+  - docx 9.5.1 (Word文档生成)
+  - docx-preview 0.3.6 (Word预览)
+  - docxtemplater 3.66.3 (Word模板)
+  - file-saver 2.0.5 (文件保存)
+  - jszip 3.10.1 (压缩文件处理)
 - **工具库**: @vueuse/core 13.9.0 (Vue组合式工具)
-- **类型支持**: TypeScript
+- **类型支持**: TypeScript + @types/file-saver 2.0.7
 - **构建工具**: Vite + @vitejs/plugin-vue 5.2.4
 
 ## 项目结构
@@ -34,16 +53,29 @@ Docly 是一款基于 Vue 3 + Vite 的现代化在线文档编辑器，专注于
 ```
 src/
 ├── components/          # Vue 组件
-│   └── DoclyEditor.vue  # 主编辑器组件
+│   ├── AnnotationSystem.vue  # 批注系统组件
+│   ├── ColorPicker.vue       # 颜色选择器组件
+│   ├── DoclyEditor.vue       # 主编辑器组件
+│   ├── EditorStatusBar.vue   # 编辑器状态栏组件
+│   ├── EditorToolbar.vue     # 编辑器工具栏组件
+│   ├── FontTool.vue          # 字体工具组件
+│   └── Tooltip.vue           # 工具提示组件
+├── composables/        # Vue 组合式函数
+│   ├── useAnnotations.ts     # 批注功能组合式函数
+│   ├── useEditorState.ts     # 编辑器状态管理组合式函数
+│   ├── useFileHandler.ts     # 文件处理组合式函数
+│   └── useTheme.ts           # 主题管理组合式函数
 ├── core/               # 编辑器核心
 │   └── EditorCore.ts   # 编辑器核心类，提供完整的编辑器功能
 ├── plugins/            # 插件系统
 │   └── PluginManager.ts # 插件管理器，支持动态加载和管理插件
 ├── fileHandlers/       # 文件处理模块
-│   └── WordHandler.ts  # Word文件处理器，支持导入导出和预览
+│   ├── WordHandler.ts        # Word文件处理器，支持导入导出和预览
+│   └── WordHandlerComments.ts # Word文档批注处理器
 ├── stores/             # 状态管理
 │   └── editorStore.ts  # 编辑器状态管理，基于 Pinia
 ├── types/              # TypeScript类型定义
+│   ├── editorjs-marker.d.ts  # Editor.js标记插件类型定义
 │   └── index.ts        # 完整的类型定义文件
 ├── utils/              # 工具函数
 │   └── TextAnalyzer.ts # 文本分析工具，支持样式提取和字体处理
@@ -172,6 +204,17 @@ Word 文档处理器，支持导入导出和预览。
 - `export(data)`: 导出为 Word 文档
 - `preview(data)`: 生成预览
 
+### WordHandlerComments
+
+Word 文档批注处理器，专门处理文档中的批注功能。
+
+#### 方法
+
+- `extractComments(document)`: 提取文档批注
+- `insertComments(document, comments)`: 插入批注到文档
+- `updateComment(id, content)`: 更新指定批注
+- `deleteComment(id)`: 删除指定批注
+
 ### PluginManager
 
 插件管理器，支持动态加载和管理插件。
@@ -182,6 +225,62 @@ Word 文档处理器，支持导入导出和预览。
 - `loadPlugin(name, config)`: 加载插件
 - `unloadPlugin(name)`: 卸载插件
 - `getPlugin(name)`: 获取插件实例
+
+### 组合式函数 (Composables)
+
+#### useAnnotations
+
+批注功能的组合式函数。
+
+```javascript
+const {
+  annotations,
+  addAnnotation,
+  removeAnnotation,
+  updateAnnotation,
+  getAnnotationsByRange
+} = useAnnotations()
+```
+
+#### useEditorState
+
+编辑器状态管理的组合式函数。
+
+```javascript
+const {
+  editorData,
+  isModified,
+  currentBlock,
+  saveState,
+  restoreState
+} = useEditorState()
+```
+
+#### useFileHandler
+
+文件处理功能的组合式函数。
+
+```javascript
+const {
+  importFile,
+  exportFile,
+  supportedFormats,
+  isProcessing
+} = useFileHandler()
+```
+
+#### useTheme
+
+主题管理的组合式函数。
+
+```javascript
+const {
+  currentTheme,
+  setTheme,
+  toggleTheme,
+  availableThemes
+} = useTheme()
+```
 
 ## 开发指南
 
@@ -239,6 +338,61 @@ export class MyFileHandler implements FileHandler {
     // 文件导出逻辑
   }
 }
+```
+
+3. **创建新的组合式函数**
+```javascript
+// 在 composables/ 目录下创建新的组合式函数
+import { ref, computed } from 'vue'
+
+export function useMyFeature() {
+  const state = ref(null)
+  const isActive = computed(() => state.value !== null)
+  
+  const activate = () => {
+    // 激活功能逻辑
+  }
+  
+  const deactivate = () => {
+    // 停用功能逻辑
+  }
+  
+  return {
+    state,
+    isActive,
+    activate,
+    deactivate
+  }
+}
+```
+
+4. **添加新的UI组件**
+```vue
+<!-- 在 components/ 目录下创建新组件 -->
+<template>
+  <div class="my-component">
+    <!-- 组件模板 -->
+  </div>
+</template>
+
+<script setup lang="ts">
+// 组件逻辑，使用组合式API
+interface Props {
+  // 定义组件属性
+}
+
+const props = defineProps<Props>()
+const emit = defineEmits<{
+  // 定义组件事件
+}>()
+</script>
+
+<style scoped>
+/* 组件样式 */
+.my-component {
+  /* 样式定义 */
+}
+</style>
 ```
 
 ### 代码规范
@@ -313,6 +467,22 @@ A: 在 <mcsymbol name="EditorCore" filename="EditorCore.ts" path="src/core/Edito
 ### Q: 支持哪些中文字体？
 
 A: 项目内置支持楷体、仿宋、方正小标宋简体等中文字体，字体文件位于 <mcfolder name="fonts" path="src/assets/fonts/"></mcfolder> 目录。
+
+### Q: 如何使用批注系统？
+
+A: 使用 <mcsymbol name="useAnnotations" filename="useAnnotations.ts" path="src/composables/useAnnotations.ts" startline="1" type="function"></mcsymbol> 组合式函数来管理批注，或直接使用 <mcfile name="AnnotationSystem.vue" path="src/components/AnnotationSystem.vue"></mcfile> 组件。
+
+### Q: 如何切换主题？
+
+A: 使用 <mcsymbol name="useTheme" filename="useTheme.ts" path="src/composables/useTheme.ts" startline="1" type="function"></mcsymbol> 组合式函数中的 `setTheme` 或 `toggleTheme` 方法来切换主题。
+
+### Q: 如何自定义颜色选择器？
+
+A: 修改 <mcfile name="ColorPicker.vue" path="src/components/ColorPicker.vue"></mcfile> 组件，添加自定义颜色预设或修改颜色选择逻辑。
+
+### Q: 编辑器状态如何管理？
+
+A: 项目使用 Pinia 进行全局状态管理（<mcfile name="editorStore.ts" path="src/stores/editorStore.ts"></mcfile>），同时提供 <mcsymbol name="useEditorState" filename="useEditorState.ts" path="src/composables/useEditorState.ts" startline="1" type="function"></mcsymbol> 组合式函数进行局部状态管理。
 
 ## 许可证
 

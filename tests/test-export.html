@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML到DOCX转换器（完整版）</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f7fa;
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+        
+        .editor-section {
+            margin-bottom: 30px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #34495e;
+        }
+        
+        #htmlInput {
+            width: 100%;
+            height: 200px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Consolas', monospace;
+            font-size: 14px;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+        
+        #htmlInput:focus {
+            border-color: #3498db;
+            outline: none;
+        }
+        
+        .preview-section {
+            margin-bottom: 30px;
+        }
+        
+        #preview {
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            padding: 20px;
+            min-height: 150px;
+            background: white;
+            overflow-y: auto;
+            max-height: 300px;
+        }
+        
+        .button-section {
+            text-align: center;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 0 10px;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        }
+        
+        button:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            display: none;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .features {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .feature-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+        }
+        
+        .info-box {
+            background: #e3f2fd;
+            border: 1px solid #2196f3;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            color: #1565c0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📄 HTML到DOCX转换器（完整版）</h1>
+        
+        <div class="info-box">
+            <strong>✨ 新特性：</strong>现在生成真正的DOCX文件，包含完整的ZIP结构，可以直接在Microsoft Word中打开！
+        </div>
+        
+        <div class="editor-section">
+            <label for="htmlInput">输入HTML内容:</label>
+            <textarea id="htmlInput" placeholder="请输入包含样式的HTML内容...">
+<div style="font-family: 'Microsoft YaHei'; padding: 20px;">
+    <h1 style="color: #2c3e50; text-align: center; font-size: 24px; margin-bottom: 20px;">项目报告</h1>
+    
+    <h2 style="color: #3498db; font-size: 20px; border-bottom: 2px solid #3498db; padding-bottom: 5px;">项目概述</h2>
+    <p style="line-height: 1.8; color: #2c3e50; margin: 15px 0; text-align: justify;">
+        本项目旨在开发一个高效的<strong style="color: #e74c3c;">HTML到DOCX转换工具</strong>，
+        能够保留原始HTML文档中的<em style="color: #27ae60;">格式和样式</em>。
+        该工具支持多种文本格式，包括<span style="background-color: #f1c40f; padding: 2px 4px; border-radius: 3px;">标题、段落、列表</span>等。
+    </p>
+    
+    <h3 style="color: #8e44ad; font-size: 18px; margin-top: 25px;">主要功能特点</h3>
+    <ul style="margin: 15px 0; padding-left: 30px; line-height: 1.6;">
+        <li style="margin-bottom: 8px; color: #34495e;">支持多种HTML标签转换</li>
+        <li style="margin-bottom: 8px; color: #34495e;">保留内联CSS样式</li>
+        <li style="margin-bottom: 8px; color: #34495e;">生成标准DOCX格式文件</li>
+        <li style="margin-bottom: 8px; color: #34495e;">支持中文字符编码</li>
+    </ul>
+    
+    <blockquote style="border-left: 4px solid #95a5a6; margin: 20px 0; padding: 15px 20px; background-color: #ecf0f1; font-style: italic; color: #7f8c8d; border-radius: 4px;">
+        "技术的进步不在于追求完美，而在于持续改进和实用性的平衡。" - 开发团队
+    </blockquote>
+    
+    <div style="text-align: center; margin-top: 30px; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 8px;">
+        <span style="font-size: 18px; font-weight: bold;">感谢使用我们的转换工具！</span><br>
+        <small style="font-size: 14px; opacity: 0.9;">Generated by HTML to DOCX Converter</small>
+    </div>
+</div></textarea>
+        </div>
+        
+        <div class="preview-section">
+            <label>实时预览:</label>
+            <div id="preview"></div>
+        </div>
+        
+        <div class="button-section">
+            <button onclick="generateDocx()" id="generateBtn">📄 生成DOCX文件</button>
+            <button onclick="clearInput()">🗑️ 清空内容</button>
+        </div>
+        
+        <div id="status" class="status"></div>
+        
+        <div class="features">
+            <h3 style="color: #2c3e50;">技术实现细节：</h3>
+            <div class="feature-list">
+                <div class="feature-item">
+                    <strong>ZIP结构</strong><br>
+                    完整的DOCX文件结构，包含所有必需的XML文件
+                </div>
+                <div class="feature-item">
+                    <strong>样式转换</strong><br>
+                    HTML CSS样式到Word格式的智能映射
+                </div>
+                <div class="feature-item">
+                    <strong>字符编码</strong><br>
+                    UTF-8编码支持，完美处理中文内容
+                </div>
+                <div class="feature-item">
+                    <strong>兼容性</strong><br>
+                    生成的文件可在Word 2007及以上版本打开
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 实时预览功能
+        document.getElementById('htmlInput').addEventListener('input', function() {
+            const htmlContent = this.value;
+            document.getElementById('preview').innerHTML = htmlContent;
+        });
+        
+        // 初始化预览
+        window.addEventListener('load', function() {
+            const htmlContent = document.getElementById('htmlInput').value;
+            document.getElementById('preview').innerHTML = htmlContent;
+        });
+        
+        // 显示状态信息
+        function showStatus(message, type) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+            statusEl.style.display = 'block';
+            
+            setTimeout(() => {
+                statusEl.style.display = 'none';
+            }, 5000);
+        }
+        
+        // 解析内联样式
+        function parseInlineStyles(styleString) {
+            const styles = {};
+            if (!styleString) return styles;
+            
+            styleString.split(';').forEach(style => {
+                const [property, value] = style.split(':').map(s => s.trim());
+                if (property && value) {
+                    styles[property] = value;
+                }
+            });
+            
+            return styles;
+        }
+        
+        // 转换颜色格式（从CSS到Word）
+        function convertColor(cssColor) {
+            if (!cssColor) return null;
+            
+            // 如果是hex颜色
+            if (cssColor.startsWith('#')) {
+                return cssColor.substring(1).toUpperCase();
+            }
+            
+            // 如果是rgb颜色
+            const rgbMatch = cssColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+            if (rgbMatch) {
+                const [, r, g, b] = rgbMatch;
+                return ((1 << 24) + (parseInt(r) << 16) + (parseInt(g) << 8) + parseInt(b)).toString(16).slice(1).toUpperCase();
+            }
+            
+            // 预定义颜色映射
+            const colorMap = {
+                'red': 'FF0000',
+                'blue': '0000FF',
+                'green': '008000',
+                'black': '000000',
+                'white': 'FFFFFF'
+            };
+            
+            return colorMap[cssColor.toLowerCase()] || null;
+        }
+        
+        // 转换字体大小（从CSS到Word半点）
+        function convertFontSize(cssSize) {
+            if (!cssSize) return null;
+            
+            const pxMatch = cssSize.match(/(\d+)px/);
+            if (pxMatch) {
+                return Math.round(parseInt(pxMatch[1]) * 1.33 * 2); // px to pt * 2 (半点)
+            }
+            
+            const ptMatch = cssSize.match(/(\d+)pt/);
+            if (ptMatch) {
+                return parseInt(ptMatch[1]) * 2; // pt * 2 (半点)
+            }
+            
+            return null;
+        }
+        
+        // HTML元素到Word XML的转换
+        function htmlToWordXml(htmlString) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(`<div>${htmlString}</div>`, 'text/html');
+            let wordXml = '';
+            
+            function processNode(node) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    const text = node.textContent.trim();
+                    if (text) {
+                        return `<w:t xml:space="preserve">${escapeXml(text)}</w:t>`;
+                    }
+                    return '';
+                }
+                
+                if (node.nodeType !== Node.ELEMENT_NODE) {
+                    return '';
+                }
+                
+                const tagName = node.tagName.toLowerCase();
+                const styles = parseInlineStyles(node.getAttribute('style'));
+                
+                // 处理不同的HTML标签
+                switch (tagName) {
+                    case 'h1':
+                    case 'h2':
+                    case 'h3':
+                    case 'h4':
+                    case 'h5':
+                    case 'h6':
+                        const headingLevel = parseInt(tagName.charAt(1));
+                        const headingSize = Math.max(28 - (headingLevel - 1) * 4, 16) * 2; // 半点
+                        return `<w:p>
+                            <w:pPr>
+                                <w:pStyle w:val="Heading${headingLevel}"/>
+                                <w:spacing w:after="240"/>
+                            </w:pPr>
+                            <w:r>
+                                <w:rPr>
+                                    <w:b/>
+                                    <w:sz w:val="${headingSize}"/>
+                                    <w:szCs w:val="${headingSize}"/>
+                                    ${styles.color ? `<w:color w:val="${convertColor(styles.color)}"/>` : ''}
+                                </w:rPr>
+                                ${processChildNodes(node)}
+                            </w:r>
+                        </w:p>`;
+                    
+                    case 'p':
+                        return `<w:p>
+                            <w:pPr>
+                                ${styles['text-align'] === 'center' ? '<w:jc w:val="center"/>' : ''}
+                                ${styles['text-align'] === 'right' ? '<w:jc w:val="right"/>' : ''}
+                                ${styles['text-align'] === 'justify' ? '<w:jc w:val="both"/>' : ''}
+                                <w:spacing w:after="120"/>
+                            </w:pPr>
+                            ${processRunContent(node, styles)}
+                        </w:p>`;
+                    
+                    case 'div':
+                        if (node.children.length === 0) {
+                            // 如果div没有子元素，当作段落处理
+                            return `<w:p>
+                                <w:pPr>
+                                    ${styles['text-align'] === 'center' ? '<w:jc w:val="center"/>' : ''}
+                                    ${styles['text-align'] === 'right' ? '<w:jc w:val="right"/>' : ''}
+                                    ${styles['text-align'] === 'justify' ? '<w:jc w:val="both"/>' : ''}
+                                </w:pPr>
+                                ${processRunContent(node, styles)}
+                            </w:p>`;
+                        } else {
+                            // 如果有子元素，递归处理
+                            let content = '';
+                            Array.from(node.childNodes).forEach(child => {
+                                content += processNode(child);
+                            });
+                            return content;
+                        }
+                    
+                    case 'ul':
+                    case 'ol':
+                        let listContent = '';
+                        Array.from(node.children).forEach((li, index) => {
+                            if (li.tagName.toLowerCase() === 'li') {
+                                listContent += `<w:p>
+                                    <w:pPr>
+                                        <w:pStyle w:val="ListParagraph"/>
+                                        <w:numPr>
+                                            <w:ilvl w:val="0"/>
+                                            <w:numId w:val="${tagName === 'ul' ? '1' : '2'}"/>
+                                        </w:numPr>
+                                    </w:pPr>
+                                    <w:r>
+                                        <w:t xml:space="preserve">${escapeXml(li.textContent)}</w:t>
+                                    </w:r>
+                                </w:p>`;
+                            }
+                        });
+                        return listContent;
+                    
+                    case 'blockquote':
+                        return `<w:p>
+                            <w:pPr>
+                                <w:pStyle w:val="Quote"/>
+                                <w:ind w:left="720"/>
+                                <w:spacing w:after="120"/>
+                            </w:pPr>
+                            ${processRunContent(node, styles)}
+                        </w:p>`;
+                    
+                    case 'br':
+                        return '<w:br/>';
+                    
+                    default:
+                        return processRunContent(node, styles);
+                }
+            }
+            
+            function processRunContent(node, parentStyles = {}) {
+                let runs = '';
+                
+                Array.from(node.childNodes).forEach(child => {
+                    if (child.nodeType === Node.TEXT_NODE) {
+                        const text = child.textContent;
+                        if (text.trim()) {
+                            runs += createRun(text, parentStyles);
+                        }
+                    } else if (child.nodeType === Node.ELEMENT_NODE) {
+                        const tagName = child.tagName.toLowerCase();
+                        const childStyles = Object.assign({}, parentStyles, parseInlineStyles(child.getAttribute('style')));
+                        
+                        switch (tagName) {
+                            case 'strong':
+                            case 'b':
+                                childStyles.fontWeight = 'bold';
+                                break;
+                            case 'em':
+                            case 'i':
+                                childStyles.fontStyle = 'italic';
+                                break;
+                            case 'span':
+                                // span标签直接继承样式
+                                break;
+                        }
+                        
+                        runs += processRunContent(child, childStyles);
+                    }
+                });
+                
+                return runs;
+            }
+            
+            function createRun(text, styles) {
+                const fontSize = convertFontSize(styles['font-size']);
+                const color = convertColor(styles.color);
+                const backgroundColor = convertColor(styles['background-color']);
+                
+                return `<w:r>
+                    <w:rPr>
+                        ${styles.fontWeight === 'bold' ? '<w:b/>' : ''}
+                        ${styles.fontStyle === 'italic' ? '<w:i/>' : ''}
+                        ${fontSize ? `<w:sz w:val="${fontSize}"/><w:szCs w:val="${fontSize}"/>` : ''}
+                        ${color ? `<w:color w:val="${color}"/>` : ''}
+                        ${backgroundColor ? `<w:highlight w:val="${backgroundColor}"/>` : ''}
+                        ${styles['font-family'] ? `<w:rFonts w:ascii="${styles['font-family']}" w:hAnsi="${styles['font-family']}"/>` : ''}
+                    </w:rPr>
+                    <w:t xml:space="preserve">${escapeXml(text)}</w:t>
+                </w:r>`;
+            }
+            
+            function processChildNodes(node) {
+                let result = '';
+                Array.from(node.childNodes).forEach(child => {
+                    if (child.nodeType === Node.TEXT_NODE) {
+                        result += escapeXml(child.textContent);
+                    }
+                });
+                return result;
+            }
+            
+            // 处理根节点
+            const rootDiv = doc.querySelector('div');
+            Array.from(rootDiv.childNodes).forEach(child => {
+                wordXml += processNode(child);
+            });
+            
+            return wordXml;
+        }
+        
+        // XML转义
+        function escapeXml(text) {
+            return text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&apos;');
+        }
+        
+        // 生成完整的DOCX文件
+        async function generateDocx() {
+            const htmlContent = document.getElementById('htmlInput').value.trim();
+            
+            if (!htmlContent) {
+                showStatus('请输入HTML内容！', 'error');
+                return;
+            }
+            
+            const generateBtn = document.getElementById('generateBtn');
+            generateBtn.disabled = true;
+            generateBtn.textContent = '生成中...';
+            
+            try {
+                showStatus('正在生成DOCX文件...', 'success');
+                
+                // 转换HTML到Word XML
+                const wordContent = htmlToWordXml(htmlContent);
+                
+                // 创建ZIP文件
+                const zip = new JSZip();
+                
+                // _rels/.rels
+                zip.folder('_rels').file('.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`);
+                
+                // [Content_Types].xml
+                zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+    <Default Extension="xml" ContentType="application/xml"/>
+    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+    <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+    <Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>
+    <Override PartName="/word/fontTable.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml"/>
+</Types>`);
+                
+                // word/_rels/document.xml.rels
+                zip.folder('word').folder('_rels').file('document.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+    <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>
+    <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable" Target="fontTable.xml"/>
+</Relationships>`);
+                
+                // word/document.xml (主文档)
+                zip.folder('word').file('document.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+    <w:body>
+        ${wordContent}
+        <w:sectPr>
+            <w:pgSz w:w="11906" w:h="16838"/>
+            <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/>
+            <w:cols w:space="708"/>
+        </w:sectPr>
+    </w:body>
+</w:document>`);
+                
+                // word/styles.xml
+                zip.folder('word').file('styles.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+    <w:docDefaults>
+        <w:rPrDefault>
+            <w:rPr>
+                <w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:eastAsia="宋体" w:cs="Times New Roman"/>
+                <w:sz w:val="22"/>
+                <w:szCs w:val="22"/>
+                <w:lang w:val="zh-CN" w:eastAsia="zh-CN" w:bidi="ar-SA"/>
+            </w:rPr>
+        </w:rPrDefault>
+    </w:docDefaults>
+    <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
+        <w:name w:val="Normal"/>
+        <w:qFormat/>
+        <w:pPr>
+            <w:spacing w:after="160" w:line="259" w:lineRule="auto"/>
+        </w:pPr>
+    </w:style>
+    <w:style w:type="paragraph" w:styleId="Heading1">
+        <w:name w:val="heading 1"/>
+        <w:basedOn w:val="Normal"/>
+        <w:next w:val="Normal"/>
+        <w:link w:val="Heading1Char"/>
+        <w:uiPriority w:val="9"/>
+        <w:qFormat/>
+        <w:pPr>
+            <w:keepNext/>
+            <w:keepLines/>
+            <w:spacing w:before="480" w:after="0"/>
+            <w:outlineLvl w:val="0"/>
+        </w:pPr>
+        <w:rPr>
+            <w:rFonts w:asciiTheme="majorHAnsi" w:eastAsiaTheme="majorEastAsia" w:hAnsiTheme="majorHAnsi" w:cstheme="majorBidi"/>
+            <w:b/>
+            <w:bCs/>
+            <w:color w:val="2F5496" w:themeColor="accent1" w:themeShade="BF"/>
+            <w:sz w:val="32"/>
+            <w:szCs w:val="32"/>
+        </w:rPr>
+    </w:style>
+    <w:style w:type="paragraph" w:styleId="Heading2">
+        <w:name w:val="heading 2"/>
+        <w:basedOn w:val="Normal"/>
+        <w:next w:val="Normal"/>
+        <w:link w:val="Heading2Char"/>
+        <w:uiPriority w:val="9"/>
+        <w:unhideWhenUsed/>
+        <w:qFormat/>
+        <w:pPr>
+            <w:keepNext/>
+            <w:keepLines/>
+            <w:spacing w:before="200" w:after="0"/>
+            <w:outlineLvl w:val="1"/>
+        </w:pPr>
+        <w:rPr>
+            <w:rFonts w:asciiTheme="majorHAnsi" w:eastAsiaTheme="majorEastAsia" w:hAnsiTheme="majorHAnsi" w:cstheme="majorBidi"/>
+            <w:b/>
+            <w:bCs/>
+            <w:color w:val="2F5496" w:themeColor="accent1" w:themeShade="BF"/>
+            <w:sz w:val="26"/>
+            <w:szCs w:val="26"/>
+        </w:rPr>
+    </w:style>
+    <w:style w:type="paragraph" w:styleId="Heading3">
+        <w:name w:val="heading 3"/>
+        <w:basedOn w:val="Normal"/>
+        <w:next w:val="Normal"/>
+        <w:link w:val="Heading3Char"/>
+        <w:uiPriority w:val="9"/>
+        <w:unhideWhenUsed/>
+        <w:qFormat/>
+        <w:pPr>
+            <w:keepNext/>
+            <w:keepLines/>
+            <w:spacing w:before="200" w:after="0"/>
+            <w:outlineLvl w:val="2"/>
+        </w:pPr>
+        <w:rPr>
+            <w:rFonts w:asciiTheme="majorHAnsi" w:eastAsiaTheme="majorEastAsia" w:hAnsiTheme="majorHAnsi" w:cstheme="majorBidi"/>
+            <w:b/>
+            <w:bCs/>
+            <w:color w:val="1F4E79" w:themeColor="accent1" w:themeShade="BF"/>
+            <w:sz w:val="24"/>
+            <w:szCs w:val="24"/>
+        </w:rPr>
+    </w:style>
+            <w:style w:type="paragraph" w:styleId="Quote">
+        <w:name w:val="Quote"/>
+        <w:basedOn w:val="Normal"/>
+        <w:next w:val="Normal"/>
+        <w:link w:val="QuoteChar"/>
+        <w:uiPriority w:val="29"/>
+        <w:unhideWhenUsed/>
+        <w:qFormat/>
+        <w:pPr>
+            <w:spacing w:after="200"/>
+            <w:ind w:left="720" w:right="720"/>
+        </w:pPr>
+        <w:rPr>
+            <w:i/>
+            <w:iCs/>
+            <w:color w:val="404040" w:themeColor="text1" w:themeTint="BF"/>
+        </w:rPr>
+    </w:style>
+    <w:style w:type="paragraph" w:styleId="ListParagraph">
+        <w:name w:val="List Paragraph"/>
+        <w:basedOn w:val="Normal"/>
+        <w:uiPriority w:val="34"/>
+        <w:qFormat/>
+        <w:pPr>
+            <w:ind w:left="720"/>
+            <w:contextualSpacing/>
+        </w:pPr>
+    </w:style>
+</w:styles>`);
+                
+                // word/settings.xml
+                zip.folder('word').file('settings.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+    <w:zoom w:percent="100"/>
+    <w:proofState w:spelling="clean" w:grammar="clean"/>
+    <w:defaultTabStop w:val="708"/>
+    <w:characterSpacingControl w:val="doNotCompress"/>
+    <w:compat>
+        <w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/>
+        <w:compatSetting w:name="overrideTableStyleFontSizeAndJustification" w:uri="http://schemas.microsoft.com/office/word" w:val="1"/>
+        <w:compatSetting w:name="enableOpenTypeFeatures" w:uri="http://schemas.microsoft.com/office/word" w:val="1"/>
+        <w:compatSetting w:name="doNotFlipMirrorIndents" w:uri="http://schemas.microsoft.com/office/word" w:val="1"/>
+        <w:compatSetting w:name="differentiateMultirowTableHeaders" w:uri="http://schemas.microsoft.com/office/word" w:val="1"/>
+    </w:compat>
+</w:settings>`);
+                
+                // word/fontTable.xml
+                zip.folder('word').file('fontTable.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+    <w:font w:name="Calibri">
+        <w:panose1 w:val="020F0502020204030204"/>
+        <w:charset w:val="00"/>
+        <w:family w:val="swiss"/>
+        <w:pitch w:val="variable"/>
+        <w:sig w:usb0="E00002FF" w:usb1="4000ACFF" w:usb2="00000001" w:usb3="00000000" w:csb0="0000019F" w:csb1="00000000"/>
+    </w:font>
+    <w:font w:name="宋体">
+        <w:charset w:val="86"/>
+        <w:family w:val="auto"/>
+        <w:pitch w:val="variable"/>
+        <w:sig w:usb0="00000003" w:usb1="288F0000" w:usb2="00000016" w:usb3="00000000" w:csb0="00040001" w:csb1="00000000"/>
+    </w:font>
+    <w:font w:name="Microsoft YaHei">
+        <w:panose1 w:val="020B0503020204020204"/>
+        <w:charset w:val="86"/>
+        <w:family w:val="swiss"/>
+        <w:pitch w:val="variable"/>
+        <w:sig w:usb0="800002BF" w:usb1="38CF7CFA" w:usb2="00000016" w:usb3="00000000" w:csb0="0004001F" w:csb1="00000000"/>
+    </w:font>
+</w:fonts>`);
+                
+                // 生成ZIP文件
+                const docxBuffer = await zip.generateAsync({
+                    type: "blob",
+                    mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                });
+                
+                // 保存文件
+                const fileName = `converted_document_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.docx`;
+                saveAs(docxBuffer, fileName);
+                
+                showStatus(`✅ DOCX文件生成成功！文件名: ${fileName}`, 'success');
+                
+            } catch (error) {
+                console.error('生成DOCX时发生错误:', error);
+                showStatus(`❌ 生成失败: ${error.message}`, 'error');
+            } finally {
+                generateBtn.disabled = false;
+                generateBtn.textContent = '📄 生成DOCX文件';
+            }
+        }
+        
+        // 清空输入
+        function clearInput() {
+            if (confirm('确定要清空所有内容吗？')) {
+                document.getElementById('htmlInput').value = '';
+                document.getElementById('preview').innerHTML = '';
+            }
+        }
+    </script>
+</body>
+</html>

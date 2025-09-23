@@ -3,7 +3,7 @@
   border: 1px solid #e0e0e0;
   border-radius: 8px;
   background: #ffffff;
-  min-height: 400px;
+  min-height: 800px;
 }
 
 .codex-editor__redactor {
@@ -20,6 +20,7 @@
 .ce-paragraph {
   line-height: 1.6;
   font-size: 16px;
+  /* 默认颜色，可被动态样式覆盖 */
   color: #333333;
   /* 确保段落元素的padding不会过大 */
   padding-top: 0 !important;
@@ -29,6 +30,7 @@
 
 .ce-header {
   font-weight: 600;
+  /* 默认颜色，可被动态样式覆盖 */
   color: #1a1a1a;
 }
 

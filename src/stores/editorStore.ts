@@ -48,8 +48,17 @@ export const useEditorStore = defineStore('editor', () => {
     editorInstance.value = instance;
     
     // 监听编辑器变化
-    instance.on('change', () => {
+    instance.on('change', async () => {
       hasUnsavedChanges.value = true;
+      
+      // 自动同步编辑器数据
+      try {
+        const currentData = await instance.save();
+        console.log('自动同步编辑器数据:', currentData);
+        editorData.value = currentData;
+      } catch (error) {
+        console.warn('自动同步编辑器数据失败:', error);
+      }
     });
   };
 
@@ -110,7 +119,6 @@ export const useEditorStore = defineStore('editor', () => {
       updateEditorData(data);
       console.log('文档加载完成，当前编辑器数据:', editorData.value);
       console.log('editorData.value是否为null:', editorData.value === null);
-      console.log('editorData.value内容:', JSON.stringify(editorData.value, null, 2));
     } catch (error) {
       console.error('加载文档失败，详细错误信息:', error);
       console.error('错误堆栈:', error.stack);
