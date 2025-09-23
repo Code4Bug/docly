@@ -1,6 +1,7 @@
 <template>
   <div class="color-picker-wrapper">
     <button 
+      ref="colorButton"
       @click="toggleColorPicker" 
       class="toolbar-btn color-btn"
     >
@@ -12,7 +13,7 @@
       </svg>
       <div class="color-indicator" :class="{ 'bg-indicator': type === 'background' }" :style="{ backgroundColor: currentColor }"></div>
     </button>
-    <div v-if="showColorPicker" class="color-picker-panel">
+    <div v-if="showColorPicker" ref="colorPanel" class="color-picker-panel">
       <div class="color-presets">
         <div 
           v-for="color in colorPresets"
@@ -33,7 +34,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+
 
 // Props
 interface Props {
@@ -44,10 +46,6 @@ interface Props {
 const props = defineProps<Props>();
 
 // Emits
-defineEmits<{
-  'color-change': [color: string];
-}>();
-
 const emit = defineEmits<{
   'color-change': [color: string];
 }>();
@@ -55,6 +53,8 @@ const emit = defineEmits<{
 // 响应式数据
 const showColorPicker = ref(false);
 const customColor = ref(props.currentColor);
+const colorButton = ref<HTMLElement>();
+const colorPanel = ref<HTMLElement>();
 
 // 颜色预设
 const colorPresets = computed(() => {
@@ -78,7 +78,39 @@ const colorPresets = computed(() => {
  */
 const toggleColorPicker = (): void => {
   showColorPicker.value = !showColorPicker.value;
+  
+  if (showColorPicker.value && colorButton.value && colorPanel.value) {
+    // 计算按钮位置
+    const rect = colorButton.value.getBoundingClientRect();
+    const panel = colorPanel.value;
+    
+    // 设置面板位置
+    panel.style.top = `${rect.bottom + 2}px`;
+    panel.style.left = `${rect.left}px`;
+  }
 };
+
+/**
+ * 处理点击外部关闭面板
+ */
+const handleClickOutside = (event: MouseEvent): void => {
+  if (showColorPicker.value && 
+      colorButton.value && 
+      colorPanel.value && 
+      !colorButton.value.contains(event.target as Node) && 
+      !colorPanel.value.contains(event.target as Node)) {
+    showColorPicker.value = false;
+  }
+};
+
+// 生命周期钩子
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside);
+});
+
+onUnmounted(() => {
+   document.removeEventListener('click', handleClickOutside);
+ });
 
 /**
  * 选择预设颜色
@@ -99,6 +131,12 @@ const handleCustomColorChange = (event: Event): void => {
   customColor.value = color;
   emit('color-change', color);
   showColorPicker.value = false;
+};
+</script>
+
+<script lang="ts">
+export default {
+  name: 'ColorPicker'
 };
 </script>
 
@@ -128,10 +166,8 @@ const handleCustomColorChange = (event: Event): void => {
 }
 
 .color-picker-panel {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  z-index: 1000;
+  position: fixed;
+  z-index: 10001;
   background: white;
   border: 1px solid #dadce0;
   border-radius: 6px;

@@ -13,7 +13,7 @@
       @export-file="exportFile"
       @undo="undo"
       @redo="redo"
-      @changeHeading="changeHeading"
+      @change-heading="changeHeading"
       @format-text="formatText"
       @set-alignment="setAlignment"
       @text-color-change="applyTextColor"
@@ -56,11 +56,12 @@
     <EditorStatusBar
       :is-saved="isSaved"
       :char-count="charCount"
-      :is-read-only="props.readOnly"
+      :is-read-only="isReadOnly"
       :is-annotation-mode="isAnnotationMode"
       :is-exporting="isExporting"
       :is-dark-theme="isDarkTheme"
       :editor-content="editorContent"
+      @toggle-readonly="toggleReadOnly"
     />
 
     <!-- 隐藏的文件输入元素 -->
@@ -126,21 +127,7 @@ const showTextColorPicker = ref(false);
 const showBgColorPicker = ref(false);
 const currentTextColor = ref('#000000');
 const currentBgColor = ref('#ffffff');
-const customTextColor = ref('#000000');
-const customBgColor = ref('#ffffff');
 
-// 颜色预设
-const textColorPresets = ref([
-  '#000000', '#333333', '#666666', '#999999',
-  '#ff0000', '#ff6600', '#ffcc00', '#00ff00',
-  '#0066ff', '#6600ff', '#ff0066', '#00ffff'
-]);
-
-const bgColorPresets = ref([
-  '#ffffff', '#f5f5f5', '#e0e0e0', '#cccccc',
-  '#ffeeee', '#fff0e6', '#fffacc', '#eeffee',
-  '#e6f0ff', '#f0e6ff', '#ffe6f0', '#e6ffff'
-]);
 
 // 悬浮提示相关状态
 const tooltip = ref({
@@ -222,13 +209,7 @@ const updateEditorTheme = (): void => {
   }
 };
 
-// 计算属性
-const isSaving = computed(() => editorStore.isSaving);
 const isReadOnly = computed(() => editorStore.isReadOnly);
-const wordCount = computed(() => editorStore.wordCount);
-const blockCount = computed(() => editorStore.blockCount);
-const commentCount = computed(() => editorStore.commentCount);
-const hasUnsavedChanges = computed(() => editorStore.hasUnsavedChanges);
 
 /**
  * 初始化编辑器
@@ -293,20 +274,8 @@ const initEditor = async (): Promise<void> => {
     
   } catch (error) {
     console.error('编辑器初始化失败，详细错误:', error);
-    console.error('错误堆栈:', error.stack);
+    console.error('错误堆栈:', (error as Error).stack);
     showMessage('编辑器初始化失败', 'error');
-  }
-};
-
-/**
- * 处理保存
- */
-const handleSave = async (): Promise<void> => {
-  try {
-    await editorStore.saveDocument();
-    showMessage('文档保存成功', 'success');
-  } catch (error) {
-    showMessage('文档保存失败', 'error');
   }
 };
 
@@ -353,17 +322,10 @@ const handleExport = async (): Promise<void> => {
     showMessage('文档导出成功', 'success');
   } catch (error) {
     console.error('导出失败:', error);
-    showMessage(`文档导出失败: ${error.message || '未知错误'}`, 'error');
+    showMessage(`文档导出失败: ${(error as Error).message || '未知错误'}`, 'error');
   } finally {
     isExporting.value = false;
   }
-};
-
-/**
- * 触发文件选择
- */
-const triggerFileInput = (): void => {
-  fileInputRef.value?.click();
 };
 
 /**
@@ -499,7 +461,7 @@ const handleImport = async (event: Event): Promise<void> => {
   } catch (error) {
     console.error('导入失败，详细错误信息:', error);
     console.error('错误类型:', typeof error);
-    console.error('错误堆栈:', error.stack);
+    console.error('错误堆栈:', (error as Error).stack);
     const errorMessage = error instanceof Error ? error.message : '未知错误';
     showMessage(`文档导入失败: ${errorMessage}`, 'error');
   } finally {
@@ -595,9 +557,7 @@ const formatText = (format: string): void => {
  * 改变标题级别
  * @param {Event} event - 选择事件
  */
-const changeHeading = async (event: Event): Promise<void> => {
-  const target = event.target as HTMLSelectElement;
-  const level = target.value;
+const changeHeading = async (level: string): Promise<void> => {
   
   if (!editorCore.value) {
     showMessage('编辑器未初始化', 'error');
@@ -661,9 +621,6 @@ const changeHeading = async (event: Event): Promise<void> => {
     console.error('更改标题级别失败:', error);
     showMessage('更改标题级别失败', 'error');
   }
-  
-  // 重置选择器
-  target.value = '';
 };
 
 /**
@@ -912,20 +869,6 @@ const toggleReadOnly = (): void => {
 };
 
 /**
- * 切换颜色选择器显示状态
- * @param {string} type - 颜色类型 ('text' | 'background')
- */
-const toggleColorPicker = (type: string): void => {
-  if (type === 'text') {
-    showTextColorPicker.value = !showTextColorPicker.value;
-    showBgColorPicker.value = false;
-  } else if (type === 'background') {
-    showBgColorPicker.value = !showBgColorPicker.value;
-    showTextColorPicker.value = false;
-  }
-};
-
-/**
  * 设置文本颜色
  * @param {string} color - 颜色值
  */
@@ -978,42 +921,6 @@ const setBgColor = (color: string): void => {
 };
 
 /**
- * 获取颜色名称
- * @param {string} color - 颜色值
- * @returns {string} 颜色名称
- */
-const getColorName = (color: string): string => {
-  const colorNames: Record<string, string> = {
-    '#000000': '黑色',
-    '#ffffff': '白色',
-    '#ff0000': '红色',
-    '#00ff00': '绿色',
-    '#0000ff': '蓝色',
-    '#ffff00': '黄色',
-    '#ff00ff': '紫色',
-    '#00ffff': '青色',
-    '#ffa500': '橙色',
-    '#ffc0cb': '粉色',
-    '#808080': '灰色',
-    '#800000': '深红',
-    '#008000': '深绿',
-    '#000080': '深蓝',
-    '#808000': '橄榄',
-    '#800080': '紫红',
-    '#008080': '深青',
-    '#c0c0c0': '银色',
-    '#fff0e6': '浅橙',
-    '#fffacc': '浅黄',
-    '#eeffee': '浅绿',
-    '#e6f0ff': '浅蓝',
-    '#f0e6ff': '浅紫',
-    '#ffe6f0': '浅粉',
-    '#e6ffff': '浅青'
-  };
-  return colorNames[color] || color;
-};
-
-/**
  * 导入文件
  */
 const importFile = (): void => {
@@ -1025,21 +932,6 @@ const importFile = (): void => {
  */
 const exportFile = async (): Promise<void> => {
   await handleExport();
-};
-
-/**
- * 检查格式是否激活
- * @param {string} format - 格式类型
- * @returns {boolean} 是否激活
- */
-const isFormatActive = (format: string): boolean => {
-  if (!editorCore.value) return false;
-  
-  try {
-    return document.queryCommandState(format);
-  } catch (error) {
-    return false;
-  }
 };
 
 /**
@@ -1056,30 +948,6 @@ const applyTextColor = (color: string): void => {
  */
 const applyBgColor = (color: string): void => {
   setBgColor(color);
-};
-
-/**
- * 显示悬浮提示
- * @param event - 鼠标事件
- * @param text - 提示文本
- */
-const showTooltip = (event: MouseEvent, text: string): void => {
-  const target = event.target as HTMLElement;
-  const rect = target.getBoundingClientRect();
-  
-  tooltip.value = {
-    visible: true,
-    text,
-    x: rect.left + rect.width / 2,
-    y: rect.bottom + 8
-  };
-};
-
-/**
- * 隐藏悬浮提示
- */
-const hideTooltip = (): void => {
-  tooltip.value.visible = false;
 };
 
 /**

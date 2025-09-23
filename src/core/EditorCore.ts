@@ -1,4 +1,4 @@
-import EditorJS, { OutputData } from '@editorjs/editorjs';
+import EditorJS from '@editorjs/editorjs';
 import Header from '@editorjs/header';
 import Paragraph from '@editorjs/paragraph';
 import List from '@editorjs/list';
@@ -18,7 +18,7 @@ export class EditorCore implements EditorInstance {
   private history: EditorData[] = [];
   private historyIndex: number = -1;
   private maxHistorySize: number = 50;
-  private saveHistoryTimeout: NodeJS.Timeout | null = null;
+  private saveHistoryTimeout: ReturnType<typeof setTimeout> | null = null;
   private isUndoRedoOperation: boolean = false;
 
   constructor(config: EditorConfig) {
@@ -216,9 +216,6 @@ export class EditorCore implements EditorInstance {
   private isCaretAtEndOfLine(selection: Selection, block: HTMLElement): boolean {
     const range = selection.getRangeAt(0);
     const contentElement = (block.querySelector('.ce-paragraph, .ce-header, .cdx-block') as HTMLElement) || block;
-    
-    // 获取内容元素的文本内容
-    const textContent = contentElement.textContent || '';
     
     // 如果是文本节点，检查光标是否在文本末尾
     if (range.startContainer.nodeType === Node.TEXT_NODE) {
@@ -553,7 +550,7 @@ export class EditorCore implements EditorInstance {
       : this.config.holder;
     if (!container) return;
     
-    const observer = new MutationObserver((mutations) => {
+    const observer = new MutationObserver(() => {
       const element = this.findBlockElement(index);
       if (element) {
         const contentElement = element.querySelector('.ce-paragraph, .ce-header, .cdx-block') || element;

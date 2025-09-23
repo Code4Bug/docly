@@ -153,33 +153,17 @@
 
       <!-- 样式区域 -->
       <div class="toolbar-section">
-        <div class="color-picker-wrapper">
-          <button 
-            @click="emit('text-color-change', currentTextColor)" 
-            class="toolbar-btn color-btn"
-            @mouseenter="showTooltip($event, '文字颜色')"
-            @mouseleave="hideTooltip"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M9.62,12L12,5.67L14.38,12M11,3L5.5,17H7.75L8.87,14H15.13L16.25,17H18.5L13,3H11Z"/>
-            </svg>
-            <div class="color-indicator" :style="{ backgroundColor: currentTextColor }"></div>
-          </button>
-        </div>
+        <ColorPicker
+          type="text"
+          :current-color="currentTextColor"
+          @color-change="(color) => emit('text-color-change', color)"
+        />
         
-        <div class="color-picker-wrapper">
-          <button 
-            @click="emit('bg-color-change', currentBgColor)" 
-            class="toolbar-btn color-btn"
-            @mouseenter="showTooltip($event, '背景颜色')"
-            @mouseleave="hideTooltip"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M19,3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5C21,3.89 20.1,3 19,3M19,5V19H5V5H19Z"/>
-            </svg>
-            <div class="color-indicator bg-indicator" :style="{ backgroundColor: currentBgColor }"></div>
-          </button>
-        </div>
+        <ColorPicker
+          type="background"
+          :current-color="currentBgColor"
+          @color-change="(color) => emit('bg-color-change', color)"
+        />
       </div>
 
       <!-- 列表区域 -->
@@ -245,7 +229,7 @@
         <button 
           @click="$emit('toggle-annotation-mode')" 
           class="toolbar-btn"
-          :class="{ active: isAnnotationMode }"
+          :class="{ active: annotationMode }"
           @mouseenter="showTooltip($event, '添加批注')"
           @mouseleave="hideTooltip"
         >
@@ -256,8 +240,7 @@
         <button 
           @click="$emit('show-annotation-list')" 
           class="toolbar-btn"
-          :class="{ active: showAnnotationPanel }"
-          @mouseenter="showTooltip($event, showAnnotationPanel ? '隐藏批注列表' : '显示批注列表')"
+          @mouseenter="showTooltip($event, '显示批注列表')"
           @mouseleave="hideTooltip"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -283,7 +266,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-
+import ColorPicker from './ColorPicker.vue';
 
 // Props
 interface Props {
@@ -291,17 +274,19 @@ interface Props {
   currentAlignment?: string;
   currentTextColor?: string;
   currentBgColor?: string;
-  isAnnotationMode?: boolean;
-  showAnnotationPanel?: boolean;
+  isExporting?: boolean;
+  annotationMode?: boolean;
+  readOnly?: boolean;
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   currentHeading: '',
   currentAlignment: 'left',
   currentTextColor: '#000000',
   currentBgColor: '#ffffff',
-  isAnnotationMode: false,
-  showAnnotationPanel: false
+  isExporting: false,
+  annotationMode: false,
+  readOnly: false
 });
 
 // Emits

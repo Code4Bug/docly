@@ -34,15 +34,20 @@
     </div>
     
     <div class="status-right">
-      <!-- 只读模式指示 -->
-      <div 
-        v-if="isReadOnly" 
-        class="status-item readonly-indicator"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12,17A2,2 0 0,0 14,15C14,13.89 13.1,13 12,13A2,2 0 0,0 10,15A2,2 0 0,0 12,17M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V10C4,8.89 4.9,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z"/>
-        </svg>
-        <span>只读模式</span>
+      <!-- 只读/可编辑开关 -->
+      <div class="status-item readonly-toggle">
+        <button 
+          class="toggle-button"
+          :class="{ 'readonly': isReadOnly, 'editable': !isReadOnly }"
+          @click="handleToggleReadOnly"
+          :title="isReadOnly ? '切换到编辑模式' : '切换到只读模式'"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path v-if="isReadOnly" d="M12,17A2,2 0 0,0 14,15C14,13.89 13.1,13 12,13A2,2 0 0,0 10,15A2,2 0 0,0 12,17M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V10C4,8.89 4.9,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z"/>
+            <path v-else d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z"/>
+          </svg>
+          <span>{{ isReadOnly ? '只读' : '编辑' }}</span>
+        </button>
       </div>
       
       <!-- 批注模式指示 -->
@@ -91,6 +96,11 @@ const props = withDefaults(defineProps<Props>(), {
   editorContent: ''
 });
 
+// Emits
+const emit = defineEmits<{
+  'toggle-readonly': [];
+}>();
+
 // 响应式数据
 const currentTime = ref<string>('');
 let timeInterval: ReturnType<typeof setInterval> | null = null;
@@ -135,6 +145,13 @@ const updateTime = (): void => {
     hour: '2-digit',
     minute: '2-digit'
   });
+};
+
+/**
+ * 处理只读模式切换
+ */
+const handleToggleReadOnly = (): void => {
+  emit('toggle-readonly');
 };
 
 // 生命周期钩子
@@ -214,9 +231,43 @@ export default {
 }
 
 /* 指示器样式 */
-.readonly-indicator {
-  color: #ffc107;
-  font-weight: 500;
+.readonly-toggle .toggle-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fff;
+  color: #666;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.readonly-toggle .toggle-button:hover {
+  background: #f5f5f5;
+  border-color: #ccc;
+}
+
+.readonly-toggle .toggle-button.readonly {
+  background: #fff3cd;
+  border-color: #ffc107;
+  color: #856404;
+}
+
+.readonly-toggle .toggle-button.readonly:hover {
+  background: #ffeaa7;
+}
+
+.readonly-toggle .toggle-button.editable {
+  background: #d1ecf1;
+  border-color: #17a2b8;
+  color: #0c5460;
+}
+
+.readonly-toggle .toggle-button.editable:hover {
+  background: #bee5eb;
 }
 
 .annotation-indicator {
