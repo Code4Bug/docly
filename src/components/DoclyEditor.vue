@@ -18,6 +18,11 @@
       @set-alignment="setAlignment"
       @text-color-change="applyTextColor"
       @bg-color-change="applyBgColor"
+      :current-font-family="currentFontFamily"
+      :current-font-size="currentFontSize"
+      @font-family-change="applyFontFamily"
+      @font-size-change="applyFontSize"
+      @font-style-change="handleFontStyleChange"
       @insert-list="insertList"
       @insert-link="insertLink"
       @insert-table="insertTable"
@@ -122,11 +127,10 @@ const currentHeading = ref('');
 const isSaved = ref(true);
 const charCount = ref(0);
 
-// 颜色相关状态
-const showTextColorPicker = ref(false);
-const showBgColorPicker = ref(false);
 const currentTextColor = ref('#000000');
 const currentBgColor = ref('#ffffff');
+const currentFontFamily = ref('Arial, sans-serif');
+const currentFontSize = ref('14px');
 
 
 // 悬浮提示相关状态
@@ -297,23 +301,41 @@ const handleExport = async (): Promise<void> => {
 
   isExporting.value = true;
   try {
+    // 调试：直接从编辑器获取最新数据
+    console.log('=== 导出调试信息 ===');
+    const currentEditorData = await editorCore.value.save();
+    console.log('直接从编辑器获取的数据:', currentEditorData);
+    console.log('编辑器数据块数量:', currentEditorData.blocks.length);
+    
     // 先保存当前编辑器数据到 store
     await editorStore.saveDocument();
+    console.log('保存后store中的数据:', editorStore.editorData);
+    console.log('store数据块数量:', editorStore.editorData?.blocks.length || 0);
+    
+    // 比较两个数据是否一致
+    const storeDataStr = JSON.stringify(editorStore.editorData);
+    const editorDataStr = JSON.stringify(currentEditorData);
+    console.log('数据是否一致:', storeDataStr === editorDataStr);
+    
+    // 使用直接从编辑器获取的数据进行导出
+    const dataToExport = currentEditorData;
     
     // 检查是否有数据可导出
-    if (!editorStore.editorData || !editorStore.editorData.blocks || editorStore.editorData.blocks.length === 0) {
+    if (!dataToExport || !dataToExport.blocks || dataToExport.blocks.length === 0) {
       showMessage('没有内容可导出，请先添加一些内容', 'warning');
       return;
     }
 
+    console.log('准备导出的数据:', dataToExport);
+    
     // 执行导出
-    const file = await wordHandler.value.export(editorStore.editorData);
+    const fileResult = await wordHandler.value.export(dataToExport);
     
     // 创建下载链接
-    const url = URL.createObjectURL(file);
+    const url = URL.createObjectURL(fileResult.blob); 
     const a = document.createElement('a');
     a.href = url;
-    a.download = file.name;
+    a.download = fileResult.name;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -415,16 +437,16 @@ const handleImport = async (event: Event): Promise<void> => {
     
     // 首先从 EditorData.comments 中读取批注（新的存储方式）
     if (editorData.comments && editorData.comments.length > 0) {
-      editorData.comments.forEach((comment, index) => {
+      editorData.comments.forEach((comment: any, index: number) => {
         importedComments.push(createStandardComment(comment, index));
       });
     }
     
     // 然后从块中提取关联的批注（保持向后兼容）
     if (editorData.blocks) {
-      editorData.blocks.forEach((block, blockIndex) => {
+      editorData.blocks.forEach((block: any, blockIndex: number) => {
         if (block.comments && block.comments.length > 0) {
-          block.comments.forEach(comment => {
+          block.comments.forEach((comment: any) => {
             // 避免重复添加已经在 EditorData.comments 中的批注
             const existingComment = importedComments.find(c => c.id === comment.id);
             if (!existingComment) {
@@ -873,24 +895,20 @@ const toggleReadOnly = (): void => {
  * @param {string} color - 颜色值
  */
 const setTextColor = (color: string): void => {
+  console.log('DoclyEditor setTextColor 被调用:', color);
   if (!editorCore.value) {
+    console.error('编辑器未初始化');
     showMessage('编辑器未初始化', 'error');
     return;
   }
 
-  const selection = editorCore.value.getSelection();
-  if (!selection || selection.rangeCount === 0) {
-    showMessage('请先选择要设置颜色的文本', 'warning');
-    return;
-  }
-
   const success = editorCore.value.execCommand('foreColor', color);
+  console.log('execCommand foreColor 结果:', success);
   if (success) {
     currentTextColor.value = color;
     showMessage('文本颜色设置成功', 'success');
-    showTextColorPicker.value = false;
   } else {
-    showMessage('文本颜色设置失败', 'error');
+    showMessage('文本颜色设置失败，请确保光标在编辑区域内', 'error');
   }
 };
 
@@ -899,24 +917,20 @@ const setTextColor = (color: string): void => {
  * @param {string} color - 颜色值
  */
 const setBgColor = (color: string): void => {
+  console.log('DoclyEditor setBgColor 被调用:', color);
   if (!editorCore.value) {
+    console.error('编辑器未初始化');
     showMessage('编辑器未初始化', 'error');
     return;
   }
 
-  const selection = editorCore.value.getSelection();
-  if (!selection || selection.rangeCount === 0) {
-    showMessage('请先选择要设置背景颜色的文本', 'warning');
-    return;
-  }
-
   const success = editorCore.value.execCommand('backColor', color);
+  console.log('execCommand backColor 结果:', success);
   if (success) {
     currentBgColor.value = color;
     showMessage('背景颜色设置成功', 'success');
-    showBgColorPicker.value = false;
   } else {
-    showMessage('背景颜色设置失败', 'error');
+    showMessage('背景颜色设置失败，请确保光标在编辑区域内', 'error');
   }
 };
 
@@ -939,6 +953,7 @@ const exportFile = async (): Promise<void> => {
  * @param {string} color - 颜色值
  */
 const applyTextColor = (color: string): void => {
+  console.log('DoclyEditor applyTextColor 被调用:', color);
   setTextColor(color);
 };
 
@@ -947,7 +962,115 @@ const applyTextColor = (color: string): void => {
  * @param {string} color - 颜色值
  */
 const applyBgColor = (color: string): void => {
+  console.log('DoclyEditor applyBgColor 被调用:', color);
   setBgColor(color);
+};
+
+/**
+ * 应用字体族
+ * @param {string} fontFamily - 字体族
+ */
+const applyFontFamily = (fontFamily: string): void => {
+  console.log('DoclyEditor applyFontFamily 被调用:', fontFamily);
+  if (!editorCore.value) {
+    showMessage('编辑器未初始化', 'error');
+    return;
+  }
+
+  const selection = editorCore.value.getSelection();
+  if (!selection || selection.rangeCount === 0) {
+    showMessage('请先选择要设置字体的文本', 'warning');
+    return;
+  }
+
+  const success = editorCore.value.execCommand('fontName', fontFamily);
+  if (success) {
+    currentFontFamily.value = fontFamily;
+    showMessage('字体设置成功', 'success');
+  } else {
+    showMessage('字体设置失败', 'error');
+  }
+};
+
+/**
+ * 应用字体大小
+ * @param {string} fontSize - 字体大小
+ */
+const applyFontSize = (fontSize: string): void => {
+  console.log('DoclyEditor applyFontSize 被调用:', fontSize);
+  if (!editorCore.value) {
+    showMessage('编辑器未初始化', 'error');
+    return;
+  }
+
+  const selection = editorCore.value.getSelection();
+  if (!selection || selection.rangeCount === 0) {
+    showMessage('请先选择要设置字体大小的文本', 'warning');
+    return;
+  }
+
+  // 将像素值转换为字号
+  const sizeValue = parseInt(fontSize.replace('px', ''));
+  const success = editorCore.value.execCommand('fontSize', sizeValue.toString());
+  if (success) {
+    currentFontSize.value = fontSize;
+    showMessage('字体大小设置成功', 'success');
+  } else {
+    showMessage('字体大小设置失败', 'error');
+  }
+};
+
+/**
+ * 处理字体样式变化
+ * @param {string} action - 操作类型
+ */
+const handleFontStyleChange = (action: string): void => {
+  console.log('DoclyEditor handleFontStyleChange 被调用:', action);
+  if (!editorCore.value) {
+    showMessage('编辑器未初始化', 'error');
+    return;
+  }
+
+  const selection = editorCore.value.getSelection();
+  if (!selection || selection.rangeCount === 0) {
+    showMessage('请先选择要调整的文本', 'warning');
+    return;
+  }
+
+  let success = false;
+  let message = '';
+
+  switch (action) {
+    case 'increase-size':
+      // 增大字体
+      const currentSize = parseInt(currentFontSize.value.replace('px', ''));
+      const newSize = Math.min(currentSize + 2, 48); // 最大48px
+      success = editorCore.value.execCommand('fontSize', newSize.toString());
+      if (success) {
+        currentFontSize.value = `${newSize}px`;
+        message = '字体已增大';
+      }
+      break;
+    case 'decrease-size':
+      // 减小字体
+      const currentSizeDecrease = parseInt(currentFontSize.value.replace('px', ''));
+      const newSizeDecrease = Math.max(currentSizeDecrease - 2, 10); // 最小10px
+      success = editorCore.value.execCommand('fontSize', newSizeDecrease.toString());
+      if (success) {
+        currentFontSize.value = `${newSizeDecrease}px`;
+        message = '字体已减小';
+      }
+      break;
+    default:
+      showMessage('不支持的字体操作', 'error');
+      return;
+  }
+
+  if (success) {
+    showMessage(message, 'success');
+  } else {
+    showMessage('字体操作失败', 'error');
+  }
 };
 
 /**

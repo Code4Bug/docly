@@ -63,7 +63,21 @@
           <option value="2">标题 2</option>
           <option value="3">标题 3</option>
         </select>
-        
+      </div>
+
+      <!-- 字体设置区域 -->
+      <div class="toolbar-section">
+        <FontTool
+          :current-font-family="currentFontFamily"
+          :current-font-size="currentFontSize"
+          @font-family-change="(fontFamily: string) => emit('font-family-change', fontFamily)"
+          @font-size-change="(fontSize: number) => emit('font-size-change', fontSize)"
+          @font-style-change="(action: string) => emit('font-style-change', action)"
+        />
+      </div>
+
+      <!-- 文本样式区域 -->
+      <div class="toolbar-section">
         <div class="button-group">
           <button 
             @click="$emit('format-text', 'bold')" 
@@ -162,7 +176,7 @@
         <ColorPicker
           type="background"
           :current-color="currentBgColor"
-          @color-change="(color) => emit('bg-color-change', color)"
+          @color-change="(color: string) => emit('bg-color-change', color)"
         />
       </div>
 
@@ -267,6 +281,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import ColorPicker from './ColorPicker.vue';
+import FontTool from './FontTool.vue';
 
 // Props
 interface Props {
@@ -274,6 +289,8 @@ interface Props {
   currentAlignment?: string;
   currentTextColor?: string;
   currentBgColor?: string;
+  currentFontFamily?: string;
+  currentFontSize?: string;
   isExporting?: boolean;
   annotationMode?: boolean;
   readOnly?: boolean;
@@ -284,6 +301,8 @@ withDefaults(defineProps<Props>(), {
   currentAlignment: 'left',
   currentTextColor: '#000000',
   currentBgColor: '#ffffff',
+  currentFontFamily: 'Arial, sans-serif',
+  currentFontSize: '14px',
   isExporting: false,
   annotationMode: false,
   readOnly: false
@@ -300,6 +319,9 @@ const emit = defineEmits<{
   'set-alignment': [alignment: string];
   'text-color-change': [color: string];
   'bg-color-change': [color: string];
+  'font-family-change': [fontFamily: string];
+  'font-size-change': [fontSize: string];
+  'font-style-change': [action: string];
   'insert-list': [type: string];
   'insert-link': [];
   'insert-table': [];

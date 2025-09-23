@@ -1,937 +1,426 @@
-import { parseAsync } from 'docx-preview';
-import type { FileHandler, EditorData, Comment } from '../types';
-import { extractCommentsFromDocument } from './WordHandlerComments';
+import JSZip from 'jszip';
+import type { EditorData } from '../types';
 
 /**
- * Word文件处理器
- * 负责Word文件的导入和导出
+ * Word文档处理器
+ * 基于JSZip实现完整的DOCX文件生成
  */
-export class WordHandler implements FileHandler {
+export class WordHandler {
+  /**
+   * 导入Word文档并转换为Editor.js数据
+   * @param file - 要导入的Word文档文件
+   * @returns Promise<EditorData> - 转换后的Editor.js数据
+   */
+  async import(file: File): Promise<EditorData> {
+    try {
+      console.log('开始导入Word文档:', file.name);
+      
+      // 读取DOCX文件
+      const arrayBuffer = await file.arrayBuffer();
+      const zip = await JSZip.loadAsync(arrayBuffer);
+      
+      // 提取document.xml文件
+      const documentXml = await zip.file('word/document.xml')?.async('text');
+      if (!documentXml) {
+        throw new Error('无法找到Word文档内容');
+      }
+      
+      // 解析XML并转换为Editor.js数据
+      const editorData = this.parseWordXmlToEditorData(documentXml);
+      
+      console.log('Word文档导入成功:', editorData);
+      return editorData;
+    } catch (error) {
+      console.error('导入Word文档时发生错误:', error);
+      throw new Error(`导入失败: ${(error as Error).message}`);
+    }
+  }
 
   /**
-   * 解析文档结构，遍历document.documentPart.body.children
-   * 为每个type类型创建独立的编辑器块，支持递归处理嵌套结构
+   * 导出Editor.js数据为Word文档
+   * @param editorData - Editor.js的数据
+   * @param filename - 导出的文件名
    */
-  private parseDocumentStructure(document: any): any[] {
+  async export(editorData: EditorData, filename: string = 'document'): Promise<{ blob: Blob; name: string }> {
+    try {
+      console.log('开始导出Word文档:', editorData);
+      
+      // 将Editor.js数据转换为HTML
+      const htmlContent = this.convertEditorDataToHtml(editorData);
+      console.log('转换后的HTML:', htmlContent);
+      
+      // 将HTML转换为Word XML
+      const wordXml = this.htmlToWordXml(htmlContent);
+      
+      // 生成完整的DOCX文件
+      const docxBlob = await this.generateDocxFile(wordXml);
+      
+      // 返回文件对象
+      const finalFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
+      
+      console.log('Word文档导出成功:', finalFilename);
+      return { blob: docxBlob, name: finalFilename };
+    } catch (error) {
+      console.error('导出Word文档时发生错误:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 解析Word XML并转换为Editor.js数据
+   * @param xmlContent - Word文档的XML内容
+   * @returns Editor.js数据
+   */
+  private parseWordXmlToEditorData(xmlContent: string): EditorData {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xmlContent, 'text/xml');
     const blocks: any[] = [];
     
-    try {
-      // 检查文档结构是否存在
-      if (!document?.documentPart?.body?.children) {
-        console.warn('文档结构不完整，缺少documentPart.body.children');
-        return blocks;
+    // 获取所有段落元素
+    const paragraphs = doc.querySelectorAll('w\\:p, p');
+    
+    paragraphs.forEach((p, index) => {
+      const blockId = `block-${Date.now()}-${index}`;
+      
+      // 检查是否是标题
+      const styleElement = p.querySelector('w\\:pStyle, pStyle');
+      const styleVal = styleElement?.getAttribute('w:val') || styleElement?.getAttribute('val');
+      
+      // 提取文本内容
+      const textElements = p.querySelectorAll('w\\:t, t');
+      let text = '';
+      textElements.forEach(t => {
+        text += t.textContent || '';
+      });
+      
+      // 跳过空段落
+      if (!text.trim()) {
+        return;
       }
       
-      const bodyChildren = document.documentPart.body.children;
-      console.log('文档body子元素数量:', bodyChildren.length);
-      
-      // 递归处理每个子元素
-      this.processElementsRecursively(bodyChildren, blocks);
-      
-      console.log('成功解析的块数量:', blocks.length);
-      return blocks;
-      
-    } catch (error) {
-      console.error('解析文档结构时出错:', error);
-      return blocks;
-    }
-  }
-
-  /**
-   * 递归处理元素数组
-   */
-  private processElementsRecursively(elements: any[], blocks: any[], depth: number = 0): void {
-    if (!elements || !Array.isArray(elements)) return;
-    
-    elements.forEach((element) => {
-      
-      // 根据元素类型分类处理
-      const elementCategory = this.categorizeElement(element);
-      
-      
-      switch (elementCategory) {
-        case 'block': // 块级元素，创建独立的编辑器块
-          const block = this.createBlockFromDocumentElement(element, blocks.length);
-          if (block) {
-            blocks.push(block);
+      // 根据样式确定块类型
+      if (styleVal && styleVal.startsWith('Heading')) {
+        const level = parseInt(styleVal.replace('Heading', '')) || 1;
+        blocks.push({
+          id: blockId,
+          type: 'header',
+          data: {
+            text: text.trim(),
+            level: Math.min(level, 6)
           }
-          // 注意：块级元素已经在createBlockFromDocumentElement中处理了子元素，不需要再递归
-          break;
-          
-        case 'inline': // 内联元素，合并到当前块
-          this.mergeInlineElement(element, blocks);
-          // 内联元素的子元素也需要递归处理
-          if (element.children) {
-            this.processElementsRecursively(element.children, blocks, depth + 1);
+        });
+      } else if (styleVal === 'Quote') {
+        blocks.push({
+          id: blockId,
+          type: 'quote',
+          data: {
+            text: text.trim(),
+            caption: '',
+            alignment: 'left'
           }
-          break;
-          
-        case 'container': // 容器元素，递归处理子元素
-          if (element.children) {
-            this.processElementsRecursively(element.children, blocks, depth + 1);
+        });
+      } else {
+        // 默认为段落
+        blocks.push({
+          id: blockId,
+          type: 'paragraph',
+          data: {
+            text: text.trim()
           }
-          break;
-          
-        case 'ignore': // 忽略的元素类型
-          console.log(`忽略元素类型: ${element.type}`);
-          break;
+        });
       }
     });
-  }
-
-  /**
-   * 元素分类
-   */
-  private categorizeElement(element: any): 'block' | 'inline' | 'container' | 'ignore' {
-    if (!element.type) return 'ignore';
     
-    const blockTypes = ['paragraph', 'heading', 'title', 'table', 'list', 'image', 'pageBreak'];
-    const inlineTypes = ['run', 'text', 'tab', 'br', 'symbol'];
-    const containerTypes = ['body', 'section', 'div'];
-    const ignoreTypes = ['bookmark', 'field', 'comment', 'footnote'];
+    // 处理表格
+    const tables = doc.querySelectorAll('w\\:tbl, tbl');
+    tables.forEach((table, index) => {
+      const blockId = `table-${Date.now()}-${index}`;
+      const rows = table.querySelectorAll('w\\:tr, tr');
+      const content: string[][] = [];
+      
+      rows.forEach(row => {
+        const cells = row.querySelectorAll('w\\:tc, tc');
+        const rowData: string[] = [];
+        
+        cells.forEach(cell => {
+          const cellTexts = cell.querySelectorAll('w\\:t, t');
+          let cellText = '';
+          cellTexts.forEach(t => {
+            cellText += t.textContent || '';
+          });
+          rowData.push(cellText.trim());
+        });
+        
+        if (rowData.length > 0) {
+          content.push(rowData);
+        }
+      });
+      
+      if (content.length > 0) {
+        blocks.push({
+          id: blockId,
+          type: 'table',
+          data: {
+            withHeadings: true,
+            content: content
+          }
+        });
+      }
+    });
     
-    if (blockTypes.includes(element.type)) return 'block';
-    if (inlineTypes.includes(element.type)) return 'inline';
-    if (containerTypes.includes(element.type)) return 'container';
-    if (ignoreTypes.includes(element.type)) return 'ignore';
-    
-    // 默认作为块级元素处理
-    return 'block';
-  }
-
-  /**
-   * 合并内联元素到最后一个块
-   */
-  private mergeInlineElement(element: any, blocks: any[]): void {
+    // 如果没有找到任何内容，添加一个默认段落
     if (blocks.length === 0) {
-      // 如果没有块，创建一个新的段落块
-      const newBlock = {
-        id: `paragraph_${Date.now()}`,
+      blocks.push({
+        id: `block-${Date.now()}`,
         type: 'paragraph',
         data: {
-          text: this.extractTextFromElement(element),
-          styles: this.extractStylesFromElement(element)
+          text: '文档导入成功，但未找到可识别的内容。'
         }
-      };
-      blocks.push(newBlock);
-    } else {
-      // 合并到最后一个块
-      const lastBlock = blocks[blocks.length - 1];
-      if (lastBlock.type === 'paragraph') {
-        const additionalText = this.extractTextFromElement(element);
-        lastBlock.data.text += additionalText;
-        
-        // 合并样式
-        const additionalStyles = this.extractStylesFromElement(element);
-        Object.assign(lastBlock.data.styles, additionalStyles);
-      }
+      });
     }
-  }
-
-  /**
-   * 根据文档元素创建编辑器块
-   * 将docx文档元素类型映射到editor.js块类型
-   */
-  private createBlockFromDocumentElement(element: any, index: number): any | null {
-    if (!element || !element.type) {
-      console.warn('元素缺少type属性:', element);
-      return null;
-    }
-    
-    const elementType = element.type;
-    
-    switch (elementType) {
-      case 'paragraph':
-        return this.createParagraphBlock(element, index);
-      
-      case 'table':
-        return this.createTableBlock(element, index);
-      
-      case 'heading':
-      case 'title':
-        return this.createHeaderBlock(element, index);
-      
-      case 'list':
-      case 'numbering':
-        return this.createListBlock(element, index);
-      
-      case 'image':
-      case 'picture':
-        return this.createImageBlock(element, index);
-      
-      default:
-        console.log(`未知元素类型: ${elementType}，尝试作为段落处理`);
-        return this.createParagraphBlock(element, index);
-    }
-  }
-
-  /**
-   * 创建段落块
-   */
-  private createParagraphBlock(element: any, index: number): any {
-    const text = this.extractTextFromElement(element);
-    const styles = this.extractStylesFromElement(element);
-    
-    const block = {
-      id: `paragraph_${Date.now()}_${index}`,
-      type: 'paragraph',
-      data: {
-        text: text || '',
-        styles: styles
-      }
-    };
-    
-    return block;
-  }
-
-  /**
-   * 创建标题块
-   */
-  private createHeaderBlock(element: any, index: number): any {
-    const text = this.extractTextFromElement(element);
-    const styles = this.extractStylesFromElement(element);
-    const level = this.extractHeaderLevel(element);
     
     return {
-      id: `header_${Date.now()}_${index}`,
-      type: 'header',
-      data: {
-        text: text || '',
-        level: level,
-        styles: styles
-      }
+      time: Date.now(),
+      blocks: blocks,
+      version: '2.28.2'
     };
   }
-
+  
   /**
-   * 创建表格块
-   */
-  private createTableBlock(element: any, index: number): any {
-    const tableData = this.extractTableData(element);
-    const styles = this.extractStylesFromElement(element);
-    
-    return {
-      id: `table_${Date.now()}_${index}`,
-      type: 'table',
-      data: {
-        withHeadings: tableData.withHeadings,
-        content: tableData.content,
-        styles: styles
-      }
-    };
-  }
-
-  /**
-   * 创建列表块
-   */
-  private createListBlock(element: any, index: number): any {
-    const listData = this.extractListData(element);
-    const styles = this.extractStylesFromElement(element);
-    
-    return {
-      id: `list_${Date.now()}_${index}`,
-      type: 'list',
-      data: {
-        style: listData.style,
-        items: listData.items,
-        styles: styles
-      }
-    };
-  }
-
-  /**
-   * 创建图片块
-   */
-  private createImageBlock(element: any, index: number): any {
-    const imageData = this.extractImageData(element);
-    const styles = this.extractStylesFromElement(element);
-    
-    return {
-      id: `image_${Date.now()}_${index}`,
-      type: 'image',
-      data: {
-        file: imageData.file,
-        caption: imageData.caption,
-        withBorder: imageData.withBorder,
-        withBackground: imageData.withBackground,
-        stretched: imageData.stretched,
-        styles: styles
-      }
-    };
-  }
-
-  /**
-   * 从文档元素中提取文本内容
+   * 将Editor.js数据转换为HTML字符串
+   * @param editorData - Editor.js数据
+   * @returns HTML字符串
    */
   /**
-   * 从元素中提取文本内容，支持递归处理嵌套结构和特殊文本元素
+   * 将Editor.js数据转换为HTML，优先使用保存的htmlContent
+   * @param editorData - Editor.js数据
+   * @returns 转换后的HTML字符串
    */
-  private extractTextFromElement(element: any): string {
-    if (!element) return '';
-    
-    let text = '';
-    
-    // 1. 直接文本属性
-    if (element.text) {
-      text += element.text;
-    }
-    
-    // 2. 处理特殊文本元素
-    switch (element.type) {
-      case 'tab':
-        text += '\t';
-        break;
-      case 'br':
-        text += '\n';
-        break;
-      case 'symbol':
-        text += element.char || '';
-        break;
-    }
-    
-    // 3. 递归提取子元素文本（重要：处理嵌套结构）
-    if (element.children && Array.isArray(element.children)) {
-      text += element.children
-        .map((child: any) => this.extractTextFromElement(child))
-        .join('');
-    }
-    
-    // 4. 提取文本运行
-    if (element.runs && Array.isArray(element.runs)) {
-      text += element.runs
-        .map((run: any) => {
-          // 递归处理run中的子元素
-          if (run.children) {
-            return this.extractTextFromElement(run);
+  private convertEditorDataToHtml(editorData: EditorData): string {
+    /**
+     * 将Editor.js数据块转换为HTML
+     * @param blocks - Editor.js数据块数组
+     * @returns 转换后的HTML字符串
+     */
+    const blocksToHtml = (blocks: any[]) => {
+      return blocks.map(block => {
+        // 优先使用保存的htmlContent（包含完整样式）
+        if (block.data && block.data.htmlContent) {
+          console.log('使用保存的htmlContent:', block.data.htmlContent);
+          
+          // 检查htmlContent是否已经有合适的标签包装
+          const htmlContent = block.data.htmlContent.trim();
+          
+          // 根据块类型处理HTML内容
+          switch (block.type) {
+            case "header":
+              const level = block.data.level || 1;
+              // 如果htmlContent已经是div，替换为对应的header标签
+              if (htmlContent.startsWith('<div>') && htmlContent.endsWith('</div>')) {
+                const innerContent = htmlContent.slice(5, -6); // 移除<div>和</div>
+                return `<h${level}>${innerContent}</h${level}>`;
+              }
+              return `<h${level}>${htmlContent}</h${level}>`;
+            case "paragraph":
+              // 如果htmlContent已经是div，替换为p标签
+              if (htmlContent.startsWith('<div>') && htmlContent.endsWith('</div>')) {
+                const innerContent = htmlContent.slice(5, -6); // 移除<div>和</div>
+                return `<p>${innerContent}</p>`;
+              }
+              // 如果已经是p标签，直接返回
+              if (htmlContent.startsWith('<p>') && htmlContent.endsWith('</p>')) {
+                return htmlContent;
+              }
+              return `<p>${htmlContent}</p>`;
+            case "list":
+              // 对于列表，htmlContent可能已经包含了完整的列表结构
+              if (htmlContent.includes('<li>')) {
+                const tag = block.data.style === "ordered" ? "ol" : "ul";
+                return `<${tag}>${htmlContent}</${tag}>`;
+              }
+              return htmlContent.startsWith('<div>') ? htmlContent : `<div>${htmlContent}</div>`;
+            case "quote":
+              if (htmlContent.startsWith('<div>') && htmlContent.endsWith('</div>')) {
+                const innerContent = htmlContent.slice(5, -6);
+                return `<blockquote>${innerContent}</blockquote>`;
+              }
+              return `<blockquote>${htmlContent}</blockquote>`;
+            case "code":
+              if (htmlContent.startsWith('<div>') && htmlContent.endsWith('</div>')) {
+                const innerContent = htmlContent.slice(5, -6);
+                return `<pre><code>${innerContent}</code></pre>`;
+              }
+              return `<pre><code>${htmlContent}</code></pre>`;
+            default:
+              return htmlContent.startsWith('<div>') ? htmlContent : `<div>${htmlContent}</div>`;
           }
-          return run.text || '';
-        })
-        .join('');
-    }
+        }
+        
+        // 回退到原来的处理方式
+        const blockStyles = this.extractBlockStyles(block);
+        
+        switch (block.type) {
+          case "header":
+            const level = block.data.level || 1;
+            const headerStyle = `font-weight:bold; margin:12px 0;${blockStyles ? ` ${blockStyles}` : ''}`;
+            return `<h${level} style="${headerStyle}">${this.escapeHtml(block.data.text || '')}</h${level}>`;
+          case "paragraph":
+            const paragraphStyle = `line-height:1.6; margin:8px 0;${blockStyles ? ` ${blockStyles}` : ''}`;
+            return `<p style="${paragraphStyle}">${this.processInlineFormatting(block.data.text || '')}</p>`;
+          case "list":
+            const tag = block.data.style === "ordered" ? "ol" : "ul";
+            const listStyle = `padding-left:20px;${blockStyles ? ` ${blockStyles}` : ''}`;
+            const listItems = (block.data.items || []).map((item: string) => `<li>${this.processInlineFormatting(item)}</li>`).join("");
+            return `<${tag} style="${listStyle}">${listItems}</${tag}>`;
+          case "image":
+            const figureStyle = `text-align:center;${blockStyles ? ` ${blockStyles}` : ''}`;
+            return `<figure style="${figureStyle}">
+                      <img src="${block.data.url}" alt="${block.data.caption || ""}" style="max-width:100%;"/>
+                      ${block.data.caption ? `<figcaption>${this.escapeHtml(block.data.caption)}</figcaption>` : ""}
+                    </figure>`;
+          case "quote":
+            const quoteStyle = `border-left:4px solid #ccc; padding-left:16px; margin:16px 0; font-style:italic;${blockStyles ? ` ${blockStyles}` : ''}`;
+            return `<blockquote style="${quoteStyle}">${this.processInlineFormatting(block.data.text || '')}</blockquote>`;
+          case "code":
+            const codeStyle = `background-color:#f5f5f5; padding:12px; border-radius:4px; font-family:monospace;${blockStyles ? ` ${blockStyles}` : ''}`;
+            return `<pre style="${codeStyle}"><code>${this.escapeHtml(block.data.code || '')}</code></pre>`;
+          case "table":
+            if (block.data.content && Array.isArray(block.data.content)) {
+              const tableStyle = `border-collapse:collapse; width:100%;${blockStyles ? ` ${blockStyles}` : ''}`;
+              const tableRows = block.data.content.map((row: string[]) => {
+                const cells = row.map(cell => `<td style="border:1px solid #ddd; padding:8px;">${this.processInlineFormatting(cell)}</td>`).join('');
+                return `<tr>${cells}</tr>`;
+              }).join('');
+              return `<table style="${tableStyle}"><tbody>${tableRows}</tbody></table>`;
+            }
+            break;
+          default:
+            // 处理未知类型的块
+            if (block.data && block.data.text) {
+              const defaultStyle = `margin:8px 0;${blockStyles ? ` ${blockStyles}` : ''}`;
+              return `<div style="${defaultStyle}">${this.processInlineFormatting(block.data.text)}</div>`;
+            }
+            return "";
+        }
+      }).join("\n");
+    };
     
-    return text;
+    return blocksToHtml(editorData.blocks);
   }
 
   /**
-   * 从文档元素中提取样式信息
-   * 支持从cssStyle、lineSpacing、runProps等多个来源获取样式
+   * 提取块级样式
+   * @param block - Editor.js块数据
+   * @returns CSS样式字符串
    */
-  private extractStylesFromElement(element: any): any {
-    const styles: any = {};
+  private extractBlockStyles(block: any): string {
+    const styles: string[] = [];
     
-    if (!element) return styles;
-    
-    // 1. 从cssStyle中提取样式
-    if (element.cssStyle) {
-      this.parseCssStyleString(element.cssStyle, styles);
-    }
-    
-    // 2. 从lineSpacing中提取行间距
-    if (element.lineSpacing) {
-      if (typeof element.lineSpacing === 'number') {
-        styles.lineHeight = element.lineSpacing;
-      } else if (element.lineSpacing.line) {
-        styles.lineHeight = element.lineSpacing.line;
-      }
-    }
-    
-    // 3. 从runProps中提取字符属性
-    if (element.runProps) {
-      this.extractRunProperties(element.runProps, styles);
-    }
-    
-    // 4. 提取段落属性（保持原有逻辑）
-    if (element.paragraphProperties) {
-      const pPr = element.paragraphProperties;
-      
-      // 对齐方式
-      if (pPr.alignment) {
-        styles.textAlign = pPr.alignment;
+    // 检查块的tunes或其他样式配置
+    if (block.tunes) {
+      // 文本对齐
+      if (block.tunes.textAlign) {
+        styles.push(`text-align: ${block.tunes.textAlign}`);
       }
       
-      // 缩进
-      if (pPr.indent) {
-        if (pPr.indent.left) styles.marginLeft = `${pPr.indent.left}px`;
-        if (pPr.indent.right) styles.marginRight = `${pPr.indent.right}px`;
-        if (pPr.indent.firstLine) styles.textIndent = `${pPr.indent.firstLine}px`;
-      }
-      
-      // 间距
-      if (pPr.spacing) {
-        if (pPr.spacing.before) styles.marginTop = `${pPr.spacing.before}px`;
-        if (pPr.spacing.after) styles.marginBottom = `${pPr.spacing.after}px`;
-        if (pPr.spacing.line) styles.lineHeight = pPr.spacing.line;
-      }
-    }
-    
-    // 5. 提取字符属性（保持原有逻辑）
-    if (element.characterProperties || element.runProperties) {
-      const rPr = element.characterProperties || element.runProperties;
-      
-      // 字体
-      if (rPr.fontFamily) {
-        styles.fontFamily = this.mapChineseFontName(rPr.fontFamily);
-      }
-      
-      // 字号
-      if (rPr.fontSize) {
-        styles.fontSize = `${rPr.fontSize}pt`;
+      // 字体样式
+      if (block.tunes.fontSize) {
+        styles.push(`font-size: ${block.tunes.fontSize}px`);
       }
       
       // 颜色
-      if (rPr.color) {
-        styles.color = rPr.color;
+      if (block.tunes.color) {
+        styles.push(`color: ${block.tunes.color}`);
       }
       
-      // 粗体
-      if (rPr.bold) {
-        styles.fontWeight = 'bold';
+      // 背景色
+      if (block.tunes.backgroundColor) {
+        styles.push(`background-color: ${block.tunes.backgroundColor}`);
       }
       
-      // 斜体
-      if (rPr.italic) {
-        styles.fontStyle = 'italic';
+      // 字体粗细
+      if (block.tunes.fontWeight) {
+        styles.push(`font-weight: ${block.tunes.fontWeight}`);
       }
       
-      // 下划线
-      if (rPr.underline) {
-        styles.textDecoration = 'underline';
+      // 字体样式
+      if (block.tunes.fontStyle) {
+        styles.push(`font-style: ${block.tunes.fontStyle}`);
+      }
+      
+      // 字体家族
+      if (block.tunes.fontFamily) {
+        styles.push(`font-family: ${block.tunes.fontFamily}`);
       }
     }
     
-    return styles;
+    // 检查data中的样式信息
+    if (block.data) {
+      if (block.data.alignment) {
+        styles.push(`text-align: ${block.data.alignment}`);
+      }
+      
+      if (block.data.fontSize) {
+        styles.push(`font-size: ${block.data.fontSize}px`);
+      }
+      
+      if (block.data.color) {
+        styles.push(`color: ${block.data.color}`);
+      }
+      
+      if (block.data.backgroundColor) {
+        styles.push(`background-color: ${block.data.backgroundColor}`);
+      }
+      
+      if (block.data.fontWeight) {
+        styles.push(`font-weight: ${block.data.fontWeight}`);
+      }
+      
+      if (block.data.fontStyle) {
+        styles.push(`font-style: ${block.data.fontStyle}`);
+      }
+      
+      if (block.data.fontFamily) {
+        styles.push(`font-family: ${block.data.fontFamily}`);
+      }
+    }
+    
+    return styles.join('; ');
   }
   
   /**
-   * 解析CSS样式字符串
+   * 处理内联格式化标记
+   * @param text - 包含内联格式的文本
+   * @returns 处理后的HTML文本
    */
-  private parseCssStyleString(cssStyle: string, styles: any): void {
-    if (!cssStyle || typeof cssStyle !== 'string') return;
-    
-    // 分割CSS样式字符串
-    const declarations = cssStyle.split(';').filter(decl => decl.trim());
-    
-    declarations.forEach(declaration => {
-      const [property, value] = declaration.split(':').map(s => s.trim());
-      if (property && value) {
-        // 转换CSS属性名为camelCase
-        const camelCaseProperty = property.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
-        
-        // 特殊处理字体族
-        if (camelCaseProperty === 'fontFamily') {
-          styles[camelCaseProperty] = this.mapChineseFontName(value);
-        } else {
-          styles[camelCaseProperty] = value;
-        }
-      }
-    });
-  }
-  
   /**
-   * 从runProps中提取字符属性
+   * 处理内联格式化，保留所有内联样式
+   * @param text - 包含HTML标记的文本
+   * @returns 处理后的HTML文本
    */
-  private extractRunProperties(runProps: any, styles: any): void {
-    if (!runProps) return;
+  private processInlineFormatting(text: string): string {
+    if (!text) return '';
     
-    // 字体族
-    if (runProps.fontFamily || runProps.rFonts) {
-      const fontFamily = runProps.fontFamily || runProps.rFonts?.ascii || runProps.rFonts?.eastAsia;
-      if (fontFamily) {
-        styles.fontFamily = this.mapChineseFontName(fontFamily);
-      }
-    }
+    // 直接返回原始HTML，保留所有内联样式和标记
+    // Editor.js会生成包含样式的HTML，我们需要完整保留这些信息
+    let processedText = text;
     
-    // 字号
-    if (runProps.fontSize || runProps.sz) {
-      const fontSize = runProps.fontSize || runProps.sz;
-      styles.fontSize = typeof fontSize === 'number' ? `${fontSize / 2}pt` : fontSize;
-    }
+    // 只进行必要的标签标准化，保留所有样式属性
+    processedText = processedText.replace(/<b([^>]*)>/g, '<strong$1>');
+    processedText = processedText.replace(/<\/b>/g, '</strong>');
+    processedText = processedText.replace(/<i([^>]*)>/g, '<em$1>');
+    processedText = processedText.replace(/<\/i>/g, '</em>');
     
-    // 颜色
-    if (runProps.color) {
-      styles.color = runProps.color.startsWith('#') ? runProps.color : `#${runProps.color}`;
-    }
+    // 保留所有span标签和style属性
+    // 不对span标签进行任何修改，确保内联样式完整保留
     
-    // 粗体
-    if (runProps.bold || runProps.b) {
-      styles.fontWeight = 'bold';
-    }
-    
-    // 斜体
-    if (runProps.italic || runProps.i) {
-      styles.fontStyle = 'italic';
-    }
-    
-    // 下划线
-    if (runProps.underline || runProps.u) {
-      styles.textDecoration = 'underline';
-    }
-    
-    // 删除线
-    if (runProps.strike) {
-      styles.textDecoration = styles.textDecoration ? `${styles.textDecoration} line-through` : 'line-through';
-    }
+    return processedText;
   }
 
   /**
-   * 提取标题级别
-   */
-  private extractHeaderLevel(element: any): number {
-    // 从样式名称中提取级别
-    if (element.styleName) {
-      const match = element.styleName.match(/heading\s*(\d+)/i) || element.styleName.match(/标题\s*(\d+)/);
-      if (match) {
-        return parseInt(match[1], 10);
-      }
-    }
-    
-    // 从段落属性中提取
-    if (element.paragraphProperties?.outlineLevel) {
-      return element.paragraphProperties.outlineLevel + 1;
-    }
-    
-    // 默认为1级标题
-    return 1;
-  }
-
-  /**
-   * 提取表格数据
-   */
-  private extractTableData(element: any): any {
-    const content: string[][] = [];
-    let withHeadings = false;
-    
-    if (element.rows && Array.isArray(element.rows)) {
-      element.rows.forEach((row: any, rowIndex: number) => {
-        const rowData: string[] = [];
-        
-        if (row.cells && Array.isArray(row.cells)) {
-          row.cells.forEach((cell: any) => {
-            const cellText = this.extractTextFromElement(cell);
-            rowData.push(cellText);
-          });
-        }
-        
-        content.push(rowData);
-        
-        // 第一行作为表头
-        if (rowIndex === 0 && rowData.some(cell => cell.trim())) {
-          withHeadings = true;
-        }
-      });
-    }
-    
-    return { content, withHeadings };
-  }
-
-  /**
-   * 提取列表数据
-   */
-  private extractListData(element: any): any {
-    const items: string[] = [];
-    let style = 'unordered';
-    
-    // 判断列表类型
-    if (element.numberingProperties || element.listType === 'ordered') {
-      style = 'ordered';
-    }
-    
-    // 提取列表项
-    if (element.items && Array.isArray(element.items)) {
-      element.items.forEach((item: any) => {
-        const itemText = this.extractTextFromElement(item);
-        if (itemText.trim()) {
-          items.push(itemText);
-        }
-      });
-    } else {
-      // 如果没有items属性，尝试从当前元素提取文本
-      const text = this.extractTextFromElement(element);
-      if (text.trim()) {
-        items.push(text);
-      }
-    }
-    
-    return { style, items };
-  }
-
-  /**
-   * 提取图片数据
-   */
-  private extractImageData(element: any): any {
-    return {
-      file: {
-        url: element.src || element.imageData || ''
-      },
-      caption: element.caption || '',
-      withBorder: false,
-      withBackground: false,
-      stretched: false
-    };
-  }
-
-  /**
-   * 导入Word文件
-   * 将.docx文件转换为编辑器数据格式
-   */
-  async import(file: File): Promise<EditorData> {
-    console.log('WordHandler.import 开始处理文件:', file.name, '大小:', file.size);
-    
-    if (!file.name.toLowerCase().endsWith('.docx')) {
-      throw new Error('仅支持.docx格式的Word文件');
-    }
-
-    try {
-      // 使用docx-preview将docx转换为HTML
-      const arrayBuffer = await file.arrayBuffer();
-      console.log('文件读取完成，ArrayBuffer大小:', arrayBuffer.byteLength, 'bytes');
-      
-      // 创建一个临时容器来渲染文档
-      const container = document.createElement('div');
-      container.style.display = 'none';
-      document.body.appendChild(container);
-      
-      try {
-        // 先解析文档获取批注数据
-        const document = await parseAsync(arrayBuffer, {
-          renderComments: true, // 解析时需要启用批注解析
-          experimental: false,
-          trimXmlDeclaration: true
-        });
-        
-        console.log('文档解析完成，批注数量:', document.commentsPart?.comments?.length || 0);
-        console.log('批注结构:', document.commentsPart);
-        console.log('文档JSON结构:', document.documentPart.body);
-        
-        
-        // 遍历document.documentPart.body.children来创建编辑器块
-        const editorBlocks = this.parseDocumentStructure(document);
-        console.log('从文档结构解析的块数量:', editorBlocks.length);
-        
-        // 如果成功解析出块，直接使用结构化数据
-        if (editorBlocks.length > 0) {
-          const editorData: EditorData = {
-            time: Date.now(),
-            blocks: editorBlocks,
-            version: '2.28.2'
-          };
-          
-          // 解析批注信息并关联到相应的块
-          const comments = extractCommentsFromDocument(document);
-          console.log('提取到的批注数量:', comments.length);
-          
-          // 将批注关联到对应的文本块
-          this.associateCommentsWithBlocks(editorData, comments);
-          
-          console.log('使用文档结构解析的编辑器数据:', editorData);
-          return editorData;
-        } else {
-          // 如果解析失败，返回空的编辑器数据
-          console.warn('文档结构解析失败，返回空的编辑器数据');
-          return {
-            time: Date.now(),
-            blocks: [],
-            version: '2.28.2'
-          };
-        }
-        
-      } finally {
-        // 清理临时容器
-        document.body.removeChild(container);
-      }
-      
-    } catch (error) {
-      console.error('Word文件导入失败:', error);
-      throw new Error('Word文件导入失败，请检查文件格式');
-    }
-  }
-
-  /**
-   * 导出为Word文件
-   * 将编辑器数据转换为.docx文件
-   */
-  async export(data: EditorData): Promise<File> {
-    try {
-      // 检查数据有效性
-      if (!data || !data.blocks || data.blocks.length === 0) {
-        throw new Error('没有可导出的内容');
-      }
-
-      console.log('开始导出Word文档，数据块数量:', data.blocks.length);
-
-      // 将编辑器数据转换为HTML
-      const html = this.editorDataToHtml(data);
-      console.log('转换后的HTML:', html);
-      
-      // 创建简化的Word文档内容
-      const wordContent = this.createSimpleWordDocument(html);
-      
-      // 创建File对象
-      const blob = new Blob([wordContent], { 
-        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
-      });
-      
-      const fileName = `document_${Date.now()}.docx`;
-      console.log('Word文档创建成功:', fileName);
-      return new File([blob], fileName, { type: blob.type });
-      
-    } catch (error) {
-      console.error('Word文件导出失败:', error);
-      throw new Error(`Word文件导出失败: ${(error as Error).message}`);
-    }
-  }
-
-  /**
-   * 预览编辑器数据
-   * 生成HTML预览
-   */
-  preview(data: EditorData): HTMLElement {
-    const container = document.createElement('div');
-    container.className = 'docly-preview';
-    container.innerHTML = this.editorDataToHtml(data);
-    return container;
-  }
-
-  /**
-   * 映射中文字体名称到Web安全字体
-   */
-  private mapChineseFontName(fontName: string): string {
-    // 清理字体名称，移除引号和多余空格
-    const cleanFontName = fontName.replace(/['"]/g, '').trim();
-    
-    console.log('开始字体映射处理:', cleanFontName);
-    
-    // 处理复合字体（如 "Times New Roman", 黑体）
-    if (cleanFontName.includes(',')) {
-      const fontParts = cleanFontName.split(',').map(part => part.trim().replace(/['"]/g, ''));
-      console.log('检测到复合字体:', fontParts);
-      
-      // 优先处理中文字体
-      const chineseFontPart = fontParts.find(part => 
-        this.isFangSongFont(part) || 
-        this.isKaiTiFont(part) || 
-        /[\u4e00-\u9fff]/.test(part)
-      );
-      
-      if (chineseFontPart) {
-        console.log(`复合字体中发现中文字体: ${chineseFontPart}`);
-        // 递归处理中文字体部分
-        const mappedChineseFont = this.mapChineseFontName(chineseFontPart);
-        console.log(`复合字体映射结果: ${mappedChineseFont}`);
-        return mappedChineseFont;
-      }
-      
-      // 如果没有中文字体，检查是否应该应用默认中文字体
-      // 对于纯英文字体的复合字体，返回仿宋作为默认中文字体
-      console.log('复合字体中未发现中文字体，应用默认仿宋字体');
-      return '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif';
-    }
-    
-    // 中文字体映射表
-    const result = this.processSingleFont(cleanFontName);
-    console.log(`单一字体映射结果: ${cleanFontName} -> ${result}`);
-    return result;
-  }
-
-  /**
-   * 中文字体映射表
-   */
-  private get chineseFontMap(): { [key: string]: string } {
-    return {
-      // 方正字体系列
-      '方正小标宋简体': '"FZXiaoBiaoSong-B05S", "SimSun", "宋体", serif',
-      '方正小标宋_GBK': '"FZXiaoBiaoSong-B05S", "SimSun", "宋体", serif',
-      '方正小标宋': '"FZXiaoBiaoSong-B05S", "SimSun", "宋体", serif',
-      'FZXiaoBiaoSong-B05S': '"FZXiaoBiaoSong-B05S", "SimSun", "宋体", serif',
-      
-      // 楷体系列 - 增强支持
-      '楷体_GB2312': '"KaiTi_GB2312", "KaiTi", "楷体", "STKaiti", "DFKai-SB", serif',
-      'KaiTi_GB2312': '"KaiTi_GB2312", "KaiTi", "楷体", "STKaiti", "DFKai-SB", serif',
-      '楷体': '"KaiTi", "楷体", "KaiTi_GB2312", "STKaiti", "DFKai-SB", serif',
-      'KaiTi': '"KaiTi", "楷体", "KaiTi_GB2312", "STKaiti", "DFKai-SB", serif',
-      'STKaiti': '"STKaiti", "楷体", "KaiTi", "KaiTi_GB2312", "DFKai-SB", serif',
-      'DFKai-SB': '"DFKai-SB", "KaiTi", "楷体", "KaiTi_GB2312", "STKaiti", serif',
-      
-      // 宋体系列
-      '宋体': '"SimSun", "宋体", serif',
-      'SimSun': '"SimSun", "宋体", serif',
-      '新宋体': '"NSimSun", "新宋体", "SimSun", "宋体", serif',
-      'NSimSun': '"NSimSun", "新宋体", "SimSun", "宋体", serif',
-      
-      // 黑体系列
-      '黑体': '"SimHei", "黑体", sans-serif',
-      'SimHei': '"SimHei", "黑体", sans-serif',
-      '微软雅黑': '"Microsoft YaHei", "微软雅黑", "SimHei", "黑体", sans-serif',
-      'Microsoft YaHei': '"Microsoft YaHei", "微软雅黑", "SimHei", "黑体", sans-serif',
-      
-      // 仿宋系列 - 优化映射顺序，确保仿宋_GB2312优先
-      '仿宋_GB2312': '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif',
-      'FangSong_GB2312': '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif',
-      '仿宋': '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif',
-      'FangSong': '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif',
-      'STFangsong': '"仿宋_GB2312", "FangSong_GB2312", "STFangsong", "FangSong", "仿宋", serif',
-      
-      // 隶书系列
-      '隶书': '"LiSu", "隶书", serif',
-      'LiSu': '"LiSu", "隶书", serif',
-      
-      // 幼圆系列
-      '幼圆': '"YouYuan", "幼圆", sans-serif',
-      'YouYuan': '"YouYuan", "幼圆", sans-serif'
-    };
-  }
-
-  /**
-   * 处理单一字体映射
-   */
-  private processSingleFont(cleanFontName: string): string {
-    // 检查是否有直接映射
-    if (this.chineseFontMap[cleanFontName]) {
-      console.log(`中文字体直接映射: ${cleanFontName} -> ${this.chineseFontMap[cleanFontName]}`);
-      return this.chineseFontMap[cleanFontName];
-    }
-    
-    // 特殊处理仿宋相关字体的模糊匹配
-    if (this.isFangSongFont(cleanFontName)) {
-      const fangsongFont = '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif';
-      console.log(`仿宋字体特殊处理: ${cleanFontName} -> ${fangsongFont}`);
-      return fangsongFont;
-    }
-    
-    // 特殊处理楷体相关字体的模糊匹配
-    if (this.isKaiTiFont(cleanFontName)) {
-      const kaitiFont = '"KaiTi_GB2312", "KaiTi", "楷体", "STKaiti", "DFKai-SB", serif';
-      console.log(`楷体字体特殊处理: ${cleanFontName} -> ${kaitiFont}`);
-      return kaitiFont;
-    }
-    
-    // 模糊匹配
-    for (const [key, value] of Object.entries(this.chineseFontMap)) {
-      if (cleanFontName.includes(key) || key.includes(cleanFontName)) {
-        return value;
-      }
-    }
-    
-    // 如果包含中文字符，添加通用中文字体fallback
-    if (/[\u4e00-\u9fff]/.test(cleanFontName)) {
-      const fallbackFont = `"${cleanFontName}", "SimSun", "宋体", "Microsoft YaHei", "微软雅黑", serif`;
-      return fallbackFont;
-    }
-    
-    // 返回原字体名称，添加引号保护
-    const quotedFont = `"${cleanFontName}"`;
-    return quotedFont;
-  }
-
-  /**
-   * 检测是否为楷体相关字体
-   */
-  private isKaiTiFont(fontName: string): boolean {
-    const kaitiKeywords = ['楷体', 'KaiTi', 'Kai', '楷', 'kaiti', 'KAITI'];
-    return kaitiKeywords.some(keyword => 
-      fontName.toLowerCase().includes(keyword.toLowerCase()) ||
-      fontName.includes(keyword)
-    );
-  }
-
-  /**
-   * 检测是否为仿宋相关字体
-   */
-  private isFangSongFont(fontName: string): boolean {
-    // 清理字体名称，移除引号和多余空格
-    const cleanFontName = fontName.replace(/['"]/g, '').trim();
-    
-    // 仿宋字体关键词，按优先级排序
-    const fangsongKeywords = [
-      '仿宋_GB2312',     // 最高优先级
-      'FangSong_GB2312', 
-      '仿宋',
-      'FangSong',
-      'fangsong',
-      'FANGSONG',
-      'STFangsong'
-    ];
-    
-    // 精确匹配优先
-    if (fangsongKeywords.includes(cleanFontName)) {
-      console.log(`仿宋字体精确匹配: ${cleanFontName}`);
-      return true;
-    }
-    
-    // 模糊匹配
-    const isMatch = fangsongKeywords.some(keyword => {
-      const lowerKeyword = keyword.toLowerCase();
-      const lowerFontName = cleanFontName.toLowerCase();
-      return lowerFontName.includes(lowerKeyword) || 
-             lowerKeyword.includes(lowerFontName) ||
-             cleanFontName.includes(keyword);
-    });
-    
-    if (isMatch) {
-      // console.log(`仿宋字体模糊匹配: ${cleanFontName}`);
-    }
-    
-    return isMatch;
-  }
-
-  /**
-   * 将编辑器数据转换为HTML
-   */
-  private editorDataToHtml(data: EditorData): string {
-    let html = '';
-
-    data.blocks.forEach(block => {
-      switch (block.type) {
-        case 'header':
-          const level = block.data.level || 2;
-          html += `<h${level}>${this.escapeHtml(block.data.text || '')}</h${level}>`;
-          break;
-        case 'paragraph':
-          html += `<p>${this.escapeHtml(block.data.text || '')}</p>`;
-          break;
-        case 'list':
-          const tag = block.data.style === 'ordered' ? 'ol' : 'ul';
-          const items = (block.data.items || []).map((item: string) => 
-            `<li>${this.escapeHtml(item)}</li>`
-          ).join('');
-          html += `<${tag}>${items}</${tag}>`;
-          break;
-        case 'quote':
-          html += `<blockquote><p>${this.escapeHtml(block.data.text || '')}</p>`;
-          if (block.data.caption) {
-            html += `<cite>${this.escapeHtml(block.data.caption)}</cite>`;
-          }
-          html += `</blockquote>`;
-          break;
-        case 'code':
-          html += `<pre><code>${this.escapeHtml(block.data.code || '')}</code></pre>`;
-          break;
-        case 'table':
-          if (block.data.content && Array.isArray(block.data.content)) {
-            html += '<table border="1" style="border-collapse: collapse; width: 100%;">';
-            block.data.content.forEach((row: string[]) => {
-              html += '<tr>';
-              row.forEach(cell => {
-                html += `<td style="padding: 8px; border: 1px solid #ccc;">${this.escapeHtml(cell || '')}</td>`;
-              });
-              html += '</tr>';
-            });
-            html += '</table>';
-          }
-          break;
-        default:
-          // 处理未知类型的块
-          if (block.data && block.data.text) {
-            html += `<p>${this.escapeHtml(block.data.text)}</p>`;
-          }
-      }
-    });
-
-    return html || '<p>空文档</p>';
-  }
-
-  /**
-   * HTML转义函数
+   * HTML转义
+   * @param text - 需要转义的文本
+   * @returns 转义后的文本
    */
   private escapeHtml(text: string): string {
     const div = document.createElement('div');
@@ -940,33 +429,362 @@ export class WordHandler implements FileHandler {
   }
 
   /**
-   * 创建简化的Word文档内容
+   * 解析内联样式
+   * @param styleString - CSS样式字符串
+   * @returns 样式对象
    */
-  private createSimpleWordDocument(html: string): string {
-    // 移除HTML标签，保留文本内容
-    const textContent = html.replace(/<[^>]*>/g, '\n').replace(/\n+/g, '\n').trim();
+  private parseInlineStyles(styleString: string): Record<string, string> {
+    const styles: Record<string, string> = {};
+    if (!styleString) return styles;
     
-    // 创建基础的Word文档XML结构
-    const wordXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-  <w:body>
-    <w:p>
-      <w:r>
-        <w:t>${this.escapeXml(textContent || '这是一个新文档')}</w:t>
-      </w:r>
-    </w:p>
-    <w:sectPr>
-      <w:pgSz w:w="11906" w:h="16838"/>
-      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>
-    </w:sectPr>
-  </w:body>
-</w:document>`;
+    styleString.split(';').forEach(style => {
+      const [property, value] = style.split(':').map(s => s.trim());
+      if (property && value) {
+        styles[property] = value;
+      }
+    });
+    
+    return styles;
+  }
 
+  /**
+   * 转换颜色格式（从CSS到Word）
+   * @param cssColor - CSS颜色值
+   * @returns Word颜色值
+   */
+  private convertColor(cssColor: string): string | null {
+    if (!cssColor) return null;
+    
+    // 如果是hex颜色
+    if (cssColor.startsWith('#')) {
+      return cssColor.substring(1).toUpperCase();
+    }
+    
+    // 如果是rgb颜色
+    const rgbMatch = cssColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    if (rgbMatch) {
+      const [, r, g, b] = rgbMatch;
+      return ((1 << 24) + (parseInt(r) << 16) + (parseInt(g) << 8) + parseInt(b)).toString(16).slice(1).toUpperCase();
+    }
+    
+    // 预定义颜色映射
+    const colorMap: Record<string, string> = {
+      'red': 'FF0000',
+      'blue': '0000FF',
+      'green': '008000',
+      'black': '000000',
+      'white': 'FFFFFF'
+    };
+    
+    return colorMap[cssColor.toLowerCase()] || null;
+  }
+
+  /**
+   * 转换字体大小（从CSS到Word半点）
+   * @param cssSize - CSS字体大小
+   * @returns Word字体大小（半点）
+   */
+  private convertFontSize(cssSize: string): number | null {
+    if (!cssSize) return null;
+    
+    const pxMatch = cssSize.match(/(\d+)px/);
+    if (pxMatch) {
+      return Math.round(parseInt(pxMatch[1]) * 1.33 * 2); // px to pt * 2 (半点)
+    }
+    
+    const ptMatch = cssSize.match(/(\d+)pt/);
+    if (ptMatch) {
+      return parseInt(ptMatch[1]) * 2; // pt * 2 (半点)
+    }
+    
+    return null;
+  }
+
+  /**
+   * HTML元素到Word XML的转换
+   * @param htmlString - HTML字符串
+   * @returns Word XML字符串
+   */
+  private htmlToWordXml(htmlString: string): string {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(`<div>${htmlString}</div>`, 'text/html');
+    let wordXml = '';
+    
+    const processNode = (node: Node): string => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent?.trim();
+        if (text) {
+          return `<w:t xml:space="preserve">${this.escapeXml(text)}</w:t>`;
+        }
+        return '';
+      }
+      
+      if (node.nodeType !== Node.ELEMENT_NODE) {
+        return '';
+      }
+      
+      const element = node as Element;
+      const tagName = element.tagName.toLowerCase();
+      const styles = this.parseInlineStyles(element.getAttribute('style') || '');
+      
+      // 处理不同的HTML标签
+      switch (tagName) {
+        case 'h1':
+        case 'h2':
+        case 'h3':
+        case 'h4':
+        case 'h5':
+        case 'h6':
+          const headingLevel = parseInt(tagName.charAt(1));
+          const headingSize = Math.max(28 - (headingLevel - 1) * 4, 16) * 2; // 半点
+          return `<w:p>
+            <w:pPr>
+              <w:pStyle w:val="Heading${headingLevel}"/>
+              <w:spacing w:after="240"/>
+            </w:pPr>
+            <w:r>
+              <w:rPr>
+                <w:b/>
+                <w:sz w:val="${headingSize}"/>
+                <w:szCs w:val="${headingSize}"/>
+                ${styles.color ? `<w:color w:val="${this.convertColor(styles.color)}"/>` : ''}
+              </w:rPr>
+              ${this.processChildNodes(element)}
+            </w:r>
+          </w:p>`;
+        
+        case 'p':
+          // 为段落添加默认样式
+          const defaultParagraphStyles = {
+            'font-size': '11pt',
+            'font-family': 'Calibri',
+            ...styles
+          };
+          return `<w:p>
+            <w:pPr>
+              ${styles['text-align'] === 'center' ? '<w:jc w:val="center"/>' : ''}
+              ${styles['text-align'] === 'right' ? '<w:jc w:val="right"/>' : ''}
+              ${styles['text-align'] === 'justify' ? '<w:jc w:val="both"/>' : ''}
+              <w:spacing w:after="120"/>
+            </w:pPr>
+            ${this.processRunContent(element, defaultParagraphStyles)}
+          </w:p>`;
+        
+        case 'div':
+          // 将div当作段落处理，无论是否有子元素
+          const defaultDivStyles = {
+            'font-size': '11pt',
+            'font-family': 'Calibri',
+            ...styles
+          };
+          return `<w:p>
+            <w:pPr>
+              ${styles['text-align'] === 'center' ? '<w:jc w:val="center"/>' : ''}
+              ${styles['text-align'] === 'right' ? '<w:jc w:val="right"/>' : ''}
+              ${styles['text-align'] === 'justify' ? '<w:jc w:val="both"/>' : ''}
+            </w:pPr>
+            ${this.processRunContent(element, defaultDivStyles)}
+          </w:p>`
+        
+        case 'ul':
+        case 'ol':
+          let listContent = '';
+          Array.from(element.children).forEach((li) => {
+            if (li.tagName.toLowerCase() === 'li') {
+              listContent += `<w:p>
+                <w:pPr>
+                  <w:pStyle w:val="ListParagraph"/>
+                  <w:numPr>
+                    <w:ilvl w:val="0"/>
+                    <w:numId w:val="${tagName === 'ul' ? '1' : '2'}"/>
+                  </w:numPr>
+                </w:pPr>
+                <w:r>
+                  <w:t xml:space="preserve">${this.escapeXml(li.textContent || '')}</w:t>
+                </w:r>
+              </w:p>`;
+            }
+          });
+          return listContent;
+        
+        case 'blockquote':
+          return `<w:p>
+            <w:pPr>
+              <w:pStyle w:val="Quote"/>
+              <w:ind w:left="720"/>
+              <w:spacing w:after="120"/>
+            </w:pPr>
+            ${this.processRunContent(element, styles)}
+          </w:p>`;
+        
+        case 'pre':
+        case 'code':
+          return `<w:p>
+            <w:pPr>
+              <w:spacing w:after="120"/>
+            </w:pPr>
+            <w:r>
+              <w:rPr>
+                <w:rFonts w:ascii="Courier New" w:hAnsi="Courier New"/>
+                <w:shading w:fill="F5F5F5"/>
+              </w:rPr>
+              <w:t xml:space="preserve">${this.escapeXml(element.textContent || '')}</w:t>
+            </w:r>
+          </w:p>`;
+        
+        case 'table':
+          let tableContent = '<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="0" w:type="auto"/></w:tblPr>';
+          Array.from(element.children).forEach(row => {
+            if (row.tagName.toLowerCase() === 'tr') {
+              tableContent += '<w:tr>';
+              Array.from(row.children).forEach(cell => {
+                if (cell.tagName.toLowerCase() === 'td') {
+                  tableContent += `<w:tc><w:tcPr><w:tcW w:w="0" w:type="auto"/></w:tcPr><w:p><w:r><w:t>${this.escapeXml(cell.textContent || '')}</w:t></w:r></w:p></w:tc>`;
+                }
+              });
+              tableContent += '</w:tr>';
+            }
+          });
+          tableContent += '</w:tbl>';
+          return tableContent;
+        
+        case 'br':
+          return '<w:br/>';
+        
+        default:
+          return this.processRunContent(element, styles);
+      }
+    };
+    
+    // 处理根节点
+    const rootDiv = doc.querySelector('div');
+    if (rootDiv) {
+      Array.from(rootDiv.childNodes).forEach(child => {
+        wordXml += processNode(child);
+      });
+    }
+    
     return wordXml;
   }
 
   /**
-   * XML转义函数
+   * 处理运行内容
+   * @param node - DOM节点
+   * @param parentStyles - 父级样式
+   * @returns Word XML字符串
+   */
+  private processRunContent(node: Element, parentStyles: Record<string, string> = {}): string {
+    let runs = '';
+    
+    Array.from(node.childNodes).forEach(child => {
+      if (child.nodeType === Node.TEXT_NODE) {
+        const text = child.textContent;
+        if (text?.trim()) {
+          runs += this.createRun(text, parentStyles);
+        }
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const element = child as Element;
+        const tagName = element.tagName.toLowerCase();
+        const childStyles = Object.assign({}, parentStyles, this.parseInlineStyles(element.getAttribute('style') || ''));
+        
+        switch (tagName) {
+          case 'strong':
+          case 'b':
+            childStyles.fontWeight = 'bold';
+            break;
+          case 'em':
+          case 'i':
+            childStyles.fontStyle = 'italic';
+            break;
+          case 'u':
+            childStyles.textDecoration = 'underline';
+            break;
+          case 'mark':
+            childStyles.backgroundColor = '#FFFF00';
+            break;
+          case 'code':
+            childStyles.fontFamily = 'Courier New';
+            childStyles.backgroundColor = '#F5F5F5';
+            break;
+          case 'span':
+            // span标签直接继承样式
+            break;
+        }
+        
+        runs += this.processRunContent(element, childStyles);
+      }
+    });
+    
+    return runs;
+  }
+
+  /**
+   * 创建Word运行元素
+   * @param text - 文本内容
+   * @param styles - 样式对象
+   * @returns Word XML字符串
+   */
+  private createRun(text: string, styles: Record<string, string>): string {
+    const fontSize = this.convertFontSize(styles['font-size']);
+    const color = this.convertColor(styles.color);
+    const backgroundColor = this.convertColor(styles['background-color']);
+    
+    // 处理背景色的高亮效果
+    let highlightXml = '';
+    if (backgroundColor) {
+      // 根据背景色选择合适的高亮颜色
+      const bgColorLower = backgroundColor.toLowerCase();
+      if (bgColorLower === 'ffff00' || bgColorLower === 'yellow') {
+        highlightXml = '<w:highlight w:val="yellow"/>';
+      } else if (bgColorLower === '00ff00' || bgColorLower === 'lime' || bgColorLower === 'green') {
+        highlightXml = '<w:highlight w:val="green"/>';
+      } else if (bgColorLower === '00ffff' || bgColorLower === 'cyan' || bgColorLower === 'aqua') {
+        highlightXml = '<w:highlight w:val="cyan"/>';
+      } else if (bgColorLower === 'ff00ff' || bgColorLower === 'magenta' || bgColorLower === 'fuchsia') {
+        highlightXml = '<w:highlight w:val="magenta"/>';
+      } else if (bgColorLower === 'ffa500' || bgColorLower === 'orange') {
+        highlightXml = '<w:highlight w:val="yellow"/>';
+      } else if (bgColorLower === 'f5f5f5' || bgColorLower === 'lightgray' || bgColorLower === 'lightgrey') {
+        highlightXml = '<w:highlight w:val="lightGray"/>';
+      } else {
+        // 默认使用黄色高亮
+        highlightXml = '<w:highlight w:val="yellow"/>';
+      }
+    }
+    
+    return `<w:r>
+      <w:rPr>
+        ${styles.fontWeight === 'bold' ? '<w:b/>' : ''}
+        ${styles.fontStyle === 'italic' ? '<w:i/>' : ''}
+        ${styles.textDecoration === 'underline' ? '<w:u w:val="single"/>' : ''}
+        ${fontSize ? `<w:sz w:val="${fontSize}"/><w:szCs w:val="${fontSize}"/>` : ''}
+        ${color ? `<w:color w:val="${color}"/>` : ''}
+        ${highlightXml}
+        ${styles['font-family'] ? `<w:rFonts w:ascii="${styles['font-family']}" w:hAnsi="${styles['font-family']}"/>` : ''}
+      </w:rPr>
+      <w:t xml:space="preserve">${this.escapeXml(text)}</w:t>
+    </w:r>`;
+  }
+
+  /**
+   * 处理子节点文本内容
+   * @param node - DOM节点
+   * @returns 转义后的文本
+   */
+  private processChildNodes(node: Element): string {
+    let result = '';
+    Array.from(node.childNodes).forEach(child => {
+      if (child.nodeType === Node.TEXT_NODE) {
+        result += this.escapeXml(child.textContent || '');
+      }
+    });
+    return result;
+  }
+
+  /**
+   * XML转义
+   * @param text - 需要转义的文本
+   * @returns 转义后的文本
    */
   private escapeXml(text: string): string {
     return text
@@ -978,101 +796,238 @@ export class WordHandler implements FileHandler {
   }
 
   /**
-   * 将批注关联到对应的文本块
-   * @param editorData - 编辑器数据
-   * @param comments - 批注数组
+   * 生成完整的DOCX文件
+   * @param wordContent - Word XML内容
+   * @returns DOCX文件的Blob对象
    */
-  private associateCommentsWithBlocks(editorData: EditorData, comments: Comment[]): void {
-    if (comments.length === 0) return;
+  private async generateDocxFile(wordContent: string): Promise<Blob> {
+    const zip = new JSZip();
     
-    // 记录已关联的批注ID，避免重复关联
-    const associatedCommentIds = new Set<string>();
+    // _rels/.rels
+    zip.folder('_rels')!.file('.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`);
     
-    // 定义匹配结果的类型接口
-    interface MatchResult {
-      blockIndex: number;
-      matchScore: number;
-    }
+    // [Content_Types].xml
+    zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+    <Default Extension="xml" ContentType="application/xml"/>
+    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+    <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+    <Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>
+    <Override PartName="/word/fontTable.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml"/>
+</Types>`);
     
-    let bestMatch: MatchResult | null = null;
+    // word/_rels/document.xml.rels
+    zip.folder('word')!.folder('_rels')!.file('document.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+    <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>
+    <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable" Target="fontTable.xml"/>
+</Relationships>`);
     
-    // 为每个批注找到最佳匹配的文本块
-    comments.forEach(comment => {
-      const commentText = comment.range.text.trim();
-      
-      // 遍历所有块，找到最佳匹配
-      editorData.blocks.forEach((block, blockIndex) => {
-        const blockText = (block.data.text || '').trim();
-        
-        if (!blockText) return;
-        
-        // 计算匹配分数
-        let matchScore = 0;
-        
-        // 1. 精确匹配（最高分）
-        if (blockText.includes(commentText)) {
-          matchScore = 100;
-        }
-        // 2. 反向匹配
-        else if (commentText.includes(blockText)) {
-          matchScore = 90;
-        }
-        // 3. 模糊匹配（去除标点符号和空格）
-        else {
-          const normalizeText = (text: string) => text.replace(/[\s\p{P}]/gu, '').toLowerCase();
-          const normalizedBlock = normalizeText(blockText);
-          const normalizedComment = normalizeText(commentText);
-          
-          if (normalizedBlock && normalizedComment) {
-            if (normalizedBlock.includes(normalizedComment)) {
-              matchScore = 80;
-            } else if (normalizedComment.includes(normalizedBlock)) {
-              matchScore = 70;
-            }
-          }
-        }
-        
-        // 更新最佳匹配
-        if (matchScore > 0 && (bestMatch === null || matchScore > bestMatch.matchScore)) {
-          bestMatch = { blockIndex, matchScore };
-        }
-      });
-      
-      // 如果找到最佳匹配，将批注关联到该块
-      if (bestMatch !== null && !associatedCommentIds.has(comment.id)) {
-        const block = editorData.blocks[bestMatch.blockIndex];
-        const blockText = (block.data.text || '').trim();
-        
-        // 创建块级别的批注引用（保持原始ID）
-        const blockComment: Comment = {
-          ...comment,
-          range: {
-            startOffset: Math.max(0, blockText.indexOf(commentText)),
-            endOffset: Math.min(blockText.length, 
-              blockText.indexOf(commentText) + commentText.length),
-            text: commentText
-          }
-        };
-        
-        // 初始化块的批注数组
-        if (!block.comments) {
-          block.comments = [];
-        }
-        
-        block.comments.push(blockComment);
-        associatedCommentIds.add(comment.id);
-      }
+    // word/document.xml (主文档)
+    zip.folder('word')!.file('document.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+    <w:body>
+        ${wordContent}
+        <w:sectPr>
+            <w:pgSz w:w="11906" w:h="16838"/>
+            <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/>
+            <w:cols w:space="708"/>
+        </w:sectPr>
+    </w:body>
+</w:document>`);
+    
+    // word/styles.xml
+    zip.folder('word')!.file('styles.xml', this.getStylesXml());
+    
+    // word/settings.xml
+    zip.folder('word')!.file('settings.xml', this.getSettingsXml());
+    
+    // word/fontTable.xml
+    zip.folder('word')!.file('fontTable.xml', this.getFontTableXml());
+    
+    // 生成ZIP文件
+    return await zip.generateAsync({
+      type: "blob",
+      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     });
-    
-    // 将所有原始批注保存到 EditorData 的 comments 属性中（避免重复）
-    if (!editorData.comments) {
-      editorData.comments = [];
-    }
-    editorData.comments.push(...comments);
-    
-    const associatedCount = associatedCommentIds.size;
-    const unassociatedCount = comments.length - associatedCount;
-    
-    console.log(`批注处理完成: 总计 ${comments.length} 个批注，其中 ${associatedCount} 个已关联到文本块，${unassociatedCount} 个未关联`);
+  }
+
+  /**
+   * 获取样式XML内容
+   * @returns 样式XML字符串
+   */
+  private getStylesXml(): string {
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+    <w:docDefaults>
+        <w:rPrDefault>
+            <w:rPr>
+                <w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:eastAsia="宋体" w:cs="Times New Roman"/>
+                <w:sz w:val="22"/>
+                <w:szCs w:val="22"/>
+                <w:lang w:val="zh-CN" w:eastAsia="zh-CN" w:bidi="ar-SA"/>
+            </w:rPr>
+        </w:rPrDefault>
+    </w:docDefaults>
+    <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
+        <w:name w:val="Normal"/>
+        <w:qFormat/>
+        <w:pPr>
+            <w:spacing w:after="160" w:line="259" w:lineRule="auto"/>
+        </w:pPr>
+    </w:style>
+    <w:style w:type="paragraph" w:styleId="Heading1">
+        <w:name w:val="heading 1"/>
+        <w:basedOn w:val="Normal"/>
+        <w:next w:val="Normal"/>
+        <w:link w:val="Heading1Char"/>
+        <w:uiPriority w:val="9"/>
+        <w:qFormat/>
+        <w:pPr>
+            <w:keepNext/>
+            <w:keepLines/>
+            <w:spacing w:before="480" w:after="0"/>
+            <w:outlineLvl w:val="0"/>
+        </w:pPr>
+        <w:rPr>
+            <w:rFonts w:asciiTheme="majorHAnsi" w:eastAsiaTheme="majorEastAsia" w:hAnsiTheme="majorHAnsi" w:cstheme="majorBidi"/>
+            <w:b/>
+            <w:bCs/>
+            <w:color w:val="2F5496" w:themeColor="accent1" w:themeShade="BF"/>
+            <w:sz w:val="32"/>
+            <w:szCs w:val="32"/>
+        </w:rPr>
+    </w:style>
+    <w:style w:type="paragraph" w:styleId="Heading2">
+        <w:name w:val="heading 2"/>
+        <w:basedOn w:val="Normal"/>
+        <w:next w:val="Normal"/>
+        <w:link w:val="Heading2Char"/>
+        <w:uiPriority w:val="9"/>
+        <w:unhideWhenUsed/>
+        <w:qFormat/>
+        <w:pPr>
+            <w:keepNext/>
+            <w:keepLines/>
+            <w:spacing w:before="200" w:after="0"/>
+            <w:outlineLvl w:val="1"/>
+        </w:pPr>
+        <w:rPr>
+            <w:rFonts w:asciiTheme="majorHAnsi" w:eastAsiaTheme="majorEastAsia" w:hAnsiTheme="majorHAnsi" w:cstheme="majorBidi"/>
+            <w:b/>
+            <w:bCs/>
+            <w:color w:val="2F5496" w:themeColor="accent1" w:themeShade="BF"/>
+            <w:sz w:val="26"/>
+            <w:szCs w:val="26"/>
+        </w:rPr>
+    </w:style>
+    <w:style w:type="paragraph" w:styleId="Heading3">
+        <w:name w:val="heading 3"/>
+        <w:basedOn w:val="Normal"/>
+        <w:next w:val="Normal"/>
+        <w:link w:val="Heading3Char"/>
+        <w:uiPriority w:val="9"/>
+        <w:unhideWhenUsed/>
+        <w:qFormat/>
+        <w:pPr>
+            <w:keepNext/>
+            <w:keepLines/>
+            <w:spacing w:before="200" w:after="0"/>
+            <w:outlineLvl w:val="2"/>
+        </w:pPr>
+        <w:rPr>
+            <w:rFonts w:asciiTheme="majorHAnsi" w:eastAsiaTheme="majorEastAsia" w:hAnsiTheme="majorHAnsi" w:cstheme="majorBidi"/>
+            <w:b/>
+            <w:bCs/>
+            <w:color w:val="1F4E79" w:themeColor="accent1" w:themeShade="BF"/>
+            <w:sz w:val="24"/>
+            <w:szCs w:val="24"/>
+        </w:rPr>
+    </w:style>
+    <w:style w:type="paragraph" w:styleId="Quote">
+        <w:name w:val="Quote"/>
+        <w:basedOn w:val="Normal"/>
+        <w:next w:val="Normal"/>
+        <w:link w:val="QuoteChar"/>
+        <w:uiPriority w:val="29"/>
+        <w:unhideWhenUsed/>
+        <w:qFormat/>
+        <w:pPr>
+            <w:spacing w:after="200"/>
+            <w:ind w:left="720" w:right="720"/>
+        </w:pPr>
+        <w:rPr>
+            <w:i/>
+            <w:iCs/>
+            <w:color w:val="404040" w:themeColor="text1" w:themeTint="BF"/>
+        </w:rPr>
+    </w:style>
+    <w:style w:type="paragraph" w:styleId="ListParagraph">
+        <w:name w:val="List Paragraph"/>
+        <w:basedOn w:val="Normal"/>
+        <w:uiPriority w:val="34"/>
+        <w:qFormat/>
+        <w:pPr>
+            <w:ind w:left="720"/>
+            <w:contextualSpacing/>
+        </w:pPr>
+    </w:style>
+</w:styles>`;
+  }
+
+  /**
+   * 获取设置XML内容
+   * @returns 设置XML字符串
+   */
+  private getSettingsXml(): string {
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+    <w:zoom w:percent="100"/>
+    <w:proofState w:spelling="clean" w:grammar="clean"/>
+    <w:defaultTabStop w:val="708"/>
+    <w:characterSpacingControl w:val="doNotCompress"/>
+    <w:compat>
+        <w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/>
+        <w:compatSetting w:name="overrideTableStyleFontSizeAndJustification" w:uri="http://schemas.microsoft.com/office/word" w:val="1"/>
+        <w:compatSetting w:name="enableOpenTypeFeatures" w:uri="http://schemas.microsoft.com/office/word" w:val="1"/>
+        <w:compatSetting w:name="doNotFlipMirrorIndents" w:uri="http://schemas.microsoft.com/office/word" w:val="1"/>
+        <w:compatSetting w:name="differentiateMultirowTableHeaders" w:uri="http://schemas.microsoft.com/office/word" w:val="1"/>
+    </w:compat>
+</w:settings>`;
+  }
+
+  /**
+   * 获取字体表XML内容
+   * @returns 字体表XML字符串
+   */
+  private getFontTableXml(): string {
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+    <w:font w:name="Calibri">
+        <w:panose1 w:val="020F0502020204030204"/>
+        <w:charset w:val="00"/>
+        <w:family w:val="swiss"/>
+        <w:pitch w:val="variable"/>
+        <w:sig w:usb0="E00002FF" w:usb1="4000ACFF" w:usb2="00000001" w:usb3="00000000" w:csb0="0000019F" w:csb1="00000000"/>
+    </w:font>
+    <w:font w:name="宋体">
+        <w:charset w:val="86"/>
+        <w:family w:val="auto"/>
+        <w:pitch w:val="variable"/>
+        <w:sig w:usb0="00000003" w:usb1="288F0000" w:usb2="00000016" w:usb3="00000000" w:csb0="00040001" w:csb1="00000000"/>
+    </w:font>
+    <w:font w:name="Microsoft YaHei">
+        <w:panose1 w:val="020B0503020204020204"/>
+        <w:charset w:val="86"/>
+        <w:family w:val="swiss"/>
+        <w:pitch w:val="variable"/>
+        <w:sig w:usb0="800002BF" w:usb1="38CF7CFA" w:usb2="00000016" w:usb3="00000000" w:csb0="0004001F" w:csb1="00000000"/>
+    </w:font>
+</w:fonts>`;
   }
 }

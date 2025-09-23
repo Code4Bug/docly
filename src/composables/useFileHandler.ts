@@ -43,17 +43,17 @@ export function useFileHandler() {
   /**
    * 导出文件
    * @param {any} editorData - 编辑器数据
-   * @returns {Promise<File>} 导出的文件
+   * @returns {Promise<{blob: Blob; name: string}>} 导出的文件对象
    */
-  const exportFile = async (editorData: any): Promise<File> => {
+  const exportFile = async (editorData: any): Promise<{blob: Blob; name: string}> => {
     if (!wordHandler.value) {
       initFileHandler();
     }
     
     isExporting.value = true;
     try {
-      const file = await wordHandler.value!.export(editorData);
-      return file;
+      const fileResult = await wordHandler.value!.export(editorData);
+      return fileResult;
     } catch (error) {
       console.error('文件导出失败:', error);
       throw error;

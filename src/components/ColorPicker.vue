@@ -20,7 +20,7 @@
           :key="color"
           class="color-preset"
           :style="{ backgroundColor: color }"
-          @click="selectColor(color)"
+          @mousedown.prevent="selectColor(color)"
         ></div>
       </div>
       <input 
@@ -117,8 +117,13 @@ onUnmounted(() => {
  * @param {string} color - 颜色值
  */
 const selectColor = (color: string): void => {
-  emit('color-change', color);
-  showColorPicker.value = false;
+  console.log('ColorPicker selectColor 被调用:', { type: props.type, color });
+  
+  // 延迟执行以确保文本选择状态得到保持
+  setTimeout(() => {
+    emit('color-change', color);
+    showColorPicker.value = false;
+  }, 0);
 };
 
 /**
@@ -128,6 +133,7 @@ const selectColor = (color: string): void => {
 const handleCustomColorChange = (event: Event): void => {
   const target = event.target as HTMLInputElement;
   const color = target.value;
+  console.log('ColorPicker handleCustomColorChange 被调用:', { type: props.type, color });
   customColor.value = color;
   emit('color-change', color);
   showColorPicker.value = false;
