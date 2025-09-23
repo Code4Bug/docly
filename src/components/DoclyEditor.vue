@@ -1,308 +1,30 @@
 <template>
   <div class="docly-editor" :class="{ 'dark-theme': isDarkMode }">
-    <!-- 工具栏 -->
-    <div class="docly-toolbar">
-      <div class="toolbar-group">
-        <!-- 文件操作区域 -->
-        <div class="toolbar-section">
-          <button 
-            @click="importFile" 
-            class="toolbar-btn"
-            @mouseenter="showTooltip($event, '导入文档')"
-            @mouseleave="hideTooltip"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20M12,19L8,15H10.5V12H13.5V15H16L12,19Z"/>
-            </svg>
-          </button>
-          <button 
-            @click="exportFile" 
-            class="toolbar-btn"
-            @mouseenter="showTooltip($event, '导出文档')"
-            @mouseleave="hideTooltip"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20M12,19L8,15H10.5V12H13.5V15H16L12,19Z"/>
-            </svg>
-          </button>
-        </div>
-
-        <!-- 撤销重做区域 -->
-        <div class="toolbar-section">
-          <button 
-            @click="undo" 
-            class="toolbar-btn"
-            @mouseenter="showTooltip($event, '撤销')"
-            @mouseleave="hideTooltip"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12.5,8C9.85,8 7.45,9 5.6,10.6L2,7V16H11L7.38,12.38C8.77,11.22 10.54,10.5 12.5,10.5C16.04,10.5 19.05,12.81 20.1,16L22.47,15.22C21.08,11.03 17.15,8 12.5,8Z"/>
-            </svg>
-          </button>
-          <button 
-            @click="redo" 
-            class="toolbar-btn"
-            @mouseenter="showTooltip($event, '重做')"
-            @mouseleave="hideTooltip"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M18.4,10.6C16.55,9 14.15,8 11.5,8C6.85,8 2.92,11.03 1.53,15.22L3.9,16C4.95,12.81 7.96,10.5 11.5,10.5C13.46,10.5 15.23,11.22 16.62,12.38L13,16H22V7L18.4,10.6Z"/>
-            </svg>
-          </button>
-        </div>
-
-        <!-- 文本格式化区域 -->
-        <div class="toolbar-section">
-          <select 
-            v-model="currentHeading" 
-            @change="changeHeading" 
-            class="compact-select"
-            @mouseenter="showTooltip($event, '标题级别')"
-            @mouseleave="hideTooltip"
-          >
-            <option value="">正文</option>
-            <option value="1">标题 1</option>
-            <option value="2">标题 2</option>
-            <option value="3">标题 3</option>
-          </select>
-          
-          <div class="button-group">
-            <button 
-              @click="formatText('bold')" 
-              class="toolbar-btn"
-              :class="{ active: isFormatActive('bold') }"
-              @mouseenter="showTooltip($event, '粗体')"
-              @mouseleave="hideTooltip"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M13.5,15.5H10V12.5H13.5A1.5,1.5 0 0,1 15,14A1.5,1.5 0 0,1 13.5,15.5M10,6.5H13A1.5,1.5 0 0,1 14.5,8A1.5,1.5 0 0,1 13,9.5H10M15.6,10.79C16.57,10.11 17.25,9.02 17.25,8C17.25,5.74 15.5,4 13.25,4H7V18H14.04C16.14,18 17.75,16.3 17.75,14.21C17.75,12.69 16.89,11.39 15.6,10.79Z"/>
-              </svg>
-            </button>
-            <button 
-              @click="formatText('italic')" 
-              class="toolbar-btn"
-              :class="{ active: isFormatActive('italic') }"
-              @mouseenter="showTooltip($event, '斜体')"
-              @mouseleave="hideTooltip"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M10,4V7H12.21L8.79,15H6V18H14V15H11.79L15.21,7H18V4H10Z"/>
-              </svg>
-            </button>
-            <button 
-              @click="formatText('underline')" 
-              class="toolbar-btn"
-              :class="{ active: isFormatActive('underline') }"
-              @mouseenter="showTooltip($event, '下划线')"
-              @mouseleave="hideTooltip"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M5,21H19V19H5V21M12,17A6,6 0 0,0 18,11V3H15.5V11A3.5,3.5 0 0,1 12,14.5A3.5,3.5 0 0,1 8.5,11V3H6V11A6,6 0 0,0 12,17Z"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <!-- 对齐方式区域 -->
-        <div class="toolbar-section">
-          <div class="button-group">
-            <button 
-              @click="setAlignment('left')" 
-              class="toolbar-btn"
-              :class="{ active: currentAlignment === 'left' }"
-              @mouseenter="showTooltip($event, '左对齐')"
-              @mouseleave="hideTooltip"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M3,3H21V5H3V3M3,7H15V9H3V7M3,11H21V13H3V11M3,15H15V17H3V15M3,19H21V21H3V19Z"/>
-              </svg>
-            </button>
-            <button 
-              @click="setAlignment('center')" 
-              class="toolbar-btn"
-              :class="{ active: currentAlignment === 'center' }"
-              @mouseenter="showTooltip($event, '居中对齐')"
-              @mouseleave="hideTooltip"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M3,3H21V5H3V3M7,7H17V9H7V7M3,11H21V13H3V11M7,15H17V17H7V15M3,19H21V21H3V19Z"/>
-              </svg>
-            </button>
-            <button 
-              @click="setAlignment('right')" 
-              class="toolbar-btn"
-              :class="{ active: currentAlignment === 'right' }"
-              @mouseenter="showTooltip($event, '右对齐')"
-              @mouseleave="hideTooltip"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M3,3H21V5H3V3M9,7H21V9H9V7M3,11H21V13H3V11M9,15H21V17H9V15M3,19H21V21H3V19Z"/>
-              </svg>
-            </button>
-            <button 
-              @click="setAlignment('justify')" 
-              class="toolbar-btn"
-              :class="{ active: currentAlignment === 'justify' }"
-              @mouseenter="showTooltip($event, '两端对齐')"
-              @mouseleave="hideTooltip"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M3,3H21V5H3V3M3,7H21V9H3V7M3,11H21V13H3V11M3,15H21V17H3V15M3,19H21V21H3V19Z"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <!-- 样式区域 -->
-        <div class="toolbar-section">
-          <div class="color-picker-wrapper">
-            <button 
-              @click="showTextColorPicker = !showTextColorPicker" 
-              class="toolbar-btn color-btn"
-              @mouseenter="showTooltip($event, '文字颜色')"
-              @mouseleave="hideTooltip"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M9.62,12L12,5.67L14.38,12M11,3L5.5,17H7.75L8.87,14H15.13L16.25,17H18.5L13,3H11Z"/>
-              </svg>
-              <div class="color-indicator" :style="{ backgroundColor: currentTextColor }"></div>
-            </button>
-            <div v-if="showTextColorPicker" class="color-picker-panel">
-              <div class="color-presets">
-                <div 
-                  v-for="color in ['#000000', '#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ffa500']"
-                  :key="color"
-                  class="color-preset"
-                  :style="{ backgroundColor: color }"
-                  @click="applyTextColor(color)"
-                ></div>
-              </div>
-              <input 
-                type="color" 
-                v-model="customTextColor" 
-                @change="applyTextColor(customTextColor)"
-                class="custom-color-input"
-              />
-            </div>
-          </div>
-          
-          <div class="color-picker-wrapper">
-            <button 
-              @click="showBgColorPicker = !showBgColorPicker" 
-              class="toolbar-btn color-btn"
-              @mouseenter="showTooltip($event, '背景颜色')"
-              @mouseleave="hideTooltip"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19,3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5C21,3.89 20.1,3 19,3M19,5V19H5V5H19Z"/>
-              </svg>
-              <div class="color-indicator bg-indicator" :style="{ backgroundColor: currentBgColor }"></div>
-            </button>
-            <div v-if="showBgColorPicker" class="color-picker-panel">
-              <div class="color-presets">
-                <div 
-                  v-for="color in ['#ffffff', '#ffff00', '#00ff00', '#00ffff', '#ff00ff', '#ffa500', '#ff0000', '#0000ff']"
-                  :key="color"
-                  class="color-preset"
-                  :style="{ backgroundColor: color }"
-                  @click="applyBgColor(color)"
-                ></div>
-              </div>
-              <input 
-                type="color" 
-                v-model="customBgColor" 
-                @change="applyBgColor(customBgColor)"
-                class="custom-color-input"
-              />
-            </div>
-          </div>
-        </div>
-
-        <!-- 列表区域 -->
-        <div class="toolbar-section">
-          <button 
-            @click="insertList('unordered')" 
-            class="toolbar-btn"
-            @mouseenter="showTooltip($event, '无序列表')"
-            @mouseleave="hideTooltip"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M7,5H21V7H7V5M7,13V11H21V13H7M4,4.5A1.5,1.5 0 0,1 5.5,6A1.5,1.5 0 0,1 4,7.5A1.5,1.5 0 0,1 2.5,6A1.5,1.5 0 0,1 4,4.5M4,10.5A1.5,1.5 0 0,1 5.5,12A1.5,1.5 0 0,1 4,13.5A1.5,1.5 0 0,1 2.5,12A1.5,1.5 0 0,1 4,10.5M7,19V17H21V19H7M4,16.5A1.5,1.5 0 0,1 5.5,18A1.5,1.5 0 0,1 4,19.5A1.5,1.5 0 0,1 2.5,18A1.5,1.5 0 0,1 4,16.5Z"/>
-            </svg>
-          </button>
-          <button 
-            @click="insertList('ordered')" 
-            class="toolbar-btn"
-            @mouseenter="showTooltip($event, '有序列表')"
-            @mouseleave="hideTooltip"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M7,13V11H21V13H7M7,19V17H21V19H7M7,7V5H21V7H7M3,8V5H2V4H4V8H3M2,17V16H5V20H2V19H4V18.5H3V17.5H4V17H2M4.25,10A0.75,0.75 0 0,1 5,10.75C5,10.95 4.92,11.14 4.79,11.27L3.12,13H5V14H2V13.08L4,11H2V10H4.25Z"/>
-            </svg>
-          </button>
-        </div>
-
-        <!-- 插入内容区域 -->
-        <div class="toolbar-section">
-          <button 
-            @click="insertLink" 
-            class="toolbar-btn"
-            @mouseenter="showTooltip($event, '插入链接')"
-            @mouseleave="hideTooltip"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M3.9,12C3.9,10.29 5.29,8.9 7,8.9H11V7H7A5,5 0 0,0 2,12A5,5 0 0,0 7,17H11V15.1H7C5.29,15.1 3.9,13.71 3.9,12M8,13H16V11H8V13M17,7H13V8.9H17C18.71,8.9 20.1,10.29 20.1,12C20.1,13.71 18.71,15.1 17,15.1H13V17H17A5,5 0 0,0 22,12A5,5 0 0,0 17,7Z"/>
-            </svg>
-          </button>
-          <button 
-            @click="insertTable" 
-            class="toolbar-btn"
-            @mouseenter="showTooltip($event, '插入表格')"
-            @mouseleave="hideTooltip"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M5,4H19A2,2 0 0,1 21,6V18A2,2 0 0,1 19,20H5A2,2 0 0,1 3,18V6A2,2 0 0,1 5,4M5,8V12H11V8H5M13,8V12H19V8H13M5,14V18H11V14H5M13,14V18H19V14H13Z"/>
-            </svg>
-          </button>
-          <button 
-            @click="insertQuote" 
-            class="toolbar-btn"
-            @mouseenter="showTooltip($event, '插入引用')"
-            @mouseleave="hideTooltip"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M14,17H17L19,13V7H13V13H16M6,17H9L11,13V7H5V13H8L6,17Z"/>
-            </svg>
-          </button>
-        </div>
-
-        <!-- 批注功能区域 -->
-        <div class="toolbar-section">
-          <button 
-            @click="toggleAnnotationMode" 
-            class="toolbar-btn"
-            :class="{ active: isAnnotationMode }"
-            @mouseenter="showTooltip($event, '添加批注')"
-            @mouseleave="hideTooltip"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M9,22A1,1 0 0,1 8,21V18H4A2,2 0 0,1 2,16V4C2,2.89 2.9,2 4,2H20A2,2 0 0,1 22,4V16A2,2 0 0,1 20,18H13.9L10.2,21.71C10,21.9 9.75,22 9.5,22H9M10,16V19.08L13.08,16H20V4H4V16H10M6,7H18V9H6V7M6,11H16V13H6V11Z"/>
-            </svg>
-          </button>
-          <button 
-            @click="showAnnotationList" 
-            class="toolbar-btn"
-            :class="{ active: showAnnotationPanel }"
-            @mouseenter="showTooltip($event, showAnnotationPanel ? '隐藏批注列表' : '显示批注列表')"
-            @mouseleave="hideTooltip"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M3,5H9V11H3V5M5,7V9H7V7H5M11,7H21V9H11V7M11,15H21V17H11V15M5,20L1.5,16.5L2.91,15.09L5,17.17L9.59,12.59L11,14L5,20Z"/>
-            </svg>
-          </button>
-        </div>
-      </div>
-    </div>
+    <!-- 工具栏组件 -->
+    <EditorToolbar
+      :current-heading="currentHeading"
+      :current-alignment="currentAlignment"
+      :current-text-color="currentTextColor"
+      :current-bg-color="currentBgColor"
+      :is-exporting="isExporting"
+      :annotation-mode="isAnnotationMode"
+      :read-only="readOnly"
+      @import-file="importFile"
+      @export-file="exportFile"
+      @undo="undo"
+      @redo="redo"
+      @changeHeading="changeHeading"
+      @format-text="formatText"
+      @set-alignment="setAlignment"
+      @text-color-change="applyTextColor"
+      @bg-color-change="applyBgColor"
+      @insert-list="insertList"
+      @insert-link="insertLink"
+      @insert-table="insertTable"
+      @insert-quote="insertQuote"
+      @toggle-annotation-mode="toggleAnnotationMode"
+      @show-annotation-list="showAnnotationList"
+    />
 
     <!-- 编辑器容器 -->
     <div class="docly-editor-container" :class="{ 'with-sidebar': showAnnotationPanel }">
@@ -312,117 +34,34 @@
         @mouseup="handleTextSelection"
       ></div>
       
-      <!-- 批注侧边栏 -->
-      <div v-if="showAnnotationPanel" class="annotation-sidebar">
-        <div class="annotation-sidebar-header">
-           <h3>批注列表 ({{ annotations.length }})</h3>
-           <div class="sidebar-actions">
-             <button 
-               @click="deleteResolvedAnnotations" 
-               class="action-btn small"
-               :disabled="annotations.filter(a => a.resolved).length === 0"
-               title="清理已解决的批注"
-             >
-               清理已解决
-             </button>
-             <button 
-               @click="exportAnnotations" 
-               class="action-btn small"
-               :disabled="annotations.length === 0"
-               title="导出批注列表"
-             >
-               导出
-             </button>
-             <button @click="showAnnotationPanel = false" class="close-btn" title="关闭侧边栏">
-               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                 <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/>
-               </svg>
-             </button>
-           </div>
-         </div>
-        <div class="annotation-list">
-          <div 
-            v-for="annotation in annotations" 
-            :key="annotation.id"
-            class="annotation-item"
-            :class="{ resolved: annotation.resolved }"
-          >
-            <div class="annotation-header">
-              <span class="annotation-author">{{ annotation.author }}</span>
-              <span class="annotation-time">{{ new Date(annotation.timestamp).toLocaleString() }}</span>
-            </div>
-            <div class="annotation-text">
-              <strong>选中文本：</strong>{{ annotation.text }}
-            </div>
-            <div class="annotation-content">
-              {{ annotation.content }}
-            </div>
-            <div class="annotation-actions">
-               <button 
-                 @click="editAnnotation(annotation.id)"
-                 class="action-btn edit"
-               >
-                 编辑
-               </button>
-               <button 
-                 @click="resolveAnnotation(annotation.id)"
-                 class="action-btn"
-                 :class="{ resolved: annotation.resolved }"
-               >
-                 {{ annotation.resolved ? '取消解决' : '标记解决' }}
-               </button>
-               <button 
-                 @click="deleteAnnotation(annotation.id)"
-                 class="action-btn delete"
-               >
-                 删除
-               </button>
-             </div>
-          </div>
-          <div v-if="annotations.length === 0" class="no-annotations">
-            暂无批注
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 批注创建弹窗 -->
-    <div v-if="isAnnotationMode && selectedText" class="annotation-modal">
-      <div class="annotation-modal-content">
-        <div class="annotation-modal-header">
-          <h3>{{ selectedAnnotation ? '编辑批注' : '添加批注' }}</h3>
-          <button @click="cancelAnnotation" class="close-btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/>
-            </svg>
-          </button>
-        </div>
-        <div class="selected-text">
-          <strong>选中文本：</strong>{{ selectedText }}
-        </div>
-        <textarea 
-          v-model="annotationInput"
-          placeholder="请输入批注内容..."
-          class="annotation-textarea"
-          rows="4"
-        ></textarea>
-        <div class="annotation-modal-actions">
-          <button @click="cancelAnnotation" class="btn-cancel">取消</button>
-          <button @click="confirmAnnotation" class="btn-confirm">
-            {{ selectedAnnotation ? '更新' : '确认' }}
-          </button>
-        </div>
-      </div>
+      <!-- 批注系统 -->
+      <AnnotationSystem
+        :show-sidebar="showAnnotationPanel"
+        :show-create-modal="isAnnotationMode && !!selectedText"
+        :annotations="annotations"
+        :selected-text="selectedText"
+        :is-dark-theme="isDarkTheme"
+        @close-sidebar="showAnnotationPanel = false"
+        @delete-resolved="deleteResolvedAnnotations"
+        @export-annotations="exportAnnotations"
+        @edit-annotation="editAnnotation"
+        @resolve-annotation="resolveAnnotation"
+        @delete-annotation="deleteAnnotation"
+        @cancel-annotation="cancelAnnotation"
+        @confirm-annotation="confirmAnnotation"
+      />
     </div>
 
     <!-- 状态栏 -->
-    <div class="docly-statusbar">
-      <div class="status-group">
-        <span class="status-item">字数: {{ wordCount }}</span>
-        <span class="status-item">字符: {{ charCount }}</span>
-        <span v-if="!isSaved" class="status-item unsaved-indicator">未保存</span>
-      </div>
-    </div>
+    <EditorStatusBar
+      :is-saved="isSaved"
+      :char-count="charCount"
+      :is-read-only="props.readOnly"
+      :is-annotation-mode="isAnnotationMode"
+      :is-exporting="isExporting"
+      :is-dark-theme="isDarkTheme"
+      :editor-content="editorContent"
+    />
 
     <!-- 隐藏的文件输入元素 -->
     <input 
@@ -453,6 +92,9 @@ import { EditorCore } from '../core/EditorCore';
 import { PluginManager } from '../plugins/PluginManager';
 import { WordHandler } from '../fileHandlers/WordHandler';
 import { useEditorStore } from '../stores/editorStore';
+import EditorToolbar from './EditorToolbar.vue';
+import AnnotationSystem from './AnnotationSystem.vue';
+import EditorStatusBar from './EditorStatusBar.vue';
 import type { EditorConfig } from '../types';
 
 // Props
@@ -534,6 +176,12 @@ const editorStore = useEditorStore();
 // 主题相关的响应式数据
 const isDarkMode = ref(false);
 const systemThemeQuery = ref<MediaQueryList | null>(null);
+
+// 编辑器内容和导出状态
+const editorContent = ref('');
+
+// 计算属性
+const isDarkTheme = computed(() => isDarkMode.value);
 
 /**
  * 检测系统主题变化

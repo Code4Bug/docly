@@ -15,12 +15,38 @@ export class EditorCore implements EditorInstance {
   private editor: EditorJS | null = null;
   private config: EditorConfig;
   private eventListeners: Map<string, Function[]> = new Map();
+  private history: EditorData[] = [];
+  private historyIndex: number = -1;
+  private maxHistorySize: number = 50;
+  private saveHistoryTimeout: NodeJS.Timeout | null = null;
+  private isUndoRedoOperation: boolean = false;
 
   constructor(config: EditorConfig) {
     this.config = config;
   }
-
-  /**
+ 
+   /**
+    * 初始化历史记录
+    */
+   private async initializeHistory(): Promise<void> {
+     if (!this.editor) return;
+     
+     try {
+       const initialData = await this.editor.save();
+       const editorData: EditorData = {
+         time: initialData.time || Date.now(),
+         blocks: initialData.blocks || [],
+         version: initialData.version || '2.0.0'
+       };
+       
+       this.history = [editorData];
+       this.historyIndex = 0;
+     } catch (error) {
+       console.error('初始化历史记录失败:', error);
+     }
+   }
+ 
+   /**
    * 初始化编辑器
    */
   async init(): Promise<void> {
@@ -79,11 +105,19 @@ export class EditorCore implements EditorInstance {
       readOnly: this.config.readOnly || false,
       placeholder: this.config.placeholder || '开始编写文档...',
       onChange: () => {
+        // 如果正在执行 undo/redo 操作，不保存历史记录
+        if (!this.isUndoRedoOperation) {
+          this.debouncedSaveToHistory();
+        }
         this.emit('change');
       }
     });
 
     await this.editor.isReady;
+    
+    // 初始化历史记录
+    this.initializeHistory();
+    
     this.setupKeyboardHandlers();
     this.emit('ready');
   }
@@ -671,15 +705,21 @@ export class EditorCore implements EditorInstance {
   /**
    * 销毁编辑器实例
    */
-  destroy(): void {
+destroy(): void {
     if (this.editor) {
       this.editor.destroy();
       this.editor = null;
     }
+    
+    // 清理定时器
+    if (this.saveHistoryTimeout) {
+      clearTimeout(this.saveHistoryTimeout);
+      this.saveHistoryTimeout = null;
+    }
+    
+    // 清理事件监听器
     this.eventListeners.clear();
-  }
-
-  /**
+  }/**
    * 添加事件监听器
    */
   on(event: string, callback: Function): void {
@@ -733,9 +773,120 @@ export class EditorCore implements EditorInstance {
    */
   execCommand(command: string, value?: any): boolean {
     try {
+      if (command === 'undo') {
+        return this.undo();
+      } else if (command === 'redo') {
+        return this.redo();
+      }
       return document.execCommand(command, false, value);
     } catch (error) {
       console.error('执行命令失败:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 防抖保存历史记录
+   */
+  private debouncedSaveToHistory(): void {
+    if (this.saveHistoryTimeout) {
+      clearTimeout(this.saveHistoryTimeout);
+    }
+    
+    this.saveHistoryTimeout = setTimeout(() => {
+      this.saveToHistory();
+    }, 300); // 300ms 防抖延迟
+  }
+
+  /**
+   * 保存当前编辑器状态到历史记录
+   */
+  private async saveToHistory(): Promise<void> {
+    if (!this.editor) return;
+    
+    try {
+      const currentData = await this.editor.save();
+      
+      // 确保数据格式符合 EditorData 类型
+      const editorData: EditorData = {
+        time: currentData.time || Date.now(),
+        blocks: currentData.blocks || [],
+        version: currentData.version || '2.0.0'
+      };
+      
+      // 如果当前状态与历史记录中的最后一个状态相同，则不保存
+      if (this.history.length > 0 && this.historyIndex >= 0) {
+        const lastData = this.history[this.historyIndex];
+        if (JSON.stringify(editorData) === JSON.stringify(lastData)) {
+          return;
+        }
+      }
+      
+      // 如果当前不在历史记录的末尾，删除后面的记录
+      if (this.historyIndex < this.history.length - 1) {
+        this.history = this.history.slice(0, this.historyIndex + 1);
+      }
+      
+      // 添加新的历史记录
+      this.history.push(editorData);
+      this.historyIndex = this.history.length - 1;
+      
+      // 限制历史记录大小
+      if (this.history.length > this.maxHistorySize) {
+        this.history.shift();
+        this.historyIndex--;
+      }
+    } catch (error) {
+      console.error('保存历史记录失败:', error);
+    }
+  }
+
+  /**
+   * 撤销操作
+   */
+  private undo(): boolean {
+    if (!this.editor || this.historyIndex <= 0) {
+      return false;
+    }
+    
+    try {
+      this.isUndoRedoOperation = true;
+      this.historyIndex--;
+      const previousData = this.history[this.historyIndex];
+      this.editor.render(previousData).then(() => {
+        this.isUndoRedoOperation = false;
+      }).catch(() => {
+        this.isUndoRedoOperation = false;
+      });
+      return true;
+    } catch (error) {
+      console.error('撤销操作失败:', error);
+      this.isUndoRedoOperation = false;
+      return false;
+    }
+  }
+
+  /**
+   * 重做操作
+   */
+  private redo(): boolean {
+    if (!this.editor || this.historyIndex >= this.history.length - 1) {
+      return false;
+    }
+    
+    try {
+      this.isUndoRedoOperation = true;
+      this.historyIndex++;
+      const nextData = this.history[this.historyIndex];
+      this.editor.render(nextData).then(() => {
+        this.isUndoRedoOperation = false;
+      }).catch(() => {
+        this.isUndoRedoOperation = false;
+      });
+      return true;
+    } catch (error) {
+      console.error('重做操作失败:', error);
+      this.isUndoRedoOperation = false;
       return false;
     }
   }
