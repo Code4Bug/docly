@@ -151,6 +151,7 @@ export class WordHandler implements FileHandler {
       // 根据元素类型分类处理
       const elementCategory = this.categorizeElement(element);
       
+      
       switch (elementCategory) {
         case 'block': // 块级元素，创建独立的编辑器块
           const block = this.createBlockFromDocumentElement(element, blocks.length);
@@ -702,6 +703,7 @@ export class WordHandler implements FileHandler {
         });
         
         console.log('文档解析完成，批注数量:', document.commentsPart?.comments?.length || 0);
+        console.log('批注结构:', document.commentsPart);
         console.log('文档JSON结构:', document.documentPart.body);
         
         
@@ -726,6 +728,14 @@ export class WordHandler implements FileHandler {
           
           console.log('使用文档结构解析的编辑器数据:', editorData);
           return editorData;
+        } else {
+          // 如果解析失败，返回空的编辑器数据
+          console.warn('文档结构解析失败，返回空的编辑器数据');
+          return {
+            time: Date.now(),
+            blocks: [],
+            version: '2.28.2'
+          };
         }
         
       } finally {
@@ -2316,10 +2326,11 @@ export class WordHandler implements FileHandler {
       matchScore: number;
     }
     
+    let bestMatch: MatchResult | null = null;
+    
     // 为每个批注找到最佳匹配的文本块
     comments.forEach(comment => {
       const commentText = comment.range.text.trim();
-      let bestMatch: MatchResult | null = null;
       
       // 遍历所有块，找到最佳匹配
       editorData.blocks.forEach((block, blockIndex) => {
@@ -2360,7 +2371,7 @@ export class WordHandler implements FileHandler {
       });
       
       // 如果找到最佳匹配，将批注关联到该块
-      if (bestMatch && !associatedCommentIds.has(comment.id)) {
+      if (bestMatch !== null && !associatedCommentIds.has(comment.id)) {
         const block = editorData.blocks[bestMatch.blockIndex];
         const blockText = (block.data.text || '').trim();
         

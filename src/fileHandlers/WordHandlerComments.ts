@@ -85,7 +85,7 @@ function buildCommentRangeMap(body: any): Record<string, string> {
       
       // 如果是文本元素，记录文本
       if (element.type === 'text' && element.text) {
-        console.log(`  发现文本: "${element.text}"`);
+        // console.log(`  发现文本: "${element.text}"`);
       }
       
       // 如果是批注范围开始标记
@@ -139,20 +139,17 @@ function collectCommentText(element: any, commentId: string, textArray: string[]
   // 如果遇到批注范围开始标记
   if (element.type === 'commentRangeStart' && element.id === commentId) {
     state.collecting = true;
-    console.log(`开始收集批注 ${commentId} 的文本`);
   }
   
   // 如果遇到批注范围结束标记
   if (element.type === 'commentRangeEnd' && element.id === commentId) {
     state.collecting = false;
-    console.log(`结束收集批注 ${commentId} 的文本，收集到: ${textArray.join('')}`);
     return true; // 停止收集
   }
   
   // 如果正在收集且是文本元素
   if (state.collecting && element.type === 'text' && element.text) {
     textArray.push(element.text);
-    console.log(`收集到文本片段: "${element.text}"`);
   }
   
   // 递归处理子元素
@@ -179,22 +176,17 @@ export function extractCommentsFromDocument(document: any): Comment[] {
     // 从文档的 commentsPart 中获取批注数据
     const commentsPart = document.commentsPart;
     if (!commentsPart || !commentsPart.comments) {
-      console.log('文档中没有找到批注数据');
       return comments;
     }
-    
-    console.log('找到批注部分，批注数量:', commentsPart.comments.length);
-    
+  
     // 首先构建文档主体的批注范围映射
-    const commentRangeMap = buildCommentRangeMap(document.documentPart?.body);
-    console.log('构建的批注范围映射:', commentRangeMap);
+    const commentRangeMap = buildCommentRangeMap(document.documentPart?.body)
     
     // 遍历所有批注
     for (const comment of commentsPart.comments) {
       try {
         // 检查是否已处理过此批注ID
         if (processedCommentIds.has(comment.id)) {
-          console.log(`批注 ${comment.id} 已处理过，跳过重复处理`);
           continue;
         }
         
@@ -256,8 +248,6 @@ export function extractCommentsFromDocument(document: any): Comment[] {
         console.error('处理单个批注时出错:', error, comment);
       }
     }
-    
-    console.log(`批注提取完成: 总计处理 ${processedCommentIds.size} 个唯一批注，最终返回 ${comments.length} 个批注对象`);
     
   } catch (error) {
     console.error('提取批注数据时出错:', error);
