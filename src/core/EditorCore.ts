@@ -365,19 +365,11 @@ export class EditorCore implements EditorInstance {
     }
 
     try {
-      // 处理带样式的数据
-      console.log('处理带样式的数据...');
       const processedData = this.processStyledData(data);
-      console.log('处理后的数据:', processedData);
       
-      console.log('调用EditorJS的render方法...');
       await this.editor.render(processedData);
-      console.log('EditorJS render完成');
       
-      // 渲染完成后应用样式
-      console.log('应用块样式...');
       this.applyBlockStyles(processedData);
-      console.log('EditorCore.render 完成');
     } catch (error) {
       console.error('渲染数据失败:', error);
       throw error;
@@ -482,26 +474,73 @@ export class EditorCore implements EditorInstance {
     if (!data || !data.blocks) return;
 
     data.blocks.forEach((block: any, index: number) => {
-      console.log(`处理块 ${index}:`, block);
+      // console.log(`处理块 ${index}:`, block);
       if (block.data && block.data.styles) {
-        console.log(`块 ${index} 有样式信息:`, block.data.styles);
-        // 减少延迟时间，提高响应速度
-        setTimeout(() => {
-          const element = this.findBlockElement(index);
-          console.log(`块 ${index} 找到的DOM元素:`, element);
-          if (element) {
-            const contentElement = element.querySelector('.ce-paragraph, .ce-header, .cdx-block') || element;
-            console.log(`块 ${index} 内容元素:`, contentElement);
-            this.applyStylesToElement(contentElement as HTMLElement, block.data.styles);
-            console.log(`块 ${index} 样式应用完成`);
-          } else {
-            console.warn(`未找到块${index + 1}的DOM元素`);
-          }
-        }, 500);
-      } else {
-        console.log(`块 ${index} 没有样式信息`);
+        // console.log(`块 ${index} 有样式信息:`, block.data.styles);
+        // 直接应用样式，不使用延迟机制
+        this.applyStylesDirectly(index, block.data.styles);
       }
     });
+  }
+
+  /**
+   * 直接应用样式到块元素
+   * @param index - 块索引
+   * @param styles - 样式对象
+   */
+  private applyStylesDirectly(index: number, styles: any): void {
+    
+    // 尝试立即查找DOM元素
+    const element = this.findBlockElement(index);
+    
+    if (element) {
+      const contentElement = element.querySelector('.ce-paragraph, .ce-header, .cdx-block') || element;
+      console.log(`块 ${index} 找到内容元素:`, contentElement);
+      this.applyStylesToElement(contentElement as HTMLElement, styles);
+      console.log(`块 ${index} 样式应用完成`);
+    } else {
+      // 如果立即找不到元素，使用MutationObserver监听DOM变化
+      // console.log(`块 ${index} 未找到DOM元素，使用观察者模式等待元素创建`);
+      this.observeAndApplyStyles(index, styles);
+    }
+  }
+
+  /**
+   * 使用MutationObserver观察DOM变化并应用样式
+   * @param index - 块索引
+   * @param styles - 样式对象
+   */
+  private observeAndApplyStyles(index: number, styles: any): void {
+    if (!this.editor) return;
+    
+    // 获取编辑器容器元素
+    const container = typeof this.config.holder === 'string' 
+      ? document.getElementById(this.config.holder)
+      : this.config.holder;
+    if (!container) return;
+    
+    const observer = new MutationObserver((mutations) => {
+      const element = this.findBlockElement(index);
+      if (element) {
+        const contentElement = element.querySelector('.ce-paragraph, .ce-header, .cdx-block') || element;
+        console.log(`通过观察者找到块 ${index} 内容元素:`, contentElement);
+        this.applyStylesToElement(contentElement as HTMLElement, styles);
+        console.log(`块 ${index} 样式应用完成`);
+        observer.disconnect(); // 停止观察
+      }
+    });
+    
+    // 开始观察DOM变化
+    observer.observe(container, {
+      childList: true,
+      subtree: true
+    });
+    
+    // 设置超时，避免无限等待
+    setTimeout(() => {
+      observer.disconnect();
+      console.warn(`块 ${index} 观察超时，停止等待DOM元素`);
+    }, 5000);
   }
 
   /**

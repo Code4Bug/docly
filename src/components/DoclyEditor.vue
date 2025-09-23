@@ -758,23 +758,55 @@ const handleImport = async (event: Event): Promise<void> => {
     showMessage('正在导入文档，请稍候...', 'info');
     
     const editorData = await wordHandler.value.import(file);
-    console.log('导入成功，数据块数量:', editorData.blocks.length);
+    console.log('导入的文档数据:', editorData);
+    
+    // 清空现有批注，避免重复累积
+    annotations.value = [];
+    console.log('已清空现有批注');
     
     // 处理导入的批注数据
     const importedComments: any[] = [];
     
+    /**
+     * 创建标准化的批注对象
+     * @param comment 原始批注数据
+     * @param index 批注索引
+     * @param blockIndex 关联的块索引，-1表示独立批注
+     * @param blockText 关联块的文本内容
+     * @returns 标准化的批注对象
+     */
+    const createStandardComment = (comment: any, index: number, blockIndex: number = -1, blockText?: string) => {
+      // 优先使用批注的原始选中文本，避免使用批注内容作为选中文本
+      let selectedText = '';
+      
+      if (comment.range?.text && comment.range.text !== comment.content) {
+        // 如果 range.text 存在且不等于批注内容，使用它
+        selectedText = comment.range.text;
+      } else if (blockText && blockIndex >= 0) {
+        // 如果有关联的块文本，尝试从中提取相关文本
+        selectedText = blockText.substring(0, 50);
+      } else if (comment.content) {
+        // 最后才使用批注内容的前50个字符作为占位符
+        selectedText = `"${comment.content.substring(0, 50)}${comment.content.length > 50 ? '...' : ''}"`;
+      } else {
+        selectedText = '未知文本';
+      }
+      
+      return {
+        id: comment.id || `imported_${Date.now()}_${index}`,
+        content: comment.content,
+        author: comment.author || comment.user || '文档作者',
+        text: selectedText,
+        timestamp: typeof comment.timestamp === 'number' ? comment.timestamp : Date.now(),
+        resolved: false,
+        blockIndex: blockIndex
+      };
+    };
+    
     // 首先从 EditorData.comments 中读取批注（新的存储方式）
     if (editorData.comments && editorData.comments.length > 0) {
       editorData.comments.forEach((comment, index) => {
-        importedComments.push({
-          id: comment.id || `imported_${Date.now()}_${index}`,
-          content: comment.content,
-          author: comment.author || comment.user || '文档作者',
-          text: comment.range?.text || comment.content?.substring(0, 50) || '未知文本',
-          timestamp: typeof comment.timestamp === 'number' ? comment.timestamp : Date.now(),
-          resolved: false,
-          blockIndex: -1 // 表示这是独立的批注
-        });
+        importedComments.push(createStandardComment(comment, index));
       });
     }
     
@@ -786,26 +818,27 @@ const handleImport = async (event: Event): Promise<void> => {
             // 避免重复添加已经在 EditorData.comments 中的批注
             const existingComment = importedComments.find(c => c.id === comment.id);
             if (!existingComment) {
-              importedComments.push({
-                id: comment.id || `block_${Date.now()}_${blockIndex}`,
-                content: comment.content,
-                author: comment.author || comment.user || '文档作者',
-                text: comment.range?.text || block.data.text?.substring(0, 50) || '未知文本',
-                timestamp: typeof comment.timestamp === 'number' ? comment.timestamp : Date.now(),
-                resolved: false,
-                blockIndex: blockIndex
-              });
+              importedComments.push(createStandardComment(comment, blockIndex, blockIndex, block.data.text));
             }
           });
         }
       });
     }
     
-    // 合并导入的批注到现有批注列表
+    // 合并导入的批注到现有批注列表，避免重复
     if (importedComments.length > 0) {
-      annotations.value.push(...importedComments);
-      showMessage(`文档导入成功，发现 ${importedComments.length} 个批注`, 'success');
-      console.log('导入的批注:', importedComments);
+      // 过滤掉已经存在的批注，避免重复添加
+      const newComments = importedComments.filter(importedComment => 
+        !annotations.value.some(existingComment => existingComment.id === importedComment.id)
+      );
+      
+      if (newComments.length > 0) {
+        annotations.value.push(...newComments);
+        showMessage(`文档导入成功，新增 ${newComments.length} 个批注`, 'success');
+        console.log('新增的批注:', newComments);
+      } else {
+        showMessage('文档导入成功，未发现新批注', 'success');
+      }
     } else {
       showMessage('文档导入成功', 'success');
     }
