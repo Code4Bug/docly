@@ -70,9 +70,9 @@
         <FontTool
           :current-font-family="currentFontFamily"
           :current-font-size="currentFontSize"
-          @font-family-change="(fontFamily: string) => emit('font-family-change', fontFamily)"
-          @font-size-change="(fontSize: number) => emit('font-size-change', fontSize)"
-          @font-style-change="(action: string) => emit('font-style-change', action)"
+          @font-family-change="handleFontFamilyChange"
+          @font-size-change="handleFontSizeChange"
+          @font-style-change="handleFontStyleChange"
         />
       </div>
 
@@ -170,13 +170,13 @@
         <ColorPicker
           type="text"
           :current-color="currentTextColor"
-          @color-change="(color) => emit('text-color-change', color)"
+          @color-change="handleTextColorChange"
         />
         
         <ColorPicker
           type="background"
           :current-color="currentBgColor"
-          @color-change="(color: string) => emit('bg-color-change', color)"
+          @color-change="handleBgColorChange"
         />
       </div>
 
@@ -382,6 +382,46 @@ const hideTooltip = (): void => {
 const handleHeadingChange = (event: Event): void => {
   const target = event.target as HTMLSelectElement;
   emit('change-heading', target.value);
+};
+
+/**
+ * 处理字体系列变化
+ * @param {string} fontFamily - 字体系列
+ */
+const handleFontFamilyChange = (fontFamily: string): void => {
+  emit('font-family-change', fontFamily);
+};
+
+/**
+ * 处理字体大小变化
+ * @param {string} fontSize - 字体大小
+ */
+const handleFontSizeChange = (fontSize: string): void => {
+  emit('font-size-change', fontSize);
+};
+
+/**
+ * 处理字体样式变化
+ * @param {string} action - 样式操作
+ */
+const handleFontStyleChange = (action: string): void => {
+  emit('font-style-change', action);
+};
+
+/**
+ * 处理文本颜色变化
+ * @param {string} color - 颜色值
+ */
+const handleTextColorChange = (color: string): void => {
+  emit('text-color-change', color);
+};
+
+/**
+ * 处理背景颜色变化
+ * @param {string} color - 颜色值
+ */
+const handleBgColorChange = (color: string): void => {
+  emit('bg-color-change', color);
 };
 </script>
 
