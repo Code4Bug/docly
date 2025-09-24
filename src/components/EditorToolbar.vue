@@ -354,6 +354,7 @@
           <button
             @click="$emit('show-annotation-list')"
             class="toolbar-btn"
+            :class="{ 'annotation-open': showAnnotationPanel }"
             @mouseenter="showTooltip($event, '显示批注列表')"
             @mouseleave="hideTooltip"
           >
@@ -404,8 +405,10 @@ interface Props {
   currentFontSize?: string;
   isExporting?: boolean;
   annotationMode?: boolean;
+  showAnnotationPanel?: boolean;
   readOnly?: boolean;
 }
+
 
 withDefaults(defineProps<Props>(), {
   currentHeading: "",
@@ -416,6 +419,7 @@ withDefaults(defineProps<Props>(), {
   currentFontSize: "10.5pt",
   isExporting: false,
   annotationMode: false,
+  showAnnotationPanel: false,
   readOnly: false,
 });
 
@@ -619,6 +623,14 @@ export default {
   position: relative;
   flex-shrink: 0;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.toolbar-btn.annotation-open {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.1));
+  border-color: #3b82f6;
+  color: #3b82f6;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.15);
 }
 
 .toolbar-btn:hover {

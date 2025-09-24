@@ -368,7 +368,8 @@
 }
 
 .docly-editor-container.with-sidebar {
-  padding-right: 370px;
+  /* padding-right: 0px; */
+  transition: all 0.3 ease;
 }
 
 .docly-editor-holder {

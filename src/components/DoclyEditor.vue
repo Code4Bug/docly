@@ -8,6 +8,7 @@
       :current-bg-color="currentBgColor"
       :is-exporting="isExporting"
       :annotation-mode="isAnnotationMode"
+      :show-annotation-panel="showAnnotationPanel"
       :read-only="readOnly"
       @import-file="importFile"
       @export-file="exportFile"
@@ -33,11 +34,13 @@
 
     <!-- 编辑器容器 -->
     <div class="docly-editor-container" :class="{ 'with-sidebar': showAnnotationPanel }">
-      <div 
-        class="docly-editor-holder" 
-        ref="editorRef"
-        @mouseup="handleTextSelection"
-      ></div>
+      <div class="docly-elditor-wrapper">
+        <div 
+          class="docly-editor-holder" 
+          ref="editorRef"
+          @mouseup="handleTextSelection"
+        ></div>
+      </div>
       
       <!-- 批注系统 -->
       <AnnotationSystem
@@ -1332,6 +1335,42 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
+/* 编辑器容器样式 - 固定高度 */
+.docly-editor-container {
+  display: flex;
+  flex: 1;
+  height: 500px; /* 固定高度 */
+  overflow: hidden;
+  position: relative;
+  padding: 0;
+}
+
+.docly-editor-container.with-sidebar {
+  padding-right: 0px; /* 为侧边栏留出空间 */
+}
+
+/* 编辑器包装器 - 自动跟随内容撑开 */
+.docly-elditor-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  min-height: 0; /* 允许收缩 */
+}
+
+/* 编辑器内容区域 - 支持内容撑开 */
+.docly-editor-holder {
+  flex: 1;
+  padding: 20px;
+  background: #ffffff;
+  min-height: 100%;
+  outline: none;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #333;
+}
+
 .docly-toolbar {
   padding: 6px 12px;
   background: linear-gradient(to bottom, #f8f9fa 0%, #f1f3f4 100%);
@@ -2218,41 +2257,6 @@ onUnmounted(() => {
 /* 暗色模式下的悬浮提示 */
 .docly-editor.dark-theme .custom-tooltip {
   background: #999;
-  color: #333;
-}
-
-/* 批注侧边栏样式 */
-.annotation-sidebar {
-  position: fixed;
-  right: 0;
-  top: 60px;
-  width: 350px;
-  height: calc(100vh - 100px);
-  background: white;
-  border-left: 1px solid #e0e0e0;
-  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
-  z-index: 1000;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  transform: translateX(0);
-  transition: transform 0.3s ease;
-}
-
-.annotation-sidebar-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e0e0e0;
-  flex-shrink: 0;
-}
-
-.annotation-sidebar-header h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
   color: #333;
 }
 
