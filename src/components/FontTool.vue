@@ -154,24 +154,21 @@
         </svg>
       </button>
     </div>
-
-    <!-- 自定义悬浮提示 -->
-    <div 
-      v-if="tooltip.visible" 
-      class="font-tooltip"
-      :style="{ 
-        left: tooltip.x + 'px', 
-        top: tooltip.y + 'px' 
-      }"
-    >
-      {{ tooltip.text }}
+    
+    <!-- Tooltip 组件 -->
+     <Tooltip 
+       :visible="tooltip.visible"
+       :text="tooltip.text"
+       :x="tooltip.x"
+       :y="tooltip.y"
+     />
     </div>
-  </div>
-</template>
+  </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
 import { useTheme } from '../composables/useTheme';
+import { useTooltip } from '../composables/useTooltip';
+import Tooltip from './Tooltip.vue';
 
 // Props
 interface Props {
@@ -194,13 +191,12 @@ const emit = defineEmits<{
 // 主题系统
 const { isDarkTheme } = useTheme();
 
-// 悬浮提示相关状态
-const tooltip = ref({
-  visible: false,
-  text: '',
-  x: 0,
-  y: 0
-});
+// Tooltip 功能
+const { tooltip, showTooltip, hideTooltip } = useTooltip();
+
+// 确保 TypeScript 识别这些变量在模板中被使用
+// 这些变量实际在模板的事件处理器和组件绑定中使用
+const _tooltipRefs = { tooltip, showTooltip, hideTooltip };
 
 /**
  * 处理字体族变化
@@ -218,30 +214,6 @@ const handleFontFamilyChange = (event: Event): void => {
 const handleFontSizeChange = (event: Event): void => {
   const target = event.target as HTMLSelectElement;
   emit('font-size-change', target.value);
-};
-
-/**
- * 显示悬浮提示
- * @param event - 鼠标事件
- * @param text - 提示文本
- */
-const showTooltip = (event: MouseEvent, text: string): void => {
-  const target = event.target as HTMLElement;
-  const rect = target.getBoundingClientRect();
-  
-  tooltip.value = {
-    visible: true,
-    text,
-    x: rect.left + rect.width / 2,
-    y: rect.bottom + 8
-  };
-};
-
-/**
- * 隐藏悬浮提示
- */
-const hideTooltip = (): void => {
-  tooltip.value.visible = false;
 };
 </script>
 
@@ -342,10 +314,6 @@ export default {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-}
-
-.font-btn:last-child {
-  border-right: none;
 }
 
 .font-btn:hover {

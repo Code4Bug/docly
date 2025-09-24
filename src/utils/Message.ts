@@ -3,7 +3,7 @@
  * @param {string} text - 消息文本
  * @param {string} type - 消息类型 ('success' | 'error' | 'warning' | 'info')
  */
-export const showMessage = (text: string, type: 'success' | 'error' | 'warning' | 'info' = 'info'): void => {
+const showMessage = (text: string, type: 'success' | 'error' | 'warning' | 'info' = 'info'): void => {
   // 清除之前的消息
   const existingMessages = document.querySelectorAll('.docly-message');
   existingMessages.forEach(msg => msg.remove());
@@ -46,3 +46,6 @@ export const showMessage = (text: string, type: 'success' | 'error' | 'warning' 
     }
   }, 3000);
 };
+
+// 导出函数
+export { showMessage };

@@ -4,6 +4,8 @@
       ref="colorButton"
       @click="toggleColorPicker" 
       class="toolbar-btn color-btn"
+      @mouseenter="showTooltip($event, tooltipText)"
+      @mouseleave="hideTooltip"
     >
       <svg v-if="type === 'text'" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
         <path d="M9.62,12L12,5.67L14.38,12M11,3L5.5,17H7.75L8.87,14H15.13L16.25,17H18.5L13,3H11Z"/>
@@ -30,13 +32,22 @@
         class="custom-color-input"
       />
     </div>
+    
+    <!-- Tooltip 组件 -->
+     <Tooltip 
+       :visible="tooltip.visible"
+       :text="tooltip.text"
+       :x="tooltip.x"
+       :y="tooltip.y"
+     />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useTheme } from '../composables/useTheme';
-
+import Tooltip from './Tooltip.vue';
+import { useTooltip } from '../composables/useTooltip';
 
 // Props
 interface Props {
@@ -45,6 +56,13 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
+// Tooltip 系统
+const { tooltip, showTooltip, hideTooltip } = useTooltip();
+
+// 确保 TypeScript 识别这些变量在模板中被使用
+// 这些变量实际在模板的事件处理器和组件绑定中使用
+const _tooltipRefs = { tooltip, showTooltip, hideTooltip };
 
 // Emits
 const emit = defineEmits<{
@@ -70,11 +88,16 @@ const colorPresets = computed(() => {
     ];
   } else {
     return [
-      '#ffffff', '#f5f5f5', '#e0e0e0', '#cccccc',
-      '#ffeeee', '#fff0e6', '#fffacc', '#eeffee',
-      '#e6f0ff', '#f0e6ff', '#ffe6f0', '#e6ffff'
+      '#ffffff', '#f0f0f0', '#d0d0d0', '#b0b0b0',
+      '#ffe0e0', '#ffe0d0', '#fff0b0', '#e0ffe0',
+      '#d0e0ff', '#e0d0ff', '#ffd0e0', '#d0ffff'
     ];
   }
+});
+
+// Tooltip 文本
+const tooltipText = computed(() => {
+  return props.type === 'text' ? '字体颜色' : '背景颜色';
 });
 
 /**
