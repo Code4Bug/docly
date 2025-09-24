@@ -273,18 +273,18 @@ const initEditor = async (): Promise<void> => {
   if (!editorRef.value) return;
 
   try {
-    Console.info('开始初始化编辑器...');
+    Console.debug('开始初始化编辑器...');
     
     // 初始化插件管理器
     pluginManager.value = new PluginManager();
-    Console.info('插件管理器初始化完成');
+    Console.debug('插件管理器初始化完成');
     
     // 初始化文件处理器
     wordHandler.value = new WordHandler();
-    Console.info('文件处理器初始化完成');
+    Console.debug('文件处理器初始化完成');
     
     // 初始化编辑器核心
-    Console.info('创建编辑器核心实例...');
+    Console.debug('创建编辑器核心实例...');
     editorCore.value = new EditorCore({
       holder: editorRef.value,
       plugins: [],
@@ -305,15 +305,86 @@ const initEditor = async (): Promise<void> => {
       },
       ...props.config
     });
-    Console.info('编辑器核心实例创建完成');
+    Console.debug('编辑器核心实例创建完成');
     
-    Console.info('调用编辑器核心初始化...');
+    Console.debug('调用编辑器核心初始化...');
     await editorCore.value.init();
-    Console.info('编辑器核心初始化完成');
+    Console.debug('编辑器核心初始化完成');
     
-    Console.info('设置编辑器实例到 store...');
+    // 监听编辑器内容变化
+    editorCore.value.on('change', async () => {
+      try {
+        Console.debug('编辑器内容发生变化，开始更新统计数据...');
+        const data = await editorCore.value!.save();
+        Console.debug('获取到编辑器数据:', data);
+        
+        // 将编辑器数据转换为HTML内容用于统计
+        let htmlContent = '';
+        data.blocks.forEach(block => {
+          Console.debug('处理块:', block);
+          if (block.type === 'paragraph' && block.data?.text) {
+            htmlContent += `<p>${block.data.text}</p>`;
+          } else if (block.type === 'header' && block.data?.text) {
+            const level = block.data.level || 1;
+            htmlContent += `<h${level}>${block.data.text}</h${level}>`;
+          } else if (block.type === 'list' && block.data?.items) {
+            const tag = block.data.style === 'ordered' ? 'ol' : 'ul';
+            htmlContent += `<${tag}>`;
+            block.data.items.forEach((item: string) => {
+              htmlContent += `<li>${item}</li>`;
+            });
+            htmlContent += `</${tag}>`;
+          } else if (block.data?.text) {
+            htmlContent += `<div>${block.data.text}</div>`;
+          }
+        });
+        
+        Console.debug('生成的HTML内容:', htmlContent);
+        editorContent.value = htmlContent;
+        
+        // 更新字符数统计
+        const textContent = htmlContent.replace(/<[^>]*>/g, '');
+        charCount.value = textContent.length;
+        Console.debug('更新后的统计数据 - editorContent:', editorContent.value, 'charCount:', charCount.value);
+        
+        // 标记为未保存
+        isSaved.value = false;
+      } catch (error) {
+        Console.error('更新编辑器内容失败:', error);
+      }
+    });
+    
+    // 初始化时也要获取一次内容
+    setTimeout(async () => {
+      try {
+        Console.debug('初始化获取编辑器内容...');
+        const data = await editorCore.value!.save();
+        Console.debug('初始化获取到的数据:', data);
+        
+        let htmlContent = '';
+        data.blocks.forEach(block => {
+          if (block.type === 'paragraph' && block.data?.text) {
+            htmlContent += `<p>${block.data.text}</p>`;
+          } else if (block.type === 'header' && block.data?.text) {
+            const level = block.data.level || 1;
+            htmlContent += `<h${level}>${block.data.text}</h${level}>`;
+          } else if (block.data?.text) {
+            htmlContent += `<div>${block.data.text}</div>`;
+          }
+        });
+        
+        editorContent.value = htmlContent;
+        const textContent = htmlContent.replace(/<[^>]*>/g, '');
+        charCount.value = textContent.length;
+        Console.debug('初始化统计数据 - editorContent:', editorContent.value, 'charCount:', charCount.value);
+      } catch (error) {
+        Console.error('初始化获取编辑器内容失败:', error);
+      }
+    }, 1000);
+    
+    Console.debug('设置编辑器实例到 store...');
     editorStore.setEditorInstance(editorCore.value);
-    Console.info('编辑器实例设置完成，当前实例:', editorStore.editorInstance);
+    Console.debug('编辑器实例设置完成，当前实例:', editorStore.editorInstance);
     
     // 应用初始主题
     updateEditorTheme();
@@ -375,20 +446,20 @@ const handleExport = async (): Promise<void> => {
   isExporting.value = true;
   try {
     // 调试：直接从编辑器获取最新数据
-    Console.info('=== 导出调试信息 ===');
+    Console.debug('=== 导出调试信息 ===');
     const currentEditorData = await editorCore.value.save();
-    Console.info('直接从编辑器获取的数据:', currentEditorData);
-    Console.info('编辑器数据块数量:', currentEditorData.blocks.length);
+    Console.debug('直接从编辑器获取的数据:', currentEditorData);
+    Console.debug('编辑器数据块数量:', currentEditorData.blocks.length);
     
     // 先保存当前编辑器数据到 store
     await editorStore.saveDocument();
-    Console.info('保存后store中的数据:', editorStore.editorData);
-    Console.info('store数据块数量:', editorStore.editorData?.blocks.length || 0);
+    Console.debug('保存后store中的数据:', editorStore.editorData);
+    Console.debug('store数据块数量:', editorStore.editorData?.blocks.length || 0);
     
     // 比较两个数据是否一致
     const storeDataStr = JSON.stringify(editorStore.editorData);
     const editorDataStr = JSON.stringify(currentEditorData);
-    Console.info('数据是否一致:', storeDataStr === editorDataStr);
+    Console.debug('数据是否一致:', storeDataStr === editorDataStr);
     
     // 使用直接从编辑器获取的数据进行导出
     const dataToExport = currentEditorData;
@@ -399,7 +470,7 @@ const handleExport = async (): Promise<void> => {
       return;
     }
 
-    Console.info('准备导出的数据:', dataToExport);
+    Console.debug('准备导出的数据:', dataToExport);
     
     // 执行导出
     const fileResult = await wordHandler.value.export(dataToExport);
@@ -466,7 +537,7 @@ const handleImport = async (event: Event): Promise<void> => {
     
     // 清空现有批注，避免重复累积
     annotations.value = [];
-    Console.info('已清空现有批注');
+    Console.debug('已清空现有批注');
     
     // 处理导入的批注数据
     const importedComments: any[] = [];
@@ -539,7 +610,7 @@ const handleImport = async (event: Event): Promise<void> => {
       if (newComments.length > 0) {
         annotations.value.push(...newComments);
         showMessage(`文档导入成功，新增 ${newComments.length} 个批注`, 'success');
-        Console.info('新增的批注:', newComments);
+        Console.debug('新增的批注:', newComments);
       } else {
         showMessage('文档导入成功，未发现新批注', 'success');
       }
@@ -547,10 +618,54 @@ const handleImport = async (event: Event): Promise<void> => {
       showMessage('文档导入成功', 'success');
     }
     
-    Console.info('准备调用 editorStore.loadDocument...');
+    Console.debug('准备调用 editorStore.loadDocument...');
     await editorStore.loadDocument(editorData);
-    Console.info('editorStore.loadDocument 调用完成');
-    Console.info('文档已加载到编辑器store，当前编辑器数据:', editorStore.editorData);
+    Console.debug('editorStore.loadDocument 调用完成');
+    Console.debug('文档已加载到编辑器store，当前编辑器数据:', editorStore.editorData);
+    
+    // 导入完成后手动更新统计数据
+    Console.debug('导入完成，开始手动更新统计数据...');
+    try {
+      // 获取导入后的编辑器数据
+      const currentData = await editorCore.value!.save();
+      Console.debug('导入后获取的编辑器数据:', currentData);
+      
+      // 将编辑器数据转换为HTML内容用于统计
+      let htmlContent = '';
+      if (currentData && currentData.blocks) {
+        currentData.blocks.forEach((block: any) => {
+          Console.debug('处理导入的块:', block);
+          if (block.type === 'paragraph' && block.data && block.data.text) {
+            htmlContent += `<p>${block.data.text}</p>`;
+          } else if (block.type === 'header' && block.data && block.data.text) {
+            const level = block.data.level || 1;
+            htmlContent += `<h${level}>${block.data.text}</h${level}>`;
+          } else if (block.type === 'list' && block.data && block.data.items) {
+            const listType = block.data.style === 'ordered' ? 'ol' : 'ul';
+            htmlContent += `<${listType}>`;
+            block.data.items.forEach((item: string) => {
+              htmlContent += `<li>${item}</li>`;
+            });
+            htmlContent += `</${listType}>`;
+          }
+        });
+      }
+      
+      Console.debug('导入后生成的HTML内容:', htmlContent);
+      
+      // 更新editorContent和charCount
+      editorContent.value = htmlContent;
+      charCount.value = htmlContent.replace(/<[^>]*>/g, '').length;
+      isSaved.value = false;
+      
+      Console.debug('导入后统计数据更新完成:', {
+        editorContent: editorContent.value,
+        charCount: charCount.value,
+        isSaved: isSaved.value
+      });
+    } catch (error) {
+      Console.error('导入后更新统计数据失败:', error);
+    }
     
   } catch (error) {
     Console.error('导入失败，详细错误信息:', error);
@@ -909,10 +1024,26 @@ const setAlignment = (alignment: string): void => {
 /**
  * 切换只读模式
  */
-const toggleReadOnly = (): void => {
+const toggleReadOnly = async (): Promise<void> => {
+  if (!editorCore.value) {
+    showMessage('编辑器未初始化', 'error');
+    return;
+  }
+
   const newReadOnly = !isReadOnly.value;
-  editorStore.setReadOnly(newReadOnly);
-  showMessage(newReadOnly ? '已切换到只读模式' : '已切换到编辑模式', 'info');
+  
+  try {
+    // 更新编辑器核心的只读状态
+    await editorCore.value.setReadOnly(newReadOnly);
+    
+    // 更新状态管理中的只读状态
+    editorStore.setReadOnly(newReadOnly);
+    
+    showMessage(newReadOnly ? '已切换到只读模式' : '已切换到编辑模式', 'info');
+  } catch (error) {
+    Console.error('切换只读模式失败:', error);
+    showMessage('切换只读模式失败', 'error');
+  }
 };
 
 /**
@@ -920,7 +1051,7 @@ const toggleReadOnly = (): void => {
  * @param {string} color - 颜色值
  */
 const setTextColor = (color: string): void => {
-  Console.info('DoclyEditor setTextColor 被调用:', color);
+  Console.debug('DoclyEditor setTextColor 被调用:', color);
   if (!editorCore.value) {
     Console.error('编辑器未初始化');
     showMessage('编辑器未初始化', 'error');
@@ -928,7 +1059,7 @@ const setTextColor = (color: string): void => {
   }
 
   const success = editorCore.value.execCommand('foreColor', color);
-  Console.info('execCommand foreColor 结果:', success);
+  Console.debug('execCommand foreColor 结果:', success);
   if (success) {
     currentTextColor.value = color;
     showMessage('文本颜色设置成功', 'success');
@@ -942,7 +1073,7 @@ const setTextColor = (color: string): void => {
  * @param {string} color - 颜色值
  */
 const setBgColor = (color: string): void => {
-  Console.info('DoclyEditor setBgColor 被调用:', color);
+  Console.debug('DoclyEditor setBgColor 被调用:', color);
   if (!editorCore.value) {
     Console.error('编辑器未初始化');
     showMessage('编辑器未初始化', 'error');
@@ -950,7 +1081,7 @@ const setBgColor = (color: string): void => {
   }
 
   const success = editorCore.value.execCommand('backColor', color);
-  Console.info('execCommand backColor 结果:', success);
+  Console.debug('execCommand backColor 结果:', success);
   if (success) {
     currentBgColor.value = color;
     showMessage('背景颜色设置成功', 'success');
@@ -978,7 +1109,7 @@ const exportFile = async (): Promise<void> => {
  * @param {string} color - 颜色值
  */
 const applyTextColor = (color: string): void => {
-  Console.info('DoclyEditor applyTextColor 被调用:', color);
+  Console.debug('DoclyEditor applyTextColor 被调用:', color);
   setTextColor(color);
 };
 
@@ -987,7 +1118,7 @@ const applyTextColor = (color: string): void => {
  * @param {string} color - 颜色值
  */
 const applyBgColor = (color: string): void => {
-  Console.info('DoclyEditor applyBgColor 被调用:', color);
+  Console.debug('DoclyEditor applyBgColor 被调用:', color);
   setBgColor(color);
 };
 
@@ -996,7 +1127,7 @@ const applyBgColor = (color: string): void => {
  * @param {string} fontFamily - 字体族
  */
 const applyFontFamily = (fontFamily: string): void => {
-  Console.info('DoclyEditor applyFontFamily 被调用:', fontFamily);
+  Console.debug('DoclyEditor applyFontFamily 被调用:', fontFamily);
   if (!editorCore.value) {
     showMessage('编辑器未初始化', 'error');
     return;
@@ -1022,7 +1153,7 @@ const applyFontFamily = (fontFamily: string): void => {
  * @param {string} fontSize - 字体大小（支持px和pt单位）
  */
 const applyFontSize = (fontSize: string): void => {
-  Console.info('DoclyEditor applyFontSize 被调用:', fontSize);
+  Console.debug('DoclyEditor applyFontSize 被调用:', fontSize);
   if (!editorCore.value) {
     showMessage('编辑器未初始化', 'error');
     return;
@@ -1061,7 +1192,7 @@ const applyFontSize = (fontSize: string): void => {
  * @param {string} action - 操作类型
  */
 const handleFontStyleChange = (action: string): void => {
-  Console.info('DoclyEditor handleFontStyleChange 被调用:', action);
+  Console.debug('DoclyEditor handleFontStyleChange 被调用:', action);
   if (!editorCore.value) {
     showMessage('编辑器未初始化', 'error');
     return;
@@ -1301,7 +1432,7 @@ const exportAnnotations = (): void => {
 
 // 生命周期
 onMounted(() => {
-  Console.info('DoclyEditor onMounted 钩子被调用');
+  Console.debug('DoclyEditor onMounted 钩子被调用');
   
   // 初始化系统主题检测
   systemThemeQuery.value = detectSystemTheme();

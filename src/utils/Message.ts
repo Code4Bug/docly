@@ -1,11 +1,15 @@
+import { Console } from './Console.ts';
 /**
  * 显示消息提示
  * @param {string} text - 消息文本
- * @param {string} type - 消息类型 ('success' | 'error' | 'warning' | 'info')
+ * @param {string} type - 消息类型 ('success' | 'error' | 'warn' | 'info')
  */
-const showMessage = (text: string, type: 'success' | 'error' | 'warning' | 'info' = 'info'): void => {
+const showMessage = (text: string, type: 'success' | 'error' | 'warn' | 'info', consoleTag: boolean = true): void => {
   
-
+  if (consoleTag) {
+    Console[type](text)
+    return
+  }
 
   // 清除之前的消息
   const existingMessages = document.querySelectorAll('.docly-message');
@@ -33,7 +37,7 @@ const showMessage = (text: string, type: 'success' | 'error' | 'warning' | 'info
   const colors = {
     success: '#52c41a',
     error: '#ff4d4f',
-    warning: '#faad14',
+    warn: '#faad14',
     info: '#1890ff'
   };
   messageEl.style.backgroundColor = colors[type] || colors.info;

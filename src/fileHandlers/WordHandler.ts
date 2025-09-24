@@ -14,7 +14,7 @@ export class WordHandler {
    */
   async import(file: File): Promise<EditorData> {
     try {
-      Console.info('开始导入Word文档:', file.name);
+      Console.debug('开始导入Word文档:', file.name);
       
       // 读取DOCX文件
       const arrayBuffer = await file.arrayBuffer();
@@ -54,7 +54,7 @@ export class WordHandler {
     const commentRangeStarts = doc.querySelectorAll('w\\:commentRangeStart, commentRangeStart');
     const commentRangeEnds = doc.querySelectorAll('w\\:commentRangeEnd, commentRangeEnd');
     
-    Console.info(`找到 ${commentRangeStarts.length} 个批注范围开始标记，${commentRangeEnds.length} 个结束标记`);
+    Console.debug(`找到 ${commentRangeStarts.length} 个批注范围开始标记，${commentRangeEnds.length} 个结束标记`);
     
     // 为每个批注范围提取文本
     commentRangeStarts.forEach(start => {
@@ -71,7 +71,7 @@ export class WordHandler {
         const rangeText = this.extractTextBetweenNodes(start, endMarker);
         if (rangeText.trim()) {
           commentRangeTextMap.set(commentId, rangeText.trim());
-          Console.info(`批注 ${commentId} 的原文: "${rangeText.trim()}"`);
+          Console.debug(`批注 ${commentId} 的原文: "${rangeText.trim()}"`);
         } else {
           Console.warn(`批注 ${commentId} 未找到原文内容`);
         }
@@ -80,7 +80,7 @@ export class WordHandler {
       }
     });
     
-    Console.info(`成功提取 ${commentRangeTextMap.size} 个批注的原文`);
+    Console.debug(`成功提取 ${commentRangeTextMap.size} 个批注的原文`);
   }
 
   /**
@@ -202,7 +202,7 @@ export class WordHandler {
       
       // 获取批注对应的原文
       const originalText = commentRangeTextMap.get(commentId || '') || '';
-      Console.info(`批注 ${commentId} 对应的原文: "${originalText}"`);
+      Console.debug(`批注 ${commentId} 对应的原文: "${originalText}"`);
       
       // 解析时间戳
       let timestamp = Date.now();
@@ -281,7 +281,7 @@ export class WordHandler {
       comments.push(commentObj);
     });
     
-    Console.info(`从Word文档中提取了 ${comments.length} 个批注`);
+    Console.debug(`从Word文档中提取了 ${comments.length} 个批注`);
     return comments;
   }
 
@@ -292,11 +292,11 @@ export class WordHandler {
    */
   async export(editorData: EditorData, filename: string = 'document'): Promise<{ blob: Blob; name: string }> {
     try {
-      Console.info('开始导出Word文档:', editorData);
+      Console.debug('开始导出Word文档:', editorData);
       
       // 将Editor.js数据转换为HTML
       const htmlContent = this.convertEditorDataToHtml(editorData);
-      Console.info('转换后的HTML:', htmlContent);
+      Console.debug('转换后的HTML:', htmlContent);
       
       // 将HTML转换为Word XML
       const wordXml = this.htmlToWordXml(htmlContent);
@@ -307,7 +307,7 @@ export class WordHandler {
       // 返回文件对象
       const finalFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
       
-      Console.info('Word文档导出成功:', finalFilename);
+      Console.debug('Word文档导出成功:', finalFilename);
       return { blob: docxBlob, name: finalFilename };
     } catch (error) {
       Console.error('导出Word文档时发生错误:', error);  
@@ -361,7 +361,7 @@ export class WordHandler {
       // 处理分节符等其他元素
       else if (tagName === 'w:sectpr' || tagName === 'sectpr') {
         // 分节符通常包含页面设置信息，可以在这里处理
-        Console.info('发现分节符，包含页面设置信息');
+        Console.debug('发现分节符，包含页面设置信息');
       }
     });
     
@@ -635,7 +635,7 @@ export class WordHandler {
       return blocks.map(block => {
         // 优先使用保存的htmlContent（包含完整样式）
         if (block.data && block.data.htmlContent) {
-          Console.info('使用保存的htmlContent:', block.data.htmlContent);
+          Console.debug('使用保存的htmlContent:', block.data.htmlContent);
           
           // 检查htmlContent是否已经有合适的标签包装
           const htmlContent = block.data.htmlContent.trim();

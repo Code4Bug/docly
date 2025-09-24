@@ -145,7 +145,7 @@ onUnmounted(() => {
  * @param {string} color - 颜色值
  */
 const selectColor = (color: string): void => {
-  Console.info('ColorPicker selectColor 被调用:', { type: props.type, color });
+  Console.debug('ColorPicker selectColor 被调用:', { type: props.type, color });
   
   // 延迟执行以确保文本选择状态得到保持
   setTimeout(() => {
@@ -161,7 +161,7 @@ const selectColor = (color: string): void => {
 const handleCustomColorChange = (event: Event): void => {
   const target = event.target as HTMLInputElement;
   const color = target.value;
-  Console.info('ColorPicker handleCustomColorChange 被调用:', { type: props.type, color });
+  Console.debug('ColorPicker handleCustomColorChange 被调用:', { type: props.type, color });
   customColor.value = color;
   emit('color-change', color);
   showColorPicker.value = false;

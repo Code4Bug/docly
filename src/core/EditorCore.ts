@@ -178,15 +178,15 @@ export class EditorCore implements EditorInstance {
    */
   private handleEnterKey(event: KeyboardEvent): void {
     const selection = window.getSelection();
-    Console.info('handleEnterKey', selection)
+    Console.debug('handleEnterKey', selection)
     if (!selection || selection.rangeCount === 0) {
       return
     };
     
     const range = selection.getRangeAt(0);
-    Console.info('range', range)
+    Console.debug('range', range)
     const currentNode = range.startContainer;
-    Console.info('currentNode', currentNode)
+    Console.debug('currentNode', currentNode)
     const currentBlock = this.findParentBlock(currentNode as Node);
     
     if (!currentBlock) return;
@@ -261,7 +261,7 @@ export class EditorCore implements EditorInstance {
    */
   private setBlockAlignment(block: HTMLElement, alignment: string): void {
     block.style.textAlign = alignment;
-    Console.info(`已将块设置为${alignment === 'left' ? '左对齐' : alignment}`);
+    Console.debug(`已将块设置为${alignment === 'left' ? '左对齐' : alignment}`);
   }
   
   /**
@@ -554,7 +554,7 @@ export class EditorCore implements EditorInstance {
    * 支持样式信息的渲染
    */
   async render(data: EditorData): Promise<void> {
-    Console.info('EditorCore.render 开始渲染数据:', data);
+    Console.debug('EditorCore.render 开始渲染数据:', data);
     
     if (!this.editor) {
       throw new Error('编辑器未初始化');
@@ -681,7 +681,7 @@ export class EditorCore implements EditorInstance {
    * @param styles - 样式对象
    */
   private applyStylesDirectly(index: number, styles: any): void {
-    Console.info(`applyStylesDirectly 开始处理块 ${index}，样式:`, styles);
+    Console.debug(`applyStylesDirectly 开始处理块 ${index}，样式:`, styles);
     
     // 尝试立即查找DOM元素
     const element = this.findBlockElement(index);
@@ -700,7 +700,7 @@ export class EditorCore implements EditorInstance {
       for (const selector of contentSelectors) {
         contentElement = element.querySelector(selector) as HTMLElement;
         if (contentElement) {
-          Console.info(`块 ${index} 通过选择器 ${selector} 找到内容元素:`, contentElement);
+          Console.debug(`块 ${index} 通过选择器 ${selector} 找到内容元素:`, contentElement);
           break;
         }
       }
@@ -708,14 +708,14 @@ export class EditorCore implements EditorInstance {
       // 如果没找到特定的内容元素，使用块元素本身
       if (!contentElement) {
         contentElement = element;
-        Console.info(`块 ${index} 使用块元素本身作为内容元素:`, contentElement);
+        Console.debug(`块 ${index} 使用块元素本身作为内容元素:`, contentElement);
       }
       
       this.applyStylesToElement(contentElement, styles);
-      Console.info(`块 ${index} 样式应用完成`);
+      Console.debug(`块 ${index} 样式应用完成`);
     } else {
       // 如果立即找不到元素，使用MutationObserver监听DOM变化
-      Console.info(`块 ${index} 未找到DOM元素，使用观察者模式等待元素创建`);
+      Console.debug(`块 ${index} 未找到DOM元素，使用观察者模式等待元素创建`);
       this.observeAndApplyStyles(index, styles);
     }
   }
@@ -738,9 +738,9 @@ export class EditorCore implements EditorInstance {
       const element = this.findBlockElement(index);
       if (element) {
         const contentElement = element.querySelector('.ce-paragraph, .ce-header, .cdx-block') || element;
-        Console.info(`通过观察者找到块 ${index} 内容元素:`, contentElement);
+        Console.debug(`通过观察者找到块 ${index} 内容元素:`, contentElement);
         this.applyStylesToElement(contentElement as HTMLElement, styles);
-        Console.info(`块 ${index} 样式应用完成`);
+        Console.debug(`块 ${index} 样式应用完成`);
         observer.disconnect(); // 停止观察
       }
     });
@@ -786,7 +786,7 @@ export class EditorCore implements EditorInstance {
         try {
           const element = method();
           if (element) {
-            Console.info(`通过方法找到块 ${index}:`, element);
+            Console.debug(`通过方法找到块 ${index}:`, element);
             return element;
           }
         } catch (e) {
@@ -806,7 +806,7 @@ export class EditorCore implements EditorInstance {
    * @param styles - 样式对象
    */
   private applyStylesToElement(element: HTMLElement, styles: any): void {
-    Console.info('applyStylesToElement 开始应用样式到元素:', element, '样式:', styles);
+    Console.debug('applyStylesToElement 开始应用样式到元素:', element, '样式:', styles);
     if (!element || !element.style) {
       console.warn('元素无效或没有style属性');
       return;
@@ -815,7 +815,7 @@ export class EditorCore implements EditorInstance {
     try {
       // 字体相关样式
       if (styles.fontFamily) {
-        Console.info('应用字体:', styles.fontFamily);
+        Console.debug('应用字体:', styles.fontFamily);
         element.style.fontFamily = styles.fontFamily;
         
         // 仿宋字体特殊处理
@@ -856,7 +856,7 @@ export class EditorCore implements EditorInstance {
       if (styles.paddingTop && element.classList.contains('ce-paragraph')) {
         const paddingValue = Math.min(parseFloat(styles.paddingTop), 12);
         element.style.paddingTop = `${paddingValue}px`;
-        Console.info('应用段落paddingTop:', paddingValue + 'px');
+        Console.debug('应用段落paddingTop:', paddingValue + 'px');
       }
 
       // 应用其他样式
@@ -869,10 +869,10 @@ export class EditorCore implements EditorInstance {
             // 对于颜色相关样式，使用setProperty确保优先级
             if (key === 'color' || key === 'backgroundColor') {
               element.style.setProperty(cssProperty, styles[key], 'important');
-              Console.info(`应用重要样式 ${key}:`, styles[key]);
+              Console.debug(`应用重要样式 ${key}:`, styles[key]);
             } else {
               (element.style as any)[camelCaseProperty] = styles[key];
-              Console.info(`应用样式 ${key}:`, styles[key]);
+              Console.debug(`应用样式 ${key}:`, styles[key]);
             }
           } catch (e) {
             console.warn(`应用样式 ${key} 失败:`, e);
@@ -886,14 +886,14 @@ export class EditorCore implements EditorInstance {
           try {
             const cssProperty = key.replace(/([A-Z])/g, '-$1').toLowerCase();
             element.style.setProperty(cssProperty, styles[key]);
-            Console.info(`应用自定义样式 ${key}:`, styles[key]);
+            Console.debug(`应用自定义样式 ${key}:`, styles[key]);
           } catch (e) {
             console.warn(`应用自定义样式 ${key} 失败:`, e);
           }
         }
       });
 
-      Console.info('样式应用完成，最终元素样式:', element.style.cssText);
+      Console.debug('样式应用完成，最终元素样式:', element.style.cssText);
     } catch (error) {
       console.warn('应用样式时发生错误:', error);
     }
@@ -1009,7 +1009,7 @@ destroy(): void {
       }
 
       const range = selection.getRangeAt(0);
-      Console.info('设置字体大小:', fontSize);
+      Console.debug('设置字体大小:', fontSize);
 
       // 如果有选中文本，应用到选中文本
       if (!range.collapsed) {
@@ -1032,7 +1032,7 @@ destroy(): void {
    */
   private applyFontSizeToSelectedText(fontSize: string, range: Range): boolean {
     try {
-      Console.info('应用字体大小到选中文本:', fontSize);
+      Console.debug('应用字体大小到选中文本:', fontSize);
       
       // 处理字体大小单位，统一转换为CSS可用的格式
       let cssSize: string;
@@ -1173,7 +1173,7 @@ destroy(): void {
    */
   private applyFontSizeToCurrentPosition(fontSize: string, range: Range): boolean {
     try {
-      Console.info('应用字体大小到光标位置:', fontSize);
+      Console.debug('应用字体大小到光标位置:', fontSize);
       
       // 处理字体大小单位，统一转换为CSS可用的格式
       let cssSize: string;
@@ -1205,7 +1205,7 @@ destroy(): void {
       if (fontSizeSpan) {
         // 如果已经在字体大小span内，直接更新字体大小
         fontSizeSpan.style.fontSize = cssSize;
-        Console.info('更新现有span的字体大小');
+        Console.debug('更新现有span的字体大小');
       } else {
         // 创建一个新的span元素用于设置字体大小
         const span = document.createElement('span');
@@ -1253,7 +1253,7 @@ destroy(): void {
       }
 
       const range = selection.getRangeAt(0);
-      Console.info('应用斜体样式');
+      Console.debug('应用斜体样式');
 
       // 如果有选中文本，应用到选中文本
       if (!range.collapsed) {
@@ -1275,7 +1275,7 @@ destroy(): void {
    */
   private applyItalicToSelectedText(range: Range): boolean {
     try {
-      Console.info('应用斜体样式到选中文本');
+      Console.debug('应用斜体样式到选中文本');
       
       // 检查选中文本是否已经是斜体
       const selectedContent = range.cloneContents();
@@ -1323,7 +1323,7 @@ destroy(): void {
    */
   private applyItalicToCurrentPosition(range: Range): boolean {
     try {
-      Console.info('应用斜体样式到光标位置');
+      Console.debug('应用斜体样式到光标位置');
       
       // 创建一个span元素用于设置斜体样式
       const span = document.createElement('span');
@@ -1443,7 +1443,7 @@ destroy(): void {
       }
 
       const range = selection.getRangeAt(0);
-      Console.info('当前选择范围:', {
+      Console.debug('当前选择范围:', {
         collapsed: range.collapsed,
         startContainer: range.startContainer,
         endContainer: range.endContainer,
@@ -1473,7 +1473,7 @@ destroy(): void {
    */
   private applyColorToSelectedText(command: string, color: string, range: Range): boolean {
     try {
-      Console.info('应用颜色到选中文本:', { command, color });
+      Console.debug('应用颜色到选中文本:', { command, color });
       
       // 提取选中的内容
       const selectedContent = range.extractContents();
@@ -1502,7 +1502,7 @@ destroy(): void {
         selection.addRange(range);
       }
       
-      Console.info('成功应用颜色到选中文本');
+      Console.debug('成功应用颜色到选中文本');
       return true;
     } catch (error) {
       Console.error('应用颜色到选中文本失败:', error);
@@ -1519,7 +1519,7 @@ destroy(): void {
    */
   private applyColorToCurrentPosition(command: string, color: string, range: Range): boolean {
     try {
-      Console.info('应用颜色到当前光标位置:', { command, color });
+      Console.debug('应用颜色到当前光标位置:', { command, color });
       
       // 创建一个不可见的span作为格式标记
       const span = document.createElement('span');
@@ -1551,7 +1551,7 @@ destroy(): void {
       // 监听下一次输入，将格式应用到新输入的文本
       this.setupColorFormatting(span, command, color);
       
-      Console.info('成功设置光标位置的颜色格式');
+      Console.debug('成功设置光标位置的颜色格式');
       return true;
     } catch (error) {
       Console.error('应用颜色到当前位置失败:', error);
@@ -1741,5 +1741,36 @@ destroy(): void {
       Console.error('获取当前块失败:', error);
       return null;
     }
+  }
+
+  /**
+   * 设置只读模式
+   * @param {boolean} readOnly - 是否只读
+   */
+  async setReadOnly(readOnly: boolean): Promise<void> {
+    if (!this.editor) {
+      Console.error('编辑器未初始化，无法设置只读模式');
+      return;
+    }
+
+    try {
+      if (readOnly) {
+        await this.editor.readOnly.toggle(true);
+      } else {
+        await this.editor.readOnly.toggle(false);
+      }
+      Console.debug('只读模式设置成功:', readOnly);
+    } catch (error) {
+      Console.error('设置只读模式失败:', error);
+    }
+  }
+
+  /**
+   * 获取当前只读状态
+   * @returns {boolean} 当前是否为只读模式
+   */
+  isReadOnly(): boolean {
+    if (!this.editor) return false;
+    return this.editor.readOnly.isEnabled;
   }
 }

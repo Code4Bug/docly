@@ -55,7 +55,7 @@ export const useEditorStore = defineStore('editor', () => {
       // 自动同步编辑器数据
       try {
         const currentData = await instance.save();
-        Console.info('自动同步编辑器数据:', currentData);
+        Console.debug('自动同步编辑器数据:', currentData);
         editorData.value = currentData;
       } catch (error) {
         console.warn('自动同步编辑器数据失败:', error);
@@ -67,10 +67,10 @@ export const useEditorStore = defineStore('editor', () => {
    * 更新编辑器数据
    */
   const updateEditorData = (data: EditorData) => {
-    Console.info('updateEditorData 被调用，传入数据:', data);
-    Console.info('更新前 editorData.value:', editorData.value);
+    Console.debug('updateEditorData 被调用，传入数据:', data);
+    Console.debug('更新前 editorData.value:', editorData.value);
     editorData.value = data;
-    Console.info('更新后 editorData.value:', editorData.value);
+    Console.debug('更新后 editorData.value:', editorData.value);
     hasUnsavedChanges.value = false;
   };
 
@@ -99,8 +99,8 @@ export const useEditorStore = defineStore('editor', () => {
    * 加载文档
    */
   const loadDocument = async (data: EditorData): Promise<void> => {
-    Console.info('editorStore.loadDocument 开始加载文档，数据:', data);
-    Console.info('检查编辑器实例状态:', {
+    Console.debug('editorStore.loadDocument 开始加载文档，数据:', data);
+    Console.debug('检查编辑器实例状态:', {
       hasInstance: !!editorInstance.value,
       instanceType: typeof editorInstance.value,
       instanceValue: editorInstance.value

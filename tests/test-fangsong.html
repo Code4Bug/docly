@@ -117,12 +117,12 @@
                 if (!fontName) return fontName;
                 
                 const cleanFontName = fontName.replace(/['"]/g, '').trim();
-                Console.info('映射字体:', cleanFontName);
+                Console.debug('映射字体:', cleanFontName);
                 
                 // 处理复合字体（包含逗号的字体名称）
                 if (cleanFontName.includes(',')) {
                     const fontParts = cleanFontName.split(',').map(part => part.trim());
-                    Console.info('复合字体部分:', fontParts);
+                    Console.debug('复合字体部分:', fontParts);
                     
                     // 检查是否有中文字体部分
                     const chineseFontPart = fontParts.find(part => 
@@ -132,11 +132,11 @@
                     if (chineseFontPart) {
                         // 如果有中文字体，优先处理中文字体部分
                         const mappedFont = this.processSingleFont(chineseFontPart);
-                        Console.info('映射中文字体部分:', chineseFontPart, '->', mappedFont);
+                        Console.debug('映射中文字体部分:', chineseFontPart, '->', mappedFont);
                         return mappedFont;
                     } else {
                         // 如果没有中文字体，应用默认仿宋字体
-                        Console.info('复合字体无中文部分，应用默认仿宋字体');
+                        Console.debug('复合字体无中文部分，应用默认仿宋字体');
                         return '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif';
                     }
                 }
@@ -184,7 +184,7 @@
                         const fontFamilyMatch = childStyle.match(/font-family:\s*([^;]+)/);
                         if (fontFamilyMatch) {
                             const currentFont = fontFamilyMatch[1].trim();
-                            Console.info('检查子元素字体:', currentFont);
+                            Console.debug('检查子元素字体:', currentFont);
                             
                             if (currentFont.includes(',')) {
                                 const mappedFont = this.mapChineseFontName(currentFont);
@@ -192,7 +192,7 @@
                                     const newStyle = childStyle.replace(/font-family:\s*[^;]+/, `font-family: ${mappedFont}`);
                                     child.setAttribute('style', newStyle);
                                     child.classList.add('fangsong-mapped');
-                                    Console.info('映射复合字体到仿宋:', currentFont, '->', mappedFont);
+                                    Console.debug('映射复合字体到仿宋:', currentFont, '->', mappedFont);
                                 }
                             } else if (currentFont.includes('Times New Roman') || 
                                       currentFont.includes('Arial') || 
@@ -201,7 +201,7 @@
                                 const newStyle = childStyle.replace(/font-family:\s*[^;]+/, `font-family: ${fangsongFont}`);
                                 child.setAttribute('style', newStyle);
                                 child.classList.add('fangsong-mapped');
-                                Console.info('映射英文字体到仿宋:', currentFont, '->', fangsongFont);
+                                Console.debug('映射英文字体到仿宋:', currentFont, '->', fangsongFont);
                             }
                         }
                     } else {
@@ -209,7 +209,7 @@
                         const fangsongFont = '"仿宋_GB2312", "FangSong_GB2312", "FangSong", "仿宋", "STFangsong", serif';
                         child.setAttribute('style', `${currentStyle}font-family: ${fangsongFont}`);
                         child.classList.add('fangsong-inherited');
-                        Console.info('传播仿宋字体到子元素:', child.tagName);
+                        Console.debug('传播仿宋字体到子元素:', child.tagName);
                     }
                 });
             }
@@ -223,7 +223,7 @@
                         const mappedFont = this.mapChineseFontName(originalFont);
                         
                         if (this.isFangSongFont(originalFont) || mappedFont.includes('仿宋')) {
-                            Console.info(`检测到仿宋字体: 原始=${originalFont}, 映射=${mappedFont}`);
+                            Console.debug(`检测到仿宋字体: 原始=${originalFont}, 映射=${mappedFont}`);
                             element.classList.add('fangsong-font', 'debug-fangsong');
                             const newStyle = style.replace(/font-family:\s*[^;]+/, `font-family: ${mappedFont}`);
                             element.setAttribute('style', newStyle);
@@ -289,18 +289,18 @@
             
             // 处理所有带有 font-family 样式的元素
             const styledElements = document.querySelectorAll('#fixed-content [style*="font-family"]');
-            Console.info(`找到 ${styledElements.length} 个带有字体样式的元素`);
+            Console.debug(`找到 ${styledElements.length} 个带有字体样式的元素`);
             
             styledElements.forEach((element, index) => {
                 const style = element.getAttribute('style');
                 const fontMatch = style.match(/font-family:\s*([^;]+)/);
                 if (fontMatch) {
                     const originalFont = fontMatch[1].trim();
-                    Console.info(`处理元素 ${index + 1}: 原始字体 = ${originalFont}`);
+                    Console.debug(`处理元素 ${index + 1}: 原始字体 = ${originalFont}`);
                     
                     // 映射字体
                     const mappedFont = handler.mapChineseFontName(originalFont);
-                    Console.info(`映射结果: ${originalFont} -> ${mappedFont}`);
+                    Console.debug(`映射结果: ${originalFont} -> ${mappedFont}`);
                     
                     // 应用映射后的字体
                     const newStyle = style.replace(/font-family:\s*[^;]+/, `font-family: ${mappedFont}`);
@@ -309,7 +309,7 @@
                     // 如果映射为仿宋字体，添加标记类并传播
                     if (mappedFont.includes('仿宋')) {
                         element.classList.add('fangsong-font');
-                        Console.info(`检测到仿宋字体，开始传播到子元素`);
+                        Console.debug(`检测到仿宋字体，开始传播到子元素`);
                         handler.propagateFangSongToChildren(element);
                     }
                 }
@@ -318,7 +318,7 @@
             // 特别处理段落元素
             const paragraphs = document.querySelectorAll('#fixed-content p');
             paragraphs.forEach((p, index) => {
-                Console.info(`检查段落 ${index + 1}`);
+                Console.debug(`检查段落 ${index + 1}`);
                 const style = p.getAttribute('style') || '';
                 if (style.includes('font-family')) {
                     const fontMatch = style.match(/font-family:\s*([^;]+)/);
@@ -326,7 +326,7 @@
                         const font = fontMatch[1].trim();
                         const mappedFont = handler.mapChineseFontName(font);
                         if (mappedFont.includes('仿宋')) {
-                            Console.info(`段落级别仿宋字体传播: 原始=${font}, 映射=${mappedFont}`);
+                            Console.debug(`段落级别仿宋字体传播: 原始=${font}, 映射=${mappedFont}`);
                             handler.propagateFangSongToChildren(p);
                         }
                     }
@@ -336,11 +336,11 @@
 
         // 页面加载完成后执行测试
         window.addEventListener('DOMContentLoaded', function() {
-            Console.info('开始字体处理测试...');
+            Console.debug('开始字体处理测试...');
             processFixedContent();
             testFontMapping();
             testFontPropagation();
-            Console.info('字体处理测试完成');
+            Console.debug('字体处理测试完成');
         });
     </script>
 </body>

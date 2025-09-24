@@ -23,7 +23,7 @@
       <!-- 字符数统计 -->
       <div class="status-item char-count">
         <span class="label">字符:</span>
-        <span class="value">{{ charCount }}</span>
+        <span class="value">{{ characterCount }}</span>
       </div>
       
       <!-- 段落数统计 -->
@@ -80,6 +80,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { Console } from '../utils/Console';
+
+Console.debug('EditorStatusBar 组件初始化');
 
 // Props
 interface Props {
@@ -112,16 +115,45 @@ let timeInterval: ReturnType<typeof setInterval> | null = null;
 const wordCount = computed(() => {
   if (!props.editorContent) return 0;
   
-  // 移除HTML标签
-  const textContent = props.editorContent.replace(/<[^>]*>/g, '');
+  // 移除HTML标签和实体编码
+  const textContent = props.editorContent
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .trim();
   
-  // 统计中文字符
-  const chineseChars = textContent.match(/[\u4e00-\u9fa5]/g) || [];
+  if (!textContent) return 0;
   
-  // 统计英文单词
-  const englishWords = textContent.match(/[a-zA-Z]+/g) || [];
+  // 统计中文字符（包括中文标点符号）
+  const chineseChars = textContent.match(/[\u4e00-\u9fff\u3400-\u4dbf]/g) || [];
+  
+  // 统计英文单词（连续的字母组成一个单词）
+  const englishText = textContent.replace(/[\u4e00-\u9fff\u3400-\u4dbf]/g, ' ');
+  const englishWords = englishText.match(/[a-zA-Z]+/g) || [];
   
   return chineseChars.length + englishWords.length;
+});
+
+/**
+ * 计算字符数（所有可见字符）
+ */
+const characterCount = computed(() => {
+  if (!props.editorContent) return 0;
+  
+  // 移除HTML标签和实体编码，但保留所有文本字符
+  const textContent = props.editorContent
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"');
+  
+  // 移除首尾空白，但保留中间的空格和换行
+  return textContent.trim().length;
 });
 
 /**
@@ -130,9 +162,20 @@ const wordCount = computed(() => {
 const paragraphCount = computed(() => {
   if (!props.editorContent) return 0;
   
-  // 按段落标签分割
-  const paragraphs = props.editorContent.split(/<\/?p[^>]*>/g).filter(p => p.trim());
-  return Math.max(1, paragraphs.length);
+  // 统计所有块级元素：p, h1-h6, li, div等
+  const blockElements = props.editorContent.match(/<(p|h[1-6]|li|div)[^>]*>.*?<\/\1>/gi) || [];
+  const selfClosingBlocks = props.editorContent.match(/<(br|hr)[^>]*\/?>/gi) || [];
+  
+  // 如果没有找到任何块级元素，但有内容，则至少算作1段
+  const totalBlocks = blockElements.length + selfClosingBlocks.length;
+  
+  if (totalBlocks === 0) {
+    // 检查是否有纯文本内容
+    const textContent = props.editorContent.replace(/<[^>]*>/g, '').trim();
+    return textContent ? 1 : 0;
+  }
+  
+  return totalBlocks;
 });
 
 /**
