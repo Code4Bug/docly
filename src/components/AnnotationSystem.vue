@@ -187,7 +187,7 @@
 import { ref, computed } from 'vue';
 
 // 接口定义
-interface Annotation {
+export interface Annotation {
   id: string;
   content: string;
   author: string;

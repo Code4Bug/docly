@@ -202,7 +202,7 @@
   gap: 4px;
   flex-shrink: 0;
   padding: 0 6px;
-  border-right: 1px solid #e8eaed;
+  /* border-right: 1px solid #e8eaed; */
   margin-right: 6px;
 }
 

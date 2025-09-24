@@ -1,5 +1,5 @@
 <template>
-  <div class="color-picker-wrapper">
+  <div class="color-picker-wrapper" :class="{ 'dark-theme': isDarkTheme }">
     <button 
       ref="colorButton"
       @click="toggleColorPicker" 
@@ -35,6 +35,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { useTheme } from '../composables/useTheme';
 
 
 // Props
@@ -49,6 +50,9 @@ const props = defineProps<Props>();
 const emit = defineEmits<{
   'color-change': [color: string];
 }>();
+
+// 主题系统
+const { isDarkTheme } = useTheme();
 
 // 响应式数据
 const showColorPicker = ref(false);
@@ -153,6 +157,27 @@ export default {
 
 .color-btn {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #e1e5e9;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.color-btn:hover {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.1));
+  border-color: #3b82f6;
+  color: #3b82f6;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.15);
 }
 
 .color-indicator {
@@ -225,5 +250,50 @@ export default {
 .custom-color-input::-webkit-color-swatch {
   border: none;
   border-radius: 2px;
+}
+
+/* 暗色主题样式 */
+.color-picker-wrapper.dark-theme .color-btn {
+  background: #2d2d2d;
+  border-color: #404040;
+  color: #e0e0e0;
+}
+
+.color-picker-wrapper.dark-theme .color-btn:hover {
+  background: linear-gradient(135deg, rgba(66, 133, 244, 0.15), rgba(147, 51, 234, 0.15));
+  border-color: #4285f4;
+  color: #4285f4;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(66, 133, 244, 0.15);
+}
+
+.color-picker-wrapper.dark-theme .color-indicator {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.color-picker-wrapper.dark-theme .color-picker-panel {
+  background: #2d2d2d;
+  border-color: #404040;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.color-picker-wrapper.dark-theme .color-preset {
+  border-color: #404040;
+}
+
+.color-picker-wrapper.dark-theme .color-preset:hover {
+  border-color: #4285f4;
+  box-shadow: 0 2px 8px rgba(66, 133, 244, 0.2);
+}
+
+.color-picker-wrapper.dark-theme .custom-color-input {
+  background: #404040;
+  border-color: #555555;
+  color: #e0e0e0;
+}
+
+.color-picker-wrapper.dark-theme .custom-color-input:hover {
+  border-color: #4285f4;
+  background: #4a4a4a;
 }
 </style>

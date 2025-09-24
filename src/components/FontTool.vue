@@ -320,27 +320,28 @@ export default {
 
 .font-style-group {
   display: flex;
-  border: 1px solid #e1e5e9;
+  gap: 4px;
+}
+
+.font-style-group .font-btn {
   border-radius: 6px;
-  overflow: hidden;
-  background: #ffffff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .font-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   padding: 0;
-  border: none;
-  /* border-right: 1px solid #e1e5e9; */
-  background: transparent;
-  color: #4a5568;
+  border: 1px solid #e1e5e9;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #374151;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .font-btn:last-child {
@@ -349,6 +350,7 @@ export default {
 
 .font-btn:hover {
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.1));
+  border-color: #3b82f6;
   color: #3b82f6;
   transform: translateY(-1px);
   box-shadow: 0 2px 4px rgba(59, 130, 246, 0.15);
@@ -423,18 +425,21 @@ export default {
 }
 
 .font-tool.dark-theme .font-btn {
+  background: #2d2d2d;
+  border-color: #404040;
   color: #e0e0e0;
-  background: transparent;
-  border-radius: 0;
 }
 
 .font-tool.dark-theme .font-btn:hover {
-  background: rgba(66, 133, 244, 0.15);
+  background: linear-gradient(135deg, rgba(66, 133, 244, 0.15), rgba(147, 51, 234, 0.15));
+  border-color: #4285f4;
   color: #4285f4;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(66, 133, 244, 0.15);
 }
 
 .font-tool.dark-theme .font-btn:active {
-   background: rgba(66, 133, 244, 0.25);
+   background: linear-gradient(135deg, rgba(66, 133, 244, 0.25), rgba(147, 51, 234, 0.25));
  }
  
  .font-tool.dark-theme .font-select optgroup,

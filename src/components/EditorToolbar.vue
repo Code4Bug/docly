@@ -638,26 +638,30 @@ export default {
   justify-content: center;
   width: 32px;
   height: 32px;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  background: transparent;
-  color: #5f6368;
+  border: 1px solid #e1e5e9;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #374151;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .toolbar-btn:hover {
-  background: rgba(26, 115, 232, 0.08);
-  border-color: rgba(26, 115, 232, 0.2);
-  color: #1a73e8;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.1));
+  border-color: #3b82f6;
+  color: #3b82f6;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.15);
 }
 
 .toolbar-btn.active {
-  background: rgba(26, 115, 232, 0.12);
-  color: #1a73e8;
-  border-color: rgba(26, 115, 232, 0.3);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(147, 51, 234, 0.15));
+  color: #3b82f6;
+  border-color: #3b82f6;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.15);
 }
 
 .toolbar-btn svg {
@@ -666,15 +670,17 @@ export default {
 
 .button-group {
   display: flex;
-  border: 1px solid #dadce0;
-  border-radius: 4px;
+  border: 1px solid #e1e5e9;
+  border-radius: 6px;
   overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .button-group .toolbar-btn {
   border: none;
   border-radius: 0;
-  border-right: 1px solid #dadce0;
+  border-right: 1px solid #e1e5e9;
+  background: #ffffff;
 }
 
 .button-group .toolbar-btn:last-child {
@@ -682,45 +688,53 @@ export default {
 }
 
 .button-group .toolbar-btn:hover {
-  background: rgba(26, 115, 232, 0.08);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.1));
   border-color: transparent;
+  color: #3b82f6;
   z-index: 1;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.15);
 }
 
 .button-group .toolbar-btn.active {
-  background: rgba(26, 115, 232, 0.12);
-  color: #1a73e8;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(147, 51, 234, 0.15));
+  color: #3b82f6;
   border-color: transparent;
   z-index: 1;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.15);
 }
 
 .compact-select {
   height: 32px;
   padding: 6px 24px 6px 8px;
-  border: 1px solid #dadce0;
-  border-radius: 4px;
-  background-color: white;
-  color: #3c4043;
+  border: 1px solid #e1e5e9;
+  border-radius: 6px;
+  background-color: #ffffff;
+  color: #374151;
   font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   appearance: none;
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
   background-repeat: no-repeat;
   background-position: calc(100% - 6px) center;
   background-size: 12px 12px;
   min-width: 80px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .compact-select:hover {
-  border-color: #1a73e8;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-color: #3b82f6;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.15);
+  transform: translateY(-1px);
 }
 
 .compact-select:focus {
   outline: none;
-  border-color: #1a73e8;
-  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1), 0 2px 4px rgba(59, 130, 246, 0.15);
+  transform: translateY(-1px);
 }
 
 /* 颜色按钮样式 */
@@ -806,19 +820,24 @@ export default {
 }
 
 .docly-toolbar.dark-theme .toolbar-btn {
+  background: #2d2d2d;
+  border-color: #404040;
   color: #e0e0e0;
 }
 
 .docly-toolbar.dark-theme .toolbar-btn:hover {
-  background: rgba(66, 133, 244, 0.15);
-  border-color: rgba(66, 133, 244, 0.2);
+  background: linear-gradient(135deg, rgba(66, 133, 244, 0.15), rgba(147, 51, 234, 0.15));
+  border-color: #4285f4;
   color: #4285f4;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(66, 133, 244, 0.15);
 }
 
 .docly-toolbar.dark-theme .toolbar-btn.active {
-  background: rgba(66, 133, 244, 0.25);
+  background: linear-gradient(135deg, rgba(66, 133, 244, 0.25), rgba(147, 51, 234, 0.25));
   color: #4285f4;
-  border-color: rgba(66, 133, 244, 0.3);
+  border-color: #4285f4;
+  box-shadow: 0 2px 4px rgba(66, 133, 244, 0.15);
 }
 
 .docly-toolbar.dark-theme .compact-select {
@@ -831,12 +850,15 @@ export default {
 .docly-toolbar.dark-theme .compact-select:hover {
   border-color: #4285f4;
   background-color: #404040;
+  box-shadow: 0 2px 4px rgba(66, 133, 244, 0.15);
+  transform: translateY(-1px);
 }
 
 .docly-toolbar.dark-theme .compact-select:focus {
   border-color: #4285f4;
   background-color: #404040;
-  box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
+  box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.1), 0 2px 4px rgba(66, 133, 244, 0.15);
+  transform: translateY(-1px);
 }
 
 .docly-toolbar.dark-theme .compact-select option {
