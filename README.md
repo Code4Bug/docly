@@ -136,7 +136,7 @@ src/
    ```bash
    npm run dev
    ```
-   访问 `http://localhost:5173` 查看应用
+   访问 `http://localhost:5174` 查看应用
 
 3. **构建生产版本**
    ```bash
