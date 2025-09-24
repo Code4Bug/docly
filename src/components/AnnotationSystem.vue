@@ -6,7 +6,7 @@
       class="annotation-sidebar"
       :class="{ 'dark-theme': isDarkTheme }"
     >
-      <div class="sidebar-header">
+      <div class="sidebar-header unselectable">
         <h3>批注列表</h3>
         <button 
           @click="$emit('close-sidebar')" 
@@ -29,10 +29,10 @@
           </div>
           
           <!-- 显示批注对应的原文 -->
-          <div v-if="annotation.range?.text" class="annotation-original-text">
+          <div v-if="annotation?.text" class="annotation-original-text">
             <label>原文：</label>
             <div class="original-text-content">
-              "{{ annotation.range.text }}"
+              "{{ annotation.text }}"
             </div>
           </div>
           
@@ -107,7 +107,7 @@
           </div>
         </div>
         
-        <div v-if="annotations.length === 0" class="empty-state">
+        <div v-if="annotations.length === 0" class="empty-state unselectable">
           <p>暂无批注</p>
         </div>
       </div>
@@ -354,14 +354,31 @@ export default {
   border: none;
   font-size: 20px;
   cursor: pointer;
-  color: #666;
+  /* color: #666; */
   padding: 4px;
   border-radius: 4px;
   transition: all 0.2s ease;
+  /* 移除按钮默认样式 */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  outline: none;
 }
 
 .close-btn:hover {
   /* background: #e9ecef; */
+  color: #c9c9c9;
+}
+
+.close-btn:active {
+  border: none;
+}
+
+.dark-theme .close-btn {
+  color: #595959;
+}
+
+.dark-theme .close-btn:hover {
   color: #c9c9c9;
 }
 
@@ -800,8 +817,8 @@ export default {
 }
 
 .dark-theme .annotation-original-text {
-  background: #4a5568;
-  border-left-color: #63b3ed;
+  background: #494a4c;
+  border-left-color: #878787;
 }
 
 .dark-theme .original-text-content {

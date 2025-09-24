@@ -181,7 +181,7 @@ interface Props {
 
 withDefaults(defineProps<Props>(), {
   currentFontFamily: 'Arial, sans-serif',
-  currentFontSize: '14px'
+  currentFontSize: '10.5pt'
 });
 
 // Emits

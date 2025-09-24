@@ -130,7 +130,7 @@ const charCount = ref(0);
 const currentTextColor = ref('#000000');
 const currentBgColor = ref('#ffffff');
 const currentFontFamily = ref('Arial, sans-serif');
-const currentFontSize = ref('14px');
+const currentFontSize = ref('10.5pt');
 
 
 // 悬浮提示相关状态

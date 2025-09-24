@@ -30,7 +30,7 @@ export class WordHandler {
 
       const commentXml = await zip.file('word/comments.xml')?.async('text');
       if (commentXml) {
-        editorData.comments = this.parseWordXmlToComments(commentXml);
+        editorData.comments = this.parseWordXmlToComments(commentXml, documentXml);
       }
       
       console.log('Word文档导入成功:', editorData);
@@ -54,6 +54,8 @@ export class WordHandler {
     const commentRangeStarts = doc.querySelectorAll('w\\:commentRangeStart, commentRangeStart');
     const commentRangeEnds = doc.querySelectorAll('w\\:commentRangeEnd, commentRangeEnd');
     
+    console.log(`找到 ${commentRangeStarts.length} 个批注范围开始标记，${commentRangeEnds.length} 个结束标记`);
+    
     // 为每个批注范围提取文本
     commentRangeStarts.forEach(start => {
       const commentId = start.getAttribute('w:id') || start.getAttribute('id');
@@ -69,9 +71,16 @@ export class WordHandler {
         const rangeText = this.extractTextBetweenNodes(start, endMarker);
         if (rangeText.trim()) {
           commentRangeTextMap.set(commentId, rangeText.trim());
+          console.log(`批注 ${commentId} 的原文: "${rangeText.trim()}"`);
+        } else {
+          console.warn(`批注 ${commentId} 未找到原文内容`);
         }
+      } else {
+        console.warn(`批注 ${commentId} 未找到对应的结束标记`);
       }
     });
+    
+    console.log(`成功提取 ${commentRangeTextMap.size} 个批注的原文`);
   }
 
   /**
@@ -84,23 +93,70 @@ export class WordHandler {
     let text = '';
     let currentNode: Node | null = startNode.nextSibling;
     
+    // 如果开始和结束节点在同一个父节点下，直接遍历兄弟节点
     while (currentNode && currentNode !== endNode) {
-      if (currentNode.nodeType === Node.TEXT_NODE) {
-        text += currentNode.textContent || '';
-      } else if (currentNode.nodeType === Node.ELEMENT_NODE) {
-        const element = currentNode as Element;
-        // 查找文本元素
-        const textElements = element.querySelectorAll('w\\:t, t');
+      text += this.extractTextFromNode(currentNode);
+      currentNode = currentNode.nextSibling;
+    }
+    
+    // 如果没有找到文本，尝试在更大的范围内查找
+    if (!text.trim() && startNode.parentNode && endNode.parentNode) {
+      const parent = startNode.parentNode;
+      
+      // 手动遍历DOM树来查找文本
+      let foundStart = false;
+      const traverseNodes = (node: Node): void => {
+        if (node === startNode) {
+          foundStart = true;
+          return;
+        }
+        
+        if (node === endNode) {
+          foundStart = false;
+          return;
+        }
+        
+        if (foundStart) {
+          text += this.extractTextFromNode(node);
+        }
+        
+        // 递归遍历子节点
+        for (let child = node.firstChild; child; child = child.nextSibling) {
+          traverseNodes(child);
+        }
+      };
+      
+      traverseNodes(parent);
+    }
+    
+    return text;
+  }
+
+  /**
+   * 从单个节点中提取文本内容
+   * @param node - 要提取文本的节点
+   * @returns 提取的文本内容
+   */
+  private extractTextFromNode(node: Node): string {
+    let text = '';
+    
+    if (node.nodeType === Node.TEXT_NODE) {
+      text += node.textContent || '';
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      const element = node as Element;
+      
+      // 查找Word文档中的文本元素
+      const textElements = element.querySelectorAll('w\\:t, t');
+      if (textElements.length > 0) {
         textElements.forEach(textEl => {
           text += textEl.textContent || '';
         });
-        
-        // 如果没有找到w:t元素，直接获取文本内容
-        if (textElements.length === 0) {
-          text += element.textContent || '';
+      } else {
+        // 如果没有找到特定的文本元素，递归处理子节点
+        for (let child = element.firstChild; child; child = child.nextSibling) {
+          text += this.extractTextFromNode(child);
         }
       }
-      currentNode = currentNode.nextSibling;
     }
     
     return text;
@@ -146,6 +202,7 @@ export class WordHandler {
       
       // 获取批注对应的原文
       const originalText = commentRangeTextMap.get(commentId || '') || '';
+      console.log(`批注 ${commentId} 对应的原文: "${originalText}"`);
       
       // 解析时间戳
       let timestamp = Date.now();
