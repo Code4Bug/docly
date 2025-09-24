@@ -33,7 +33,7 @@ export function useFileHandler() {
       const editorData = await wordHandler.value!.import(file);
       return editorData;
     } catch (error) {
-      console.error('文件导入失败:', error);
+      Console.error('文件导入失败:', error);
       throw error;
     } finally {
       isImporting.value = false;
@@ -55,7 +55,7 @@ export function useFileHandler() {
       const fileResult = await wordHandler.value!.export(editorData);
       return fileResult;
     } catch (error) {
-      console.error('文件导出失败:', error);
+      Console.error('文件导出失败:', error);
       throw error;
     } finally {
       isExporting.value = false;

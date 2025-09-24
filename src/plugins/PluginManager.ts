@@ -60,7 +60,7 @@ export class PluginManager {
       plugin.init(this.editor);
       this.loadedPlugins.add(pluginName);
     } catch (error) {
-      console.error(`插件 ${pluginName} 加载失败:`, error);
+      Console.error(`插件 ${pluginName} 加载失败:`, error);
       throw error;
     }
   }
@@ -95,7 +95,7 @@ export class PluginManager {
     try {
       this.loadedPlugins.delete(pluginName);
     } catch (error) {
-      console.error(`插件 ${pluginName} 卸载失败:`, error);
+      Console.error(`插件 ${pluginName} 卸载失败:`, error);
       throw error;
     }
   }

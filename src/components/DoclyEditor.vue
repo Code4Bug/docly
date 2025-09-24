@@ -155,6 +155,7 @@ import EditorStatusBar from './EditorStatusBar.vue';
 import type { EditorConfig } from '../types';
 import { showMessage } from '../utils/Message';
 import { Annotation } from './AnnotationSystem.vue';
+import { Console } from '../utils/Console';
 
 // Props
 interface Props {
@@ -272,18 +273,18 @@ const initEditor = async (): Promise<void> => {
   if (!editorRef.value) return;
 
   try {
-    console.log('开始初始化编辑器...');
+    Console.info('开始初始化编辑器...');
     
     // 初始化插件管理器
     pluginManager.value = new PluginManager();
-    console.log('插件管理器初始化完成');
+    Console.info('插件管理器初始化完成');
     
     // 初始化文件处理器
     wordHandler.value = new WordHandler();
-    console.log('文件处理器初始化完成');
+    Console.info('文件处理器初始化完成');
     
     // 初始化编辑器核心
-    console.log('创建编辑器核心实例...');
+    Console.info('创建编辑器核心实例...');
     editorCore.value = new EditorCore({
       holder: editorRef.value,
       plugins: [],
@@ -304,15 +305,15 @@ const initEditor = async (): Promise<void> => {
       },
       ...props.config
     });
-    console.log('编辑器核心实例创建完成');
+    Console.info('编辑器核心实例创建完成');
     
-    console.log('调用编辑器核心初始化...');
+    Console.info('调用编辑器核心初始化...');
     await editorCore.value.init();
-    console.log('编辑器核心初始化完成');
+    Console.info('编辑器核心初始化完成');
     
-    console.log('设置编辑器实例到 store...');
+    Console.info('设置编辑器实例到 store...');
     editorStore.setEditorInstance(editorCore.value);
-    console.log('编辑器实例设置完成，当前实例:', editorStore.editorInstance);
+    Console.info('编辑器实例设置完成，当前实例:', editorStore.editorInstance);
     
     // 应用初始主题
     updateEditorTheme();
@@ -349,8 +350,8 @@ const initEditor = async (): Promise<void> => {
     }, 1000);
     
   } catch (error) {
-    console.error('编辑器初始化失败，详细错误:', error);
-    console.error('错误堆栈:', (error as Error).stack);
+    Console.error('编辑器初始化失败，详细错误:', error);
+    Console.error('错误堆栈:', (error as Error).stack);
     showMessage('编辑器初始化失败', 'error');
   }
 };
@@ -374,20 +375,20 @@ const handleExport = async (): Promise<void> => {
   isExporting.value = true;
   try {
     // 调试：直接从编辑器获取最新数据
-    console.log('=== 导出调试信息 ===');
+    Console.info('=== 导出调试信息 ===');
     const currentEditorData = await editorCore.value.save();
-    console.log('直接从编辑器获取的数据:', currentEditorData);
-    console.log('编辑器数据块数量:', currentEditorData.blocks.length);
+    Console.info('直接从编辑器获取的数据:', currentEditorData);
+    Console.info('编辑器数据块数量:', currentEditorData.blocks.length);
     
     // 先保存当前编辑器数据到 store
     await editorStore.saveDocument();
-    console.log('保存后store中的数据:', editorStore.editorData);
-    console.log('store数据块数量:', editorStore.editorData?.blocks.length || 0);
+    Console.info('保存后store中的数据:', editorStore.editorData);
+    Console.info('store数据块数量:', editorStore.editorData?.blocks.length || 0);
     
     // 比较两个数据是否一致
     const storeDataStr = JSON.stringify(editorStore.editorData);
     const editorDataStr = JSON.stringify(currentEditorData);
-    console.log('数据是否一致:', storeDataStr === editorDataStr);
+    Console.info('数据是否一致:', storeDataStr === editorDataStr);
     
     // 使用直接从编辑器获取的数据进行导出
     const dataToExport = currentEditorData;
@@ -398,7 +399,7 @@ const handleExport = async (): Promise<void> => {
       return;
     }
 
-    console.log('准备导出的数据:', dataToExport);
+    Console.info('准备导出的数据:', dataToExport);
     
     // 执行导出
     const fileResult = await wordHandler.value.export(dataToExport);
@@ -415,7 +416,7 @@ const handleExport = async (): Promise<void> => {
     
     showMessage('文档导出成功', 'success');
   } catch (error) {
-    console.error('导出失败:', error);
+    Console.error('导出失败:', error);
     showMessage(`文档导出失败: ${(error as Error).message || '未知错误'}`, 'error');
   } finally {
     isExporting.value = false;
@@ -439,7 +440,7 @@ const handleImport = async (event: Event): Promise<void> => {
       // 重新初始化wordHandler
       wordHandler.value = new WordHandler();
     } catch (error) {
-      console.error('wordHandler初始化失败:', error);
+      Console.error('wordHandler初始化失败:', error);
       showMessage('文件处理器初始化失败', 'error');
       return;
     }
@@ -462,11 +463,10 @@ const handleImport = async (event: Event): Promise<void> => {
     showMessage('正在导入文档，请稍候...', 'info');
     
     const editorData = await wordHandler.value.import(file);
-    console.log('导入的文档数据:', editorData);
     
     // 清空现有批注，避免重复累积
     annotations.value = [];
-    console.log('已清空现有批注');
+    Console.info('已清空现有批注');
     
     // 处理导入的批注数据
     const importedComments: any[] = [];
@@ -539,7 +539,7 @@ const handleImport = async (event: Event): Promise<void> => {
       if (newComments.length > 0) {
         annotations.value.push(...newComments);
         showMessage(`文档导入成功，新增 ${newComments.length} 个批注`, 'success');
-        console.log('新增的批注:', newComments);
+        Console.info('新增的批注:', newComments);
       } else {
         showMessage('文档导入成功，未发现新批注', 'success');
       }
@@ -547,15 +547,15 @@ const handleImport = async (event: Event): Promise<void> => {
       showMessage('文档导入成功', 'success');
     }
     
-    console.log('准备调用 editorStore.loadDocument...');
+    Console.info('准备调用 editorStore.loadDocument...');
     await editorStore.loadDocument(editorData);
-    console.log('editorStore.loadDocument 调用完成');
-    console.log('文档已加载到编辑器store，当前编辑器数据:', editorStore.editorData);
+    Console.info('editorStore.loadDocument 调用完成');
+    Console.info('文档已加载到编辑器store，当前编辑器数据:', editorStore.editorData);
     
   } catch (error) {
-    console.error('导入失败，详细错误信息:', error);
-    console.error('错误类型:', typeof error);
-    console.error('错误堆栈:', (error as Error).stack);
+    Console.error('导入失败，详细错误信息:', error);
+    Console.error('错误类型:', typeof error);
+    Console.error('错误堆栈:', (error as Error).stack);
     const errorMessage = error instanceof Error ? error.message : '未知错误';
     showMessage(`文档导入失败: ${errorMessage}`, 'error');
   } finally {
@@ -665,7 +665,7 @@ const changeHeading = async (level: string): Promise<void> => {
        }
     }
   } catch (error) {
-    console.error('更改标题级别失败:', error);
+    Console.error('更改标题级别失败:', error);
     showMessage('更改标题级别失败', 'error');
   }
 };
@@ -718,7 +718,7 @@ const insertList = async (type: string): Promise<void> => {
       showMessage(`已插入${listTypeName}`, 'success');
     }
   } catch (error) {
-    console.error('插入列表失败:', error);
+    Console.error('插入列表失败:', error);
     showMessage('插入列表失败', 'error');
   }
 };
@@ -773,7 +773,7 @@ const insertTable = async (): Promise<void> => {
     });
     showMessage('已插入表格', 'success');
   } catch (error) {
-    console.error('插入表格失败:', error);
+    Console.error('插入表格失败:', error);
     showMessage('插入表格失败', 'error');
   }
 };
@@ -822,7 +822,7 @@ const insertQuote = async (): Promise<void> => {
       showMessage('已插入引用', 'success');
     }
   } catch (error) {
-    console.error('插入引用失败:', error);
+    Console.error('插入引用失败:', error);
     showMessage('插入引用失败', 'error');
   }
 };
@@ -920,15 +920,15 @@ const toggleReadOnly = (): void => {
  * @param {string} color - 颜色值
  */
 const setTextColor = (color: string): void => {
-  console.log('DoclyEditor setTextColor 被调用:', color);
+  Console.info('DoclyEditor setTextColor 被调用:', color);
   if (!editorCore.value) {
-    console.error('编辑器未初始化');
+    Console.error('编辑器未初始化');
     showMessage('编辑器未初始化', 'error');
     return;
   }
 
   const success = editorCore.value.execCommand('foreColor', color);
-  console.log('execCommand foreColor 结果:', success);
+  Console.info('execCommand foreColor 结果:', success);
   if (success) {
     currentTextColor.value = color;
     showMessage('文本颜色设置成功', 'success');
@@ -942,15 +942,15 @@ const setTextColor = (color: string): void => {
  * @param {string} color - 颜色值
  */
 const setBgColor = (color: string): void => {
-  console.log('DoclyEditor setBgColor 被调用:', color);
+  Console.info('DoclyEditor setBgColor 被调用:', color);
   if (!editorCore.value) {
-    console.error('编辑器未初始化');
+    Console.error('编辑器未初始化');
     showMessage('编辑器未初始化', 'error');
     return;
   }
 
   const success = editorCore.value.execCommand('backColor', color);
-  console.log('execCommand backColor 结果:', success);
+  Console.info('execCommand backColor 结果:', success);
   if (success) {
     currentBgColor.value = color;
     showMessage('背景颜色设置成功', 'success');
@@ -978,7 +978,7 @@ const exportFile = async (): Promise<void> => {
  * @param {string} color - 颜色值
  */
 const applyTextColor = (color: string): void => {
-  console.log('DoclyEditor applyTextColor 被调用:', color);
+  Console.info('DoclyEditor applyTextColor 被调用:', color);
   setTextColor(color);
 };
 
@@ -987,7 +987,7 @@ const applyTextColor = (color: string): void => {
  * @param {string} color - 颜色值
  */
 const applyBgColor = (color: string): void => {
-  console.log('DoclyEditor applyBgColor 被调用:', color);
+  Console.info('DoclyEditor applyBgColor 被调用:', color);
   setBgColor(color);
 };
 
@@ -996,7 +996,7 @@ const applyBgColor = (color: string): void => {
  * @param {string} fontFamily - 字体族
  */
 const applyFontFamily = (fontFamily: string): void => {
-  console.log('DoclyEditor applyFontFamily 被调用:', fontFamily);
+  Console.info('DoclyEditor applyFontFamily 被调用:', fontFamily);
   if (!editorCore.value) {
     showMessage('编辑器未初始化', 'error');
     return;
@@ -1022,7 +1022,7 @@ const applyFontFamily = (fontFamily: string): void => {
  * @param {string} fontSize - 字体大小（支持px和pt单位）
  */
 const applyFontSize = (fontSize: string): void => {
-  console.log('DoclyEditor applyFontSize 被调用:', fontSize);
+  Console.info('DoclyEditor applyFontSize 被调用:', fontSize);
   if (!editorCore.value) {
     showMessage('编辑器未初始化', 'error');
     return;
@@ -1061,7 +1061,7 @@ const applyFontSize = (fontSize: string): void => {
  * @param {string} action - 操作类型
  */
 const handleFontStyleChange = (action: string): void => {
-  console.log('DoclyEditor handleFontStyleChange 被调用:', action);
+  Console.info('DoclyEditor handleFontStyleChange 被调用:', action);
   if (!editorCore.value) {
     showMessage('编辑器未初始化', 'error');
     return;
@@ -1301,7 +1301,7 @@ const exportAnnotations = (): void => {
 
 // 生命周期
 onMounted(() => {
-  console.log('DoclyEditor onMounted 钩子被调用');
+  Console.info('DoclyEditor onMounted 钩子被调用');
   
   // 初始化系统主题检测
   systemThemeQuery.value = detectSystemTheme();

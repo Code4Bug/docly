@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 import type { EditorData, Comment } from '../types';
+import { Console } from '../utils/Console';
 
 /**
  * Word文档处理器
@@ -13,7 +14,7 @@ export class WordHandler {
    */
   async import(file: File): Promise<EditorData> {
     try {
-      console.log('开始导入Word文档:', file.name);
+      Console.info('开始导入Word文档:', file.name);
       
       // 读取DOCX文件
       const arrayBuffer = await file.arrayBuffer();
@@ -33,10 +34,9 @@ export class WordHandler {
         editorData.comments = this.parseWordXmlToComments(commentXml, documentXml);
       }
       
-      console.log('Word文档导入成功:', editorData);
       return editorData;
     } catch (error) {
-      console.error('导入Word文档时发生错误:', error);
+      Console.error('导入Word文档时发生错误:', error);
       throw new Error(`导入失败: ${(error as Error).message}`);
     }
   }
@@ -54,7 +54,7 @@ export class WordHandler {
     const commentRangeStarts = doc.querySelectorAll('w\\:commentRangeStart, commentRangeStart');
     const commentRangeEnds = doc.querySelectorAll('w\\:commentRangeEnd, commentRangeEnd');
     
-    console.log(`找到 ${commentRangeStarts.length} 个批注范围开始标记，${commentRangeEnds.length} 个结束标记`);
+    Console.info(`找到 ${commentRangeStarts.length} 个批注范围开始标记，${commentRangeEnds.length} 个结束标记`);
     
     // 为每个批注范围提取文本
     commentRangeStarts.forEach(start => {
@@ -71,16 +71,16 @@ export class WordHandler {
         const rangeText = this.extractTextBetweenNodes(start, endMarker);
         if (rangeText.trim()) {
           commentRangeTextMap.set(commentId, rangeText.trim());
-          console.log(`批注 ${commentId} 的原文: "${rangeText.trim()}"`);
+          Console.info(`批注 ${commentId} 的原文: "${rangeText.trim()}"`);
         } else {
-          console.warn(`批注 ${commentId} 未找到原文内容`);
+          Console.warn(`批注 ${commentId} 未找到原文内容`);
         }
       } else {
-        console.warn(`批注 ${commentId} 未找到对应的结束标记`);
+        Console.warn(`批注 ${commentId} 未找到对应的结束标记`);
       }
     });
     
-    console.log(`成功提取 ${commentRangeTextMap.size} 个批注的原文`);
+    Console.info(`成功提取 ${commentRangeTextMap.size} 个批注的原文`);
   }
 
   /**
@@ -202,7 +202,7 @@ export class WordHandler {
       
       // 获取批注对应的原文
       const originalText = commentRangeTextMap.get(commentId || '') || '';
-      console.log(`批注 ${commentId} 对应的原文: "${originalText}"`);
+      Console.info(`批注 ${commentId} 对应的原文: "${originalText}"`);
       
       // 解析时间戳
       let timestamp = Date.now();
@@ -281,7 +281,7 @@ export class WordHandler {
       comments.push(commentObj);
     });
     
-    console.log(`从Word文档中提取了 ${comments.length} 个批注`);
+    Console.info(`从Word文档中提取了 ${comments.length} 个批注`);
     return comments;
   }
 
@@ -292,11 +292,11 @@ export class WordHandler {
    */
   async export(editorData: EditorData, filename: string = 'document'): Promise<{ blob: Blob; name: string }> {
     try {
-      console.log('开始导出Word文档:', editorData);
+      Console.info('开始导出Word文档:', editorData);
       
       // 将Editor.js数据转换为HTML
       const htmlContent = this.convertEditorDataToHtml(editorData);
-      console.log('转换后的HTML:', htmlContent);
+      Console.info('转换后的HTML:', htmlContent);
       
       // 将HTML转换为Word XML
       const wordXml = this.htmlToWordXml(htmlContent);
@@ -307,10 +307,10 @@ export class WordHandler {
       // 返回文件对象
       const finalFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
       
-      console.log('Word文档导出成功:', finalFilename);
+      Console.info('Word文档导出成功:', finalFilename);
       return { blob: docxBlob, name: finalFilename };
     } catch (error) {
-      console.error('导出Word文档时发生错误:', error);
+      Console.error('导出Word文档时发生错误:', error);  
       throw error;
     }
   }
@@ -324,124 +324,56 @@ export class WordHandler {
   private parseWordXmlToEditorData(xmlContent: string, commentsXml?: string): EditorData {
     const parser = new DOMParser();
     const doc = parser.parseFromString(xmlContent, 'text/xml');
-    console.log('解析后的XML文档:', doc);
-    const blocks: any[] = []
+    const blocks: any[] = [];
     
-    // 获取所有段落元素
-    const paragraphs = doc.querySelectorAll('w\\:p, p');
-    
-    paragraphs.forEach((p, index) => {
-      const blockId = `block-${Date.now()}-${index}`;
-      
-      // 解析段落属性
-      const pPrElement = p.querySelector('w\\:pPr, pPr');
-      const paragraphStyles = this.parseParagraphProperties(pPrElement);
-      
-      // 检查是否是标题
-      const styleElement = pPrElement?.querySelector('w\\:pStyle, pStyle');
-      const styleVal = styleElement?.getAttribute('w:val') || styleElement?.getAttribute('val'); 
-      
-      // 解析格式化的文本运行
-      const formattedRuns = this.parseFormattedTextRuns(p);
-      
-      // 提取批注信息
-      const blockCommentIds: string[] = [];
-      const commentRefs = p.querySelectorAll('w\\:commentReference, commentReference');
-      commentRefs.forEach(ref => {
-        const commentId = ref.getAttribute('w:id') || ref.getAttribute('id');
-        if (commentId) {
-          blockCommentIds.push(commentId);
-        }
-      });
-      
-      // 合并所有文本运行的文本内容
-      let combinedText = '';
-      if (formattedRuns.length > 0) {
-        combinedText = formattedRuns.map(run => run.text).join('');
-      } else {
-        // 如果没有格式化运行，使用传统方法提取文本
-        const textElements = p.querySelectorAll('w\\:t, t');
-        textElements.forEach(t => {
-          combinedText += t.textContent || '';
-        });
-      }
-      
-      // 跳过空段落
-      if (!combinedText.trim()) {
-        return;
-      }
-      
-      // 创建基础块数据
-      let blockData: any = {
-        id: blockId,
-        data: {
-          text: combinedText.trim(),
-          // 保存段落样式
-          paragraphStyles: paragraphStyles,
-          // 保存格式化的文本运行信息
-          formattedRuns: formattedRuns.length > 0 ? formattedRuns : undefined
-        }
+    // 获取文档主体
+    const body = doc.querySelector('w\\:body, body');
+    if (!body) {
+      Console.warn('未找到文档主体元素');
+      return {
+        time: Date.now(),
+        blocks: [],
+        version: '2.28.2',
+        comments: []
       };
+    }
+    
+    // 处理文档中的所有元素（段落、表格等）
+    const bodyChildren = Array.from(body.children);
+    
+    bodyChildren.forEach((element, index) => {
+      const tagName = element.tagName.toLowerCase();
       
-      // 如果有关联的批注，添加批注ID信息
-      if (blockCommentIds.length > 0) {
-        blockData.data.commentIds = blockCommentIds;
+      // 处理段落元素
+      if (tagName === 'w:p' || tagName === 'p') {
+        const paragraphBlock = this.processParagraphElement(element, index);
+        if (paragraphBlock) {
+          blocks.push(paragraphBlock);
+        }
       }
-      
-      // 根据样式确定块类型
-      if (styleVal && styleVal.startsWith('Heading')) {
-        const level = parseInt(styleVal.replace('Heading', '')) || 1;
-        blockData.type = 'header';
-        blockData.data.level = Math.min(level, 6);
-      } else if (styleVal === 'Quote') {
-        blockData.type = 'quote';
-        blockData.data.caption = '';
-        blockData.data.alignment = 'left';
-      } else {
-        // 默认为段落
-        blockData.type = 'paragraph';
+      // 处理表格元素
+      else if (tagName === 'w:tbl' || tagName === 'tbl') {
+        const tableBlock = this.processTableElement(element, index);
+        if (tableBlock) {
+          blocks.push(tableBlock);
+        }
       }
-      
-      blocks.push(blockData);
+      // 处理分节符等其他元素
+      else if (tagName === 'w:sectpr' || tagName === 'sectpr') {
+        // 分节符通常包含页面设置信息，可以在这里处理
+        Console.info('发现分节符，包含页面设置信息');
+      }
     });
     
     // 处理表格
     const tables = doc.querySelectorAll('w\\:tbl, tbl');
     tables.forEach((table, index) => {
-      const blockId = `table-${Date.now()}-${index}`;
-      const rows = table.querySelectorAll('w\\:tr, tr');
-      const content: string[][] = [];
-      
-      rows.forEach(row => {
-        const cells = row.querySelectorAll('w\\:tc, tc');
-        const rowData: string[] = [];
-        
-        cells.forEach(cell => {
-          const cellTexts = cell.querySelectorAll('w\\:t, t');
-          let cellText = '';
-          cellTexts.forEach(t => {
-            cellText += t.textContent || '';
-          });
-          rowData.push(cellText.trim());
-        });
-        
-        if (rowData.length > 0) {
-          content.push(rowData);
-        }
-      });
-      
-      if (content.length > 0) {
-        blocks.push({
-          id: blockId,
-          type: 'table',
-          data: {
-            withHeadings: true,
-            content
-          }
-        });
+      const tableBlock = this.processTableElement(table, index);
+      if (tableBlock) {
+        blocks.push(tableBlock);
       }
     });
-    
+
     // 解析批注信息（如果提供了批注XML）
     let comments: Comment[] = [];
     if (commentsXml) {
@@ -455,6 +387,237 @@ export class WordHandler {
       version: '2.28.2',
       comments
     };
+  }
+
+  /**
+   * 处理段落元素，生成对应的编辑器块
+   * @param paragraphElement - 段落元素
+   * @param index - 段落索引
+   * @returns 编辑器块数据或null
+   */
+  private processParagraphElement(paragraphElement: Element, index: number): any | null {
+    const blockId = `block-${Date.now()}-${index}`;
+    
+    // 解析段落属性
+    const pPrElement = paragraphElement.querySelector('w\\:pPr, pPr');
+    const paragraphStyles = this.parseParagraphProperties(pPrElement);
+    
+    // 检查段落样式
+    const styleElement = pPrElement?.querySelector('w\\:pStyle, pStyle');
+    const styleVal = styleElement?.getAttribute('w:val') || styleElement?.getAttribute('val');
+    
+    // 解析格式化的文本运行
+    const formattedRuns = this.parseFormattedTextRuns(paragraphElement);
+    
+    // 提取批注信息
+    const blockCommentIds: string[] = [];
+    const commentRefs = paragraphElement.querySelectorAll('w\\:commentReference, commentReference');
+    commentRefs.forEach(ref => {
+      const commentId = ref.getAttribute('w:id') || ref.getAttribute('id');
+      if (commentId) {
+        blockCommentIds.push(commentId);
+      }
+    });
+    
+    // 合并所有文本运行的文本内容
+    let combinedText = '';
+    const hasFormattedContent = formattedRuns.length > 0;
+    
+    if (hasFormattedContent) {
+      // 从格式化运行中提取文本
+      combinedText = formattedRuns
+        .filter(run => run.type === 'run')
+        .map(run => run.text || '')
+        .join('');
+    } else {
+      // 如果没有格式化运行，使用传统方法提取文本
+      const textElements = paragraphElement.querySelectorAll('w\\:t, t');
+      textElements.forEach(t => {
+        combinedText += t.textContent || '';
+      });
+    }
+    
+    // 跳过空段落（除非包含特殊元素如书签、批注等）
+    const hasSpecialContent = formattedRuns.some(run => 
+      run.type === 'bookmark' || run.type === 'comment' || run.type === 'media'
+    );
+    
+    if (!combinedText.trim() && !hasSpecialContent) {
+      return null;
+    }
+    
+    // 创建基础块数据
+    const blockData: any = {
+      id: blockId,
+      data: {
+        text: combinedText.trim(),
+        // 保存段落样式
+        paragraphStyles: paragraphStyles,
+        // 保存格式化的文本运行信息
+        formattedRuns: hasFormattedContent ? formattedRuns : undefined
+      }
+    };
+    
+    // 如果有关联的批注，添加批注ID信息
+    if (blockCommentIds.length > 0) {
+      blockData.data.commentIds = blockCommentIds;
+    }
+    
+    // 根据样式确定块类型
+    if (styleVal && styleVal.startsWith('Heading')) {
+      const level = parseInt(styleVal.replace('Heading', '')) || 1;
+      blockData.type = 'header';
+      blockData.data.level = Math.min(level, 6);
+    } else if (styleVal === 'Quote') {
+      blockData.type = 'quote';
+      blockData.data.caption = '';
+      blockData.data.alignment = 'left';
+    } else if (styleVal && (styleVal.includes('List') || styleVal.includes('Bullet'))) {
+      // 处理列表样式
+      blockData.type = 'list';
+      blockData.data.style = styleVal.includes('Number') ? 'ordered' : 'unordered';
+      blockData.data.items = [combinedText.trim()];
+    } else {
+      // 默认为段落
+      blockData.type = 'paragraph';
+    }
+    
+    return blockData;
+  }
+
+  /**
+   * 处理表格元素，生成对应的编辑器块
+   * @param tableElement - 表格元素
+   * @param index - 表格索引
+   * @returns 编辑器块数据或null
+   */
+  private processTableElement(tableElement: Element, index: number): any | null {
+    const blockId = `table-${Date.now()}-${index}`;
+    const rows = tableElement.querySelectorAll('w\\:tr, tr');
+    const content: string[][] = [];
+    
+    // 解析表格属性
+    const tblPrElement = tableElement.querySelector('w\\:tblPr, tblPr');
+    const tableStyles = this.parseTableProperties(tblPrElement);
+    
+    rows.forEach(row => {
+      const cells = row.querySelectorAll('w\\:tc, tc');
+      const rowData: string[] = [];
+      
+      cells.forEach(cell => {
+        // 解析单元格中的段落
+        const cellParagraphs = cell.querySelectorAll('w\\:p, p');
+        let cellText = '';
+        
+        cellParagraphs.forEach(p => {
+          const paragraphRuns = this.parseFormattedTextRuns(p);
+          if (paragraphRuns.length > 0) {
+            const paragraphText = paragraphRuns
+              .filter(run => run.type === 'run')
+              .map(run => run.text || '')
+              .join('');
+            cellText += paragraphText;
+          } else {
+            const textElements = p.querySelectorAll('w\\:t, t');
+            textElements.forEach(t => {
+              cellText += t.textContent || '';
+            });
+          }
+          cellText += '\n'; // 段落间换行
+        });
+        
+        rowData.push(cellText.trim());
+      });
+      
+      if (rowData.length > 0) {
+        content.push(rowData);
+      }
+    });
+    
+    if (content.length === 0) {
+      return null;
+    }
+    
+    return {
+      id: blockId,
+      type: 'table',
+      data: {
+        withHeadings: true,
+        content,
+        // 保存表格样式信息
+        tableStyles: tableStyles
+      }
+    };
+  }
+
+  /**
+   * 解析表格属性
+   * @param tblPrElement - 表格属性元素
+   * @returns 表格样式对象
+   */
+  private parseTableProperties(tblPrElement: Element | null): any {
+    if (!tblPrElement) {
+      return {};
+    }
+    
+    const styles: any = {};
+    
+    // 表格样式引用
+    const tblStyleElement = tblPrElement.querySelector('w\\:tblStyle, tblStyle');
+    if (tblStyleElement) {
+      styles.styleReference = tblStyleElement.getAttribute('w:val') || tblStyleElement.getAttribute('val');
+    }
+    
+    // 表格宽度
+    const tblWElement = tblPrElement.querySelector('w\\:tblW, tblW');
+    if (tblWElement) {
+      const width = tblWElement.getAttribute('w:w') || tblWElement.getAttribute('w');
+      const type = tblWElement.getAttribute('w:type') || tblWElement.getAttribute('type');
+      if (width && type) {
+        styles.width = {
+          value: parseInt(width),
+          type: type
+        };
+      }
+    }
+    
+    // 表格对齐
+    const jcElement = tblPrElement.querySelector('w\\:jc, jc');
+    if (jcElement) {
+      styles.alignment = jcElement.getAttribute('w:val') || jcElement.getAttribute('val');
+    }
+    
+    // 表格边框
+    const tblBordersElement = tblPrElement.querySelector('w\\:tblBorders, tblBorders');
+    if (tblBordersElement) {
+      styles.borders = this.parseTableBorders(tblBordersElement);
+    }
+    
+    return styles;
+  }
+
+  /**
+   * 解析表格边框
+   * @param bordersElement - 边框元素
+   * @returns 边框样式对象
+   */
+  private parseTableBorders(bordersElement: Element): any {
+    const borders: any = {};
+    
+    const borderTypes = ['top', 'left', 'bottom', 'right', 'insideH', 'insideV'];
+    
+    borderTypes.forEach(borderType => {
+      const borderElement = bordersElement.querySelector(`w\\:${borderType}, ${borderType}`);
+      if (borderElement) {
+        borders[borderType] = {
+          style: borderElement.getAttribute('w:val') || borderElement.getAttribute('val'),
+          size: borderElement.getAttribute('w:sz') || borderElement.getAttribute('sz'),
+          color: borderElement.getAttribute('w:color') || borderElement.getAttribute('color')
+        };
+      }
+    });
+    
+    return borders;
   }
   
   /**
@@ -472,7 +635,7 @@ export class WordHandler {
       return blocks.map(block => {
         // 优先使用保存的htmlContent（包含完整样式）
         if (block.data && block.data.htmlContent) {
-          console.log('使用保存的htmlContent:', block.data.htmlContent);
+          Console.info('使用保存的htmlContent:', block.data.htmlContent);
           
           // 检查htmlContent是否已经有合适的标签包装
           const htmlContent = block.data.htmlContent.trim();
@@ -525,14 +688,63 @@ export class WordHandler {
         // 回退到原来的处理方式
         const blockStyles = this.extractBlockStyles(block);
         
+        // 处理formattedRuns（格式化文本运行）
+        let processedText = '';
+        if (block.data && block.data.formattedRuns && block.data.formattedRuns.length > 0) {
+          // 使用格式化运行构建HTML
+          processedText = block.data.formattedRuns
+            .filter((run: any) => run.type === 'run')
+            .map((run: any) => {
+              if (!run.text) return '';
+              
+              let runHtml = this.escapeHtml(run.text);
+              
+              // 应用运行样式
+              if (run.styles) {
+                const runStyles: string[] = [];
+                
+                // 字体样式
+                if (run.styles.fontFamily) {
+                  runStyles.push(`font-family: ${run.styles.fontFamily}`);
+                }
+                if (run.styles.fontSize) {
+                  runStyles.push(`font-size: ${run.styles.fontSize}`);
+                }
+                if (run.styles.color) {
+                  runStyles.push(`color: ${run.styles.color}`);
+                }
+                if (run.styles.fontWeight === 'bold') {
+                  runHtml = `<strong>${runHtml}</strong>`;
+                }
+                if (run.styles.fontStyle === 'italic') {
+                  runHtml = `<em>${runHtml}</em>`;
+                }
+                if (run.styles.textDecoration === 'underline') {
+                  runHtml = `<u>${runHtml}</u>`;
+                }
+                
+                // 如果有其他样式，用span包装
+                if (runStyles.length > 0) {
+                  runHtml = `<span style="${runStyles.join('; ')}">${runHtml}</span>`;
+                }
+              }
+              
+              return runHtml;
+            })
+            .join('');
+        } else {
+          // 使用普通文本
+          processedText = this.processInlineFormatting(block.data.text || '');
+        }
+        
         switch (block.type) {
           case "header":
             const level = block.data.level || 1;
             const headerStyle = `font-weight:bold; margin:12px 0;${blockStyles ? ` ${blockStyles}` : ''}`;
-            return `<h${level} style="${headerStyle}">${this.escapeHtml(block.data.text || '')}</h${level}>`;
+            return `<h${level} style="${headerStyle}">${processedText}</h${level}>`;
           case "paragraph":
             const paragraphStyle = `line-height:1.6; margin:8px 0;${blockStyles ? ` ${blockStyles}` : ''}`;
-            return `<p style="${paragraphStyle}">${this.processInlineFormatting(block.data.text || '')}</p>`;
+            return `<p style="${paragraphStyle}">${processedText}</p>`;
           case "list":
             const tag = block.data.style === "ordered" ? "ol" : "ul";
             const listStyle = `padding-left:20px;${blockStyles ? ` ${blockStyles}` : ''}`;
@@ -622,6 +834,48 @@ export class WordHandler {
     
     // 检查data中的样式信息
     if (block.data) {
+      // 处理段落样式
+      if (block.data.paragraphStyles) {
+        const pStyles = block.data.paragraphStyles;
+        
+        // 文本对齐
+        if (pStyles.textAlign) {
+          styles.push(`text-align: ${pStyles.textAlign}`);
+        }
+        
+        // 行高
+        if (pStyles.lineHeight) {
+          styles.push(`line-height: ${pStyles.lineHeight}`);
+        }
+        
+        // 段前间距
+        if (pStyles.marginTop) {
+          styles.push(`margin-top: ${pStyles.marginTop}`);
+        }
+        
+        // 段后间距
+        if (pStyles.marginBottom) {
+          styles.push(`margin-bottom: ${pStyles.marginBottom}`);
+        }
+        
+        // 左缩进
+        if (pStyles.paddingLeft || pStyles.marginLeft) {
+          const indent = pStyles.paddingLeft || pStyles.marginLeft;
+          styles.push(`padding-left: ${indent}`);
+        }
+        
+        // 右缩进
+        if (pStyles.paddingRight || pStyles.marginRight) {
+          const indent = pStyles.paddingRight || pStyles.marginRight;
+          styles.push(`padding-right: ${indent}`);
+        }
+        
+        // 首行缩进
+        if (pStyles.textIndent) {
+          styles.push(`text-indent: ${pStyles.textIndent}`);
+        }
+      }
+      
       if (block.data.alignment) {
         styles.push(`text-align: ${block.data.alignment}`);
       }
@@ -1320,6 +1574,7 @@ export class WordHandler {
           styles.textAlign = 'right';
           break;
         case 'justify':
+        case 'both':
           styles.textAlign = 'justify';
           break;
         case 'left':
@@ -1347,6 +1602,17 @@ export class WordHandler {
           styles.lineHeight = (parseInt(line) / 240).toString();
         }
       }
+
+      // 解析段前段后间距
+      const spacingBefore = spacingElement.getAttribute('w:before') || spacingElement.getAttribute('before');
+      const spacingAfter = spacingElement.getAttribute('w:after') || spacingElement.getAttribute('after');
+      
+      if (spacingBefore) {
+        styles.marginTop = `${Math.round(parseInt(spacingBefore) / 20)}pt`;
+      }
+      if (spacingAfter) {
+        styles.marginBottom = `${Math.round(parseInt(spacingAfter) / 20)}pt`;
+      }
     }
 
     // 解析缩进
@@ -1356,6 +1622,8 @@ export class WordHandler {
       const right = indElement.getAttribute('w:right') || indElement.getAttribute('right');
       const firstLine = indElement.getAttribute('w:firstLine') || indElement.getAttribute('firstLine');
       const hanging = indElement.getAttribute('w:hanging') || indElement.getAttribute('hanging');
+      const leftChars = indElement.getAttribute('w:leftChars') || indElement.getAttribute('leftChars');
+      const rightChars = indElement.getAttribute('w:rightChars') || indElement.getAttribute('rightChars');
 
       if (left) {
         styles.marginLeft = `${Math.round(parseInt(left) / 20)}pt`;
@@ -1368,17 +1636,213 @@ export class WordHandler {
       } else if (hanging) {
         styles.textIndent = `-${Math.round(parseInt(hanging) / 20)}pt`;
       }
+
+      // 保存字符单位的缩进信息
+      if (leftChars || rightChars) {
+        styles.indentChars = {
+          left: leftChars ? parseInt(leftChars) : 0,
+          right: rightChars ? parseInt(rightChars) : 0
+        };
+      }
     }
 
-    // 解析段前段后间距
-    const spacingBefore = spacingElement?.getAttribute('w:before') || spacingElement?.getAttribute('before');
-    const spacingAfter = spacingElement?.getAttribute('w:after') || spacingElement?.getAttribute('after');
-    
-    if (spacingBefore) {
-      styles.marginTop = `${Math.round(parseInt(spacingBefore) / 20)}pt`;
+    // 解析制表符
+    const tabsElement = pPrElement.querySelector('w\\:tabs, tabs');
+    if (tabsElement) {
+      const tabElements = tabsElement.querySelectorAll('w\\:tab, tab');
+      const tabs: any[] = [];
+      
+      tabElements.forEach(tab => {
+        const val = tab.getAttribute('w:val') || tab.getAttribute('val');
+        const pos = tab.getAttribute('w:pos') || tab.getAttribute('pos');
+        const leader = tab.getAttribute('w:leader') || tab.getAttribute('leader');
+        
+        if (val && pos) {
+          tabs.push({
+            type: val, // left, right, center, decimal, bar, clear
+            position: `${Math.round(parseInt(pos) / 20)}pt`,
+            leader: leader || 'none'
+          });
+        }
+      });
+      
+      if (tabs.length > 0) {
+        styles.tabs = tabs;
+      }
     }
-    if (spacingAfter) {
-      styles.marginBottom = `${Math.round(parseInt(spacingAfter) / 20)}pt`;
+
+    // 解析编号/项目符号
+    const numPrElement = pPrElement.querySelector('w\\:numPr, numPr');
+    if (numPrElement) {
+      const ilvlElement = numPrElement.querySelector('w\\:ilvl, ilvl');
+      const numIdElement = numPrElement.querySelector('w\\:numId, numId');
+      
+      const level = ilvlElement ? parseInt(ilvlElement.getAttribute('w:val') || ilvlElement.getAttribute('val') || '0') : 0;
+      const numId = numIdElement ? parseInt(numIdElement.getAttribute('w:val') || numIdElement.getAttribute('val') || '0') : 0;
+      
+      if (numId > 0) {
+        styles.numbering = {
+          level: level,
+          numId: numId
+        };
+      }
+    }
+
+    // 解析段落边框
+    const pBdrElement = pPrElement.querySelector('w\\:pBdr, pBdr');
+    if (pBdrElement) {
+      const borders: any = {};
+      
+      ['top', 'left', 'bottom', 'right'].forEach(side => {
+        const borderElement = pBdrElement.querySelector(`w\\:${side}, ${side}`);
+        if (borderElement) {
+          const val = borderElement.getAttribute('w:val') || borderElement.getAttribute('val');
+          const sz = borderElement.getAttribute('w:sz') || borderElement.getAttribute('sz');
+          const color = borderElement.getAttribute('w:color') || borderElement.getAttribute('color');
+          
+          if (val && val !== 'none') {
+            borders[side] = {
+              style: val,
+              width: sz ? `${Math.round(parseInt(sz) / 8)}pt` : '1pt', // sz单位是1/8pt
+              color: color && color !== 'auto' ? `#${color}` : '#000000'
+            };
+          }
+        }
+      });
+      
+      if (Object.keys(borders).length > 0) {
+        styles.borders = borders;
+      }
+    }
+
+    // 解析段落阴影
+    const shdElement = pPrElement.querySelector('w\\:shd, shd');
+    if (shdElement) {
+      const val = shdElement.getAttribute('w:val') || shdElement.getAttribute('val');
+      const color = shdElement.getAttribute('w:color') || shdElement.getAttribute('color');
+      const fill = shdElement.getAttribute('w:fill') || shdElement.getAttribute('fill');
+      
+      if (fill && fill !== 'auto' && fill !== 'FFFFFF') {
+        styles.backgroundColor = `#${fill}`;
+      }
+      
+      if (val && val !== 'clear') {
+        styles.shading = {
+          pattern: val,
+          color: color && color !== 'auto' ? `#${color}` : undefined,
+          fill: fill && fill !== 'auto' ? `#${fill}` : undefined
+        };
+      }
+    }
+
+    // 解析段落样式引用
+    const pStyleElement = pPrElement.querySelector('w\\:pStyle, pStyle');
+    if (pStyleElement) {
+      const styleId = pStyleElement.getAttribute('w:val') || pStyleElement.getAttribute('val');
+      if (styleId) {
+        styles.styleId = styleId;
+      }
+    }
+
+    // 解析段落控制选项
+    const keepNextElement = pPrElement.querySelector('w\\:keepNext, keepNext');
+    if (keepNextElement) {
+      const val = keepNextElement.getAttribute('w:val') || keepNextElement.getAttribute('val');
+      styles.keepNext = val !== '0' && val !== 'false';
+    }
+
+    const keepLinesElement = pPrElement.querySelector('w\\:keepLines, keepLines');
+    if (keepLinesElement) {
+      const val = keepLinesElement.getAttribute('w:val') || keepLinesElement.getAttribute('val');
+      styles.keepLines = val !== '0' && val !== 'false';
+    }
+
+    const pageBreakBeforeElement = pPrElement.querySelector('w\\:pageBreakBefore, pageBreakBefore');
+    if (pageBreakBeforeElement) {
+      const val = pageBreakBeforeElement.getAttribute('w:val') || pageBreakBeforeElement.getAttribute('val');
+      styles.pageBreakBefore = val !== '0' && val !== 'false';
+    }
+
+    const widowControlElement = pPrElement.querySelector('w\\:widowControl, widowControl');
+    if (widowControlElement) {
+      const val = widowControlElement.getAttribute('w:val') || widowControlElement.getAttribute('val');
+      styles.widowControl = val !== '0' && val !== 'false';
+    }
+
+    // 解析文本对齐方式
+    const textAlignmentElement = pPrElement.querySelector('w\\:textAlignment, textAlignment');
+    if (textAlignmentElement) {
+      const val = textAlignmentElement.getAttribute('w:val') || textAlignmentElement.getAttribute('val');
+      if (val) {
+        styles.textAlignment = val; // auto, top, center, baseline, bottom
+      }
+    }
+
+    // 解析亚洲文字排版控制
+    const kinsokuElement = pPrElement.querySelector('w\\:kinsoku, kinsoku');
+    if (kinsokuElement) {
+      const val = kinsokuElement.getAttribute('w:val') || kinsokuElement.getAttribute('val');
+      styles.kinsoku = val !== '0' && val !== 'false';
+    }
+
+    const wordWrapElement = pPrElement.querySelector('w\\:wordWrap, wordWrap');
+    if (wordWrapElement) {
+      const val = wordWrapElement.getAttribute('w:val') || wordWrapElement.getAttribute('val');
+      styles.wordWrap = val !== '0' && val !== 'false';
+    }
+
+    const overflowPunctElement = pPrElement.querySelector('w\\:overflowPunct, overflowPunct');
+    if (overflowPunctElement) {
+      const val = overflowPunctElement.getAttribute('w:val') || overflowPunctElement.getAttribute('val');
+      styles.overflowPunct = val !== '0' && val !== 'false';
+    }
+
+    const topLinePunctElement = pPrElement.querySelector('w\\:topLinePunct, topLinePunct');
+    if (topLinePunctElement) {
+      const val = topLinePunctElement.getAttribute('w:val') || topLinePunctElement.getAttribute('val');
+      styles.topLinePunct = val !== '0' && val !== 'false';
+    }
+
+    const autoSpaceDEElement = pPrElement.querySelector('w\\:autoSpaceDE, autoSpaceDE');
+    if (autoSpaceDEElement) {
+      const val = autoSpaceDEElement.getAttribute('w:val') || autoSpaceDEElement.getAttribute('val');
+      styles.autoSpaceDE = val !== '0' && val !== 'false';
+    }
+
+    const autoSpaceDNElement = pPrElement.querySelector('w\\:autoSpaceDN, autoSpaceDN');
+    if (autoSpaceDNElement) {
+      const val = autoSpaceDNElement.getAttribute('w:val') || autoSpaceDNElement.getAttribute('val');
+      styles.autoSpaceDN = val !== '0' && val !== 'false';
+    }
+
+    // 解析双向文本控制
+    const bidiElement = pPrElement.querySelector('w\\:bidi, bidi');
+    if (bidiElement) {
+      const val = bidiElement.getAttribute('w:val') || bidiElement.getAttribute('val');
+      styles.bidi = val !== '0' && val !== 'false';
+    }
+
+    // 解析右缩进调整
+    const adjustRightIndElement = pPrElement.querySelector('w\\:adjustRightInd, adjustRightInd');
+    if (adjustRightIndElement) {
+      const val = adjustRightIndElement.getAttribute('w:val') || adjustRightIndElement.getAttribute('val');
+      styles.adjustRightInd = val !== '0' && val !== 'false';
+    }
+
+    // 解析网格对齐
+    const snapToGridElement = pPrElement.querySelector('w\\:snapToGrid, snapToGrid');
+    if (snapToGridElement) {
+      const val = snapToGridElement.getAttribute('w:val') || snapToGridElement.getAttribute('val');
+      styles.snapToGrid = val !== '0' && val !== 'false';
+    }
+
+    // 解析段落运行属性（段落级别的字符格式）
+    const rPrElement = pPrElement.querySelector('w\\:rPr, rPr');
+    if (rPrElement) {
+      const runStyles = this.parseRunProperties(rPrElement);
+      if (Object.keys(runStyles).length > 0) {
+        styles.defaultRunProperties = runStyles;
+      }
     }
 
     return styles;
@@ -1401,6 +1865,8 @@ export class WordHandler {
       if (fontInfo.fontFamily) {
         styles.fontFamily = fontInfo.fontFamily;
       }
+      // 保存完整的字体信息
+      styles.fonts = fontInfo.fonts;
     }
 
     // 解析字体大小
@@ -1413,12 +1879,52 @@ export class WordHandler {
       }
     }
 
+    // 解析复杂脚本字体大小
+    const szCsElement = rPrElement.querySelector('w\\:szCs, szCs');
+    if (szCsElement) {
+      const size = szCsElement.getAttribute('w:val') || szCsElement.getAttribute('val');
+      if (size) {
+        styles.fontSizeCs = `${parseInt(size) / 2}pt`;
+      }
+    }
+
     // 解析字体颜色
     const colorElement = rPrElement.querySelector('w\\:color, color');
     if (colorElement) {
       const color = colorElement.getAttribute('w:val') || colorElement.getAttribute('val');
+      const themeColor = colorElement.getAttribute('w:themeColor') || colorElement.getAttribute('themeColor');
+      const themeTint = colorElement.getAttribute('w:themeTint') || colorElement.getAttribute('themeTint');
+      const themeShade = colorElement.getAttribute('w:themeShade') || colorElement.getAttribute('themeShade');
+      
       if (color && color !== 'auto') {
         styles.color = `#${color}`;
+      }
+      
+      // 保存主题颜色信息
+      if (themeColor) {
+        styles.themeColor = {
+          theme: themeColor,
+          tint: themeTint,
+          shade: themeShade
+        };
+      }
+    }
+
+    // 解析14版本的文本填充效果
+    const textFillElement = rPrElement.querySelector('w14\\:textFill, textFill');
+    if (textFillElement) {
+      const solidFillElement = textFillElement.querySelector('w14\\:solidFill, solidFill');
+      if (solidFillElement) {
+        const schemeClrElement = solidFillElement.querySelector('w14\\:schemeClr, schemeClr');
+        if (schemeClrElement) {
+          const val = schemeClrElement.getAttribute('w14:val') || schemeClrElement.getAttribute('val');
+          if (val) {
+            styles.textFill = {
+              type: 'solid',
+              schemeColor: val
+            };
+          }
+        }
       }
     }
 
@@ -1431,6 +1937,15 @@ export class WordHandler {
       }
     }
 
+    // 解析复杂脚本粗体
+    const bCsElement = rPrElement.querySelector('w\\:bCs, bCs');
+    if (bCsElement) {
+      const val = bCsElement.getAttribute('w:val') || bCsElement.getAttribute('val');
+      if (val !== '0' && val !== 'false') {
+        styles.fontWeightCs = 'bold';
+      }
+    }
+
     // 解析斜体
     const italicElement = rPrElement.querySelector('w\\:i, i');
     if (italicElement) {
@@ -1440,12 +1955,28 @@ export class WordHandler {
       }
     }
 
+    // 解析复杂脚本斜体
+    const iCsElement = rPrElement.querySelector('w\\:iCs, iCs');
+    if (iCsElement) {
+      const val = iCsElement.getAttribute('w:val') || iCsElement.getAttribute('val');
+      if (val !== '0' && val !== 'false') {
+        styles.fontStyleCs = 'italic';
+      }
+    }
+
     // 解析下划线
     const underlineElement = rPrElement.querySelector('w\\:u, u');
     if (underlineElement) {
       const val = underlineElement.getAttribute('w:val') || underlineElement.getAttribute('val');
+      const color = underlineElement.getAttribute('w:color') || underlineElement.getAttribute('color');
+      
       if (val && val !== 'none') {
         styles.textDecoration = 'underline';
+        styles.underlineStyle = val; // single, double, thick, dotted, dashed, etc.
+        
+        if (color && color !== 'auto') {
+          styles.underlineColor = `#${color}`;
+        }
       }
     }
 
@@ -1459,12 +1990,43 @@ export class WordHandler {
       }
     }
 
+    // 解析双删除线
+    const dstrikeElement = rPrElement.querySelector('w\\:dstrike, dstrike');
+    if (dstrikeElement) {
+      const val = dstrikeElement.getAttribute('w:val') || dstrikeElement.getAttribute('val');
+      if (val !== '0' && val !== 'false') {
+        styles.textDecoration = styles.textDecoration ? 
+          `${styles.textDecoration} line-through` : 'line-through';
+        styles.strikeStyle = 'double';
+      }
+    }
+
     // 解析背景色/高亮
     const shdElement = rPrElement.querySelector('w\\:shd, shd');
     if (shdElement) {
+      const val = shdElement.getAttribute('w:val') || shdElement.getAttribute('val');
+      const color = shdElement.getAttribute('w:color') || shdElement.getAttribute('color');
       const fill = shdElement.getAttribute('w:fill') || shdElement.getAttribute('fill');
+      
       if (fill && fill !== 'auto' && fill !== 'FFFFFF') {
         styles.backgroundColor = `#${fill}`;
+      }
+      
+      if (val && val !== 'clear') {
+        styles.shading = {
+          pattern: val,
+          color: color && color !== 'auto' ? `#${color}` : undefined,
+          fill: fill && fill !== 'auto' ? `#${fill}` : undefined
+        };
+      }
+    }
+
+    // 解析高亮颜色
+    const highlightElement = rPrElement.querySelector('w\\:highlight, highlight');
+    if (highlightElement) {
+      const val = highlightElement.getAttribute('w:val') || highlightElement.getAttribute('val');
+      if (val && val !== 'none') {
+        styles.highlight = val; // yellow, green, cyan, magenta, blue, red, etc.
       }
     }
 
@@ -1477,6 +2039,137 @@ export class WordHandler {
       } else if (val === 'subscript') {
         styles.verticalAlign = 'sub';
       }
+    }
+
+    // 解析字符间距
+    const spacingElement = rPrElement.querySelector('w\\:spacing, spacing');
+    if (spacingElement) {
+      const val = spacingElement.getAttribute('w:val') || spacingElement.getAttribute('val');
+      if (val) {
+        // 单位是 twips (1/20 point)
+        styles.letterSpacing = `${parseInt(val) / 20}pt`;
+      }
+    }
+
+    // 解析字符缩放
+    const wElement = rPrElement.querySelector('w\\:w, w');
+    if (wElement) {
+      const val = wElement.getAttribute('w:val') || wElement.getAttribute('val');
+      if (val) {
+        styles.textTransform = `scaleX(${parseInt(val) / 100})`;
+      }
+    }
+
+    // 解析字符位置调整
+    const positionElement = rPrElement.querySelector('w\\:position, position');
+    if (positionElement) {
+      const val = positionElement.getAttribute('w:val') || positionElement.getAttribute('val');
+      if (val) {
+        // 单位是 half-points
+        styles.baselineShift = `${parseInt(val) / 2}pt`;
+      }
+    }
+
+    // 解析字符边框
+    const bdrElement = rPrElement.querySelector('w\\:bdr, bdr');
+    if (bdrElement) {
+      const val = bdrElement.getAttribute('w:val') || bdrElement.getAttribute('val');
+      const sz = bdrElement.getAttribute('w:sz') || bdrElement.getAttribute('sz');
+      const color = bdrElement.getAttribute('w:color') || bdrElement.getAttribute('color');
+      
+      if (val && val !== 'none') {
+        styles.border = {
+          style: val,
+          width: sz ? `${Math.round(parseInt(sz) / 8)}pt` : '1pt',
+          color: color && color !== 'auto' ? `#${color}` : '#000000'
+        };
+      }
+    }
+
+    // 解析文本效果
+    const effectElement = rPrElement.querySelector('w\\:effect, effect');
+    if (effectElement) {
+      const val = effectElement.getAttribute('w:val') || effectElement.getAttribute('val');
+      if (val) {
+        styles.textEffect = val; // blinkBackground, lights, antsBlack, antsRed, shimmer, sparkle
+      }
+    }
+
+    // 解析浮雕效果
+    const embossElement = rPrElement.querySelector('w\\:emboss, emboss');
+    if (embossElement) {
+      const val = embossElement.getAttribute('w:val') || embossElement.getAttribute('val');
+      if (val !== '0' && val !== 'false') {
+        styles.textEffect = 'emboss';
+      }
+    }
+
+    // 解析阴刻效果
+    const imprintElement = rPrElement.querySelector('w\\:imprint, imprint');
+    if (imprintElement) {
+      const val = imprintElement.getAttribute('w:val') || imprintElement.getAttribute('val');
+      if (val !== '0' && val !== 'false') {
+        styles.textEffect = 'imprint';
+      }
+    }
+
+    // 解析阴影效果
+    const shadowElement = rPrElement.querySelector('w\\:shadow, shadow');
+    if (shadowElement) {
+      const val = shadowElement.getAttribute('w:val') || shadowElement.getAttribute('val');
+      if (val !== '0' && val !== 'false') {
+        styles.textShadow = '1px 1px 1px rgba(0,0,0,0.5)';
+      }
+    }
+
+    // 解析轮廓效果
+    const outlineElement = rPrElement.querySelector('w\\:outline, outline');
+    if (outlineElement) {
+      const val = outlineElement.getAttribute('w:val') || outlineElement.getAttribute('val');
+      if (val !== '0' && val !== 'false') {
+        styles.textStroke = '1px';
+      }
+    }
+
+    // 解析小型大写字母
+    const smallCapsElement = rPrElement.querySelector('w\\:smallCaps, smallCaps');
+    if (smallCapsElement) {
+      const val = smallCapsElement.getAttribute('w:val') || smallCapsElement.getAttribute('val');
+      if (val !== '0' && val !== 'false') {
+        styles.fontVariant = 'small-caps';
+      }
+    }
+
+    // 解析全部大写
+    const capsElement = rPrElement.querySelector('w\\:caps, caps');
+    if (capsElement) {
+      const val = capsElement.getAttribute('w:val') || capsElement.getAttribute('val');
+      if (val !== '0' && val !== 'false') {
+        styles.textTransform = 'uppercase';
+      }
+    }
+
+    // 解析隐藏文本
+    const vanishElement = rPrElement.querySelector('w\\:vanish, vanish');
+    if (vanishElement) {
+      const val = vanishElement.getAttribute('w:val') || vanishElement.getAttribute('val');
+      if (val !== '0' && val !== 'false') {
+        styles.visibility = 'hidden';
+      }
+    }
+
+    // 解析语言信息
+    const langElement = rPrElement.querySelector('w\\:lang, lang');
+    if (langElement) {
+      const val = langElement.getAttribute('w:val') || langElement.getAttribute('val');
+      const eastAsia = langElement.getAttribute('w:eastAsia') || langElement.getAttribute('eastAsia');
+      const bidi = langElement.getAttribute('w:bidi') || langElement.getAttribute('bidi');
+      
+      styles.language = {
+        default: val,
+        eastAsia: eastAsia,
+        bidi: bidi
+      };
     }
 
     return styles;
@@ -1530,27 +2223,248 @@ export class WordHandler {
    */
   private parseFormattedTextRuns(paragraph: Element): any[] {
     const runs: any[] = [];
-    const textRuns = paragraph.querySelectorAll('w\\:r, r');
+    const childNodes = paragraph.childNodes;
 
-    textRuns.forEach((run, index) => {
-      const rPrElement = run.querySelector('w\\:rPr, rPr');
-      const textElements = run.querySelectorAll('w\\:t, t');
+    for (let i = 0; i < childNodes.length; i++) {
+      const node = childNodes[i];
       
-      let text = '';
-      textElements.forEach(t => {
-        text += t.textContent || '';
-      });
-
-      if (text.trim()) {
-        const runStyles = this.parseRunProperties(rPrElement);
-        runs.push({
-          text: text,
-          styles: runStyles,
-          index: index
-        });
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const element = node as Element;
+        const tagName = element.tagName.toLowerCase();
+        
+        // 处理文本运行 (w:r)
+        if (tagName === 'w:r' || tagName === 'r') {
+          const runData = this.parseTextRun(element);
+          if (runData) {
+            runs.push(runData);
+          }
+        }
+        // 处理超链接 (w:hyperlink)
+        else if (tagName === 'w:hyperlink' || tagName === 'hyperlink') {
+          const hyperlinkRuns = this.parseHyperlink(element);
+          runs.push(...hyperlinkRuns);
+        }
+        // 处理书签开始 (w:bookmarkStart)
+        else if (tagName === 'w:bookmarkstart' || tagName === 'bookmarkstart') {
+          const bookmarkId = element.getAttribute('w:id') || element.getAttribute('id');
+          const bookmarkName = element.getAttribute('w:name') || element.getAttribute('name');
+          
+          if (bookmarkId && bookmarkName) {
+            runs.push({
+              type: 'bookmark',
+              subtype: 'start',
+              id: bookmarkId,
+              name: bookmarkName,
+              text: ''
+            });
+          }
+        }
+        // 处理书签结束 (w:bookmarkEnd)
+        else if (tagName === 'w:bookmarkend' || tagName === 'bookmarkend') {
+          const bookmarkId = element.getAttribute('w:id') || element.getAttribute('id');
+          
+          if (bookmarkId) {
+            runs.push({
+              type: 'bookmark',
+              subtype: 'end',
+              id: bookmarkId,
+              text: ''
+            });
+          }
+        }
+        // 处理批注范围开始 (w:commentRangeStart)
+        else if (tagName === 'w:commentrangestart' || tagName === 'commentrangestart') {
+          const commentId = element.getAttribute('w:id') || element.getAttribute('id');
+          
+          if (commentId) {
+            runs.push({
+              type: 'comment',
+              subtype: 'rangeStart',
+              commentId: commentId,
+              text: ''
+            });
+          }
+        }
+        // 处理批注范围结束 (w:commentRangeEnd)
+        else if (tagName === 'w:commentrangeend' || tagName === 'commentrangeend') {
+          const commentId = element.getAttribute('w:id') || element.getAttribute('id');
+          
+          if (commentId) {
+            runs.push({
+              type: 'comment',
+              subtype: 'rangeEnd',
+              commentId: commentId,
+              text: ''
+            });
+          }
+        }
       }
-    });
+    }
 
     return runs;
-   }
+  }
+
+  /**
+   * 解析单个文本运行元素
+   * @param runElement - 文本运行元素
+   * @returns 文本运行数据对象
+   */
+  private parseTextRun(runElement: Element): any | null {
+    const rPrElement = runElement.querySelector('w\\:rPr, rPr');
+    const runStyles = this.parseRunProperties(rPrElement);
+    
+    let text = '';
+    const textContent: any[] = [];
+    
+    // 遍历运行中的所有子元素
+    const childNodes = runElement.childNodes;
+    for (let i = 0; i < childNodes.length; i++) {
+      const node = childNodes[i];
+      
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const element = node as Element;
+        const tagName = element.tagName.toLowerCase();
+        
+        // 处理文本内容 (w:t)
+        if (tagName === 'w:t' || tagName === 't') {
+          const textValue = element.textContent || '';
+          text += textValue;
+          textContent.push({
+            type: 'text',
+            value: textValue
+          });
+        }
+        // 处理制表符 (w:tab)
+        else if (tagName === 'w:tab' || tagName === 'tab') {
+          text += '\t';
+          textContent.push({
+            type: 'tab'
+          });
+        }
+        // 处理换行符 (w:br)
+        else if (tagName === 'w:br' || tagName === 'br') {
+          const type = element.getAttribute('w:type') || element.getAttribute('type');
+          const clear = element.getAttribute('w:clear') || element.getAttribute('clear');
+          
+          text += '\n';
+          textContent.push({
+            type: 'break',
+            breakType: type || 'textWrapping',
+            clear: clear
+          });
+        }
+        // 处理页码字段 (w:fldChar, w:instrText)
+        else if (tagName === 'w:fldchar' || tagName === 'fldchar') {
+          const fldCharType = element.getAttribute('w:fldCharType') || element.getAttribute('fldCharType');
+          textContent.push({
+            type: 'field',
+            subtype: 'char',
+            fldCharType: fldCharType
+          });
+        }
+        else if (tagName === 'w:instrtext' || tagName === 'instrtext') {
+          const instrText = element.textContent || '';
+          textContent.push({
+            type: 'field',
+            subtype: 'instruction',
+            instruction: instrText
+          });
+        }
+        // 处理符号字符 (w:sym)
+        else if (tagName === 'w:sym' || tagName === 'sym') {
+          const font = element.getAttribute('w:font') || element.getAttribute('font');
+          const char = element.getAttribute('w:char') || element.getAttribute('char');
+          
+          if (char) {
+            // 将十六进制字符码转换为字符
+            const charCode = parseInt(char, 16);
+            const symbolChar = String.fromCharCode(charCode);
+            text += symbolChar;
+            
+            textContent.push({
+              type: 'symbol',
+              font: font,
+              char: char,
+              symbol: symbolChar
+            });
+          }
+        }
+        // 处理图片/对象 (w:drawing, w:object, w:pict)
+        else if (tagName === 'w:drawing' || tagName === 'drawing' ||
+                 tagName === 'w:object' || tagName === 'object' ||
+                 tagName === 'w:pict' || tagName === 'pict') {
+          textContent.push({
+            type: 'media',
+            mediaType: tagName.replace('w:', ''),
+            element: element
+          });
+        }
+        // 处理脚注引用 (w:footnoteReference)
+        else if (tagName === 'w:footnotereference' || tagName === 'footnotereference') {
+          const footnoteId = element.getAttribute('w:id') || element.getAttribute('id');
+          textContent.push({
+            type: 'footnote',
+            footnoteId: footnoteId
+          });
+        }
+        // 处理尾注引用 (w:endnoteReference)
+        else if (tagName === 'w:endnotereference' || tagName === 'endnotereference') {
+          const endnoteId = element.getAttribute('w:id') || element.getAttribute('id');
+          textContent.push({
+            type: 'endnote',
+            endnoteId: endnoteId
+          });
+        }
+        // 处理批注引用 (w:commentReference)
+        else if (tagName === 'w:commentreference' || tagName === 'commentreference') {
+          const commentId = element.getAttribute('w:id') || element.getAttribute('id');
+          textContent.push({
+            type: 'commentReference',
+            commentId: commentId
+          });
+        }
+      }
+    }
+    
+    // 如果有内容，返回运行数据
+    if (text || textContent.length > 0) {
+      return {
+        type: 'run',
+        text: text,
+        styles: runStyles,
+        content: textContent
+      };
+    }
+    
+    return null;
+  }
+
+  /**
+   * 解析超链接元素
+   * @param hyperlinkElement - 超链接元素
+   * @returns 超链接中的文本运行数组
+   */
+  private parseHyperlink(hyperlinkElement: Element): any[] {
+    const runs: any[] = [];
+    const relationshipId = hyperlinkElement.getAttribute('r:id') || hyperlinkElement.getAttribute('id');
+    const anchor = hyperlinkElement.getAttribute('w:anchor') || hyperlinkElement.getAttribute('anchor');
+    const tooltip = hyperlinkElement.getAttribute('w:tooltip') || hyperlinkElement.getAttribute('tooltip');
+    
+    // 解析超链接中的文本运行
+    const textRuns = hyperlinkElement.querySelectorAll('w\\:r, r');
+    textRuns.forEach(run => {
+      const runData = this.parseTextRun(run);
+      if (runData) {
+        // 为超链接运行添加额外信息
+        runData.hyperlink = {
+          relationshipId: relationshipId,
+          anchor: anchor,
+          tooltip: tooltip
+        };
+        runs.push(runData);
+      }
+    });
+    
+    return runs;
+  }
 }

@@ -231,6 +231,7 @@ import { useTheme } from '../composables/useTheme';
 import { useTooltip } from '../composables/useTooltip';
 import { shortcutManager, type ShortcutConfig, type ShortcutGroup } from '../core/ShortcutManager';
 import Tooltip from './Tooltip.vue';
+import { Console } from '../utils/Console';
 
 // 主题和工具提示
 const { isDarkTheme } = useTheme();
@@ -480,7 +481,7 @@ const exportConfig = (): void => {
     
     URL.revokeObjectURL(url);
   } catch (error) {
-    console.error('导出配置失败:', error);
+    Console.error('导出配置失败:', error);
   }
 };
 
@@ -509,7 +510,7 @@ const handleFileImport = (event: Event): void => {
         shortcutManager.importConfig(config);
         refreshData();
       } catch (error) {
-        console.error('导入配置失败:', error);
+        Console.error('导入配置失败:', error);
         alert('导入配置失败，请检查文件格式是否正确。');
       }
     };

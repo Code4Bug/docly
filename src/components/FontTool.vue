@@ -20,7 +20,7 @@
           <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
           <option value="'Comic Sans MS', cursive">Comic Sans MS</option>
           <option value="Impact, sans-serif">Impact</option>
-          <option value="'Lucida Console', monospace">Lucida Console</option>
+          <option value="'Lucida console', monospace">Lucida console</option>
           <option value="'Palatino Linotype', serif">Palatino Linotype</option>
           <option value="Tahoma, sans-serif">Tahoma</option>
         </optgroup>

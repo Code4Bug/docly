@@ -9,6 +9,7 @@ import InlineCode from '@editorjs/inline-code';
 import Underline from '@editorjs/underline';
 import Marker from '@editorjs/marker';
 import type { EditorConfig, EditorData, EditorInstance } from '../types';
+import { Console } from '../utils/Console';
 
 /**
  * 编辑器核心类
@@ -45,7 +46,7 @@ export class EditorCore implements EditorInstance {
        this.history = [editorData];
        this.historyIndex = 0;
      } catch (error) {
-       console.error('初始化历史记录失败:', error);
+       Console.error('初始化历史记录失败:', error);
      }
    }
  
@@ -177,15 +178,15 @@ export class EditorCore implements EditorInstance {
    */
   private handleEnterKey(event: KeyboardEvent): void {
     const selection = window.getSelection();
-    console.log('handleEnterKey', selection)
+    Console.info('handleEnterKey', selection)
     if (!selection || selection.rangeCount === 0) {
       return
     };
     
     const range = selection.getRangeAt(0);
-    console.log('range', range)
+    Console.info('range', range)
     const currentNode = range.startContainer;
-    console.log('currentNode', currentNode)
+    Console.info('currentNode', currentNode)
     const currentBlock = this.findParentBlock(currentNode as Node);
     
     if (!currentBlock) return;
@@ -260,7 +261,7 @@ export class EditorCore implements EditorInstance {
    */
   private setBlockAlignment(block: HTMLElement, alignment: string): void {
     block.style.textAlign = alignment;
-    console.log(`已将块设置为${alignment === 'left' ? '左对齐' : alignment}`);
+    Console.info(`已将块设置为${alignment === 'left' ? '左对齐' : alignment}`);
   }
   
   /**
@@ -357,7 +358,7 @@ export class EditorCore implements EditorInstance {
         }
       }
     } catch (error) {
-      console.error('获取块索引失败:', error);
+      Console.error('获取块索引失败:', error);
     }
     
     return -1;
@@ -401,7 +402,7 @@ export class EditorCore implements EditorInstance {
         await this.editor.blocks.update(block.id, { text: content });
       }
     } catch (error) {
-      console.error('更新块内容失败:', error);
+      Console.error('更新块内容失败:', error);
     }
   }
   
@@ -417,7 +418,7 @@ export class EditorCore implements EditorInstance {
       // 确保在当前块之后插入新块，而不是在文档末尾
       await this.editor.blocks.insert('paragraph', { text: content }, {}, index + 1, false, true);
     } catch (error) {
-      console.error('插入块失败:', error);
+      Console.error('插入块失败:', error);
     }
   }
   
@@ -448,7 +449,7 @@ export class EditorCore implements EditorInstance {
         selection.addRange(range);
       }
     } catch (error) {
-      console.error('移动光标失败:', error);
+      Console.error('移动光标失败:', error);
     }
   }
 
@@ -553,7 +554,7 @@ export class EditorCore implements EditorInstance {
    * 支持样式信息的渲染
    */
   async render(data: EditorData): Promise<void> {
-    console.log('EditorCore.render 开始渲染数据:', data);
+    Console.info('EditorCore.render 开始渲染数据:', data);
     
     if (!this.editor) {
       throw new Error('编辑器未初始化');
@@ -566,7 +567,7 @@ export class EditorCore implements EditorInstance {
       
       this.applyBlockStyles(processedData);
     } catch (error) {
-      console.error('渲染数据失败:', error);
+      Console.error('渲染数据失败:', error);
       throw error;
     }
   }
@@ -575,7 +576,6 @@ export class EditorCore implements EditorInstance {
    * 处理带样式的数据
    */
   private processStyledData(data: EditorData): EditorData {
-    console.log('block 长度:', data.blocks.length);
     const processedBlocks = data.blocks.map(block => {
       // 保持原有数据结构，但确保样式信息被保留
       const processedBlock = { ...block };
@@ -665,13 +665,10 @@ export class EditorCore implements EditorInstance {
    * @param data - 编辑器数据
    */
   private applyBlockStyles(data: EditorData): void {
-    console.log('applyBlockStyles 开始应用样式，数据:', data);
     if (!data || !data.blocks) return;
 
     data.blocks.forEach((block: any, index: number) => {
-      // console.log(`处理块 ${index}:`, block);
       if (block.data && block.data.styles) {
-        // console.log(`块 ${index} 有样式信息:`, block.data.styles);
         // 直接应用样式，不使用延迟机制
         this.applyStylesDirectly(index, block.data.styles);
       }
@@ -684,7 +681,7 @@ export class EditorCore implements EditorInstance {
    * @param styles - 样式对象
    */
   private applyStylesDirectly(index: number, styles: any): void {
-    console.log(`applyStylesDirectly 开始处理块 ${index}，样式:`, styles);
+    Console.info(`applyStylesDirectly 开始处理块 ${index}，样式:`, styles);
     
     // 尝试立即查找DOM元素
     const element = this.findBlockElement(index);
@@ -703,7 +700,7 @@ export class EditorCore implements EditorInstance {
       for (const selector of contentSelectors) {
         contentElement = element.querySelector(selector) as HTMLElement;
         if (contentElement) {
-          console.log(`块 ${index} 通过选择器 ${selector} 找到内容元素:`, contentElement);
+          Console.info(`块 ${index} 通过选择器 ${selector} 找到内容元素:`, contentElement);
           break;
         }
       }
@@ -711,14 +708,14 @@ export class EditorCore implements EditorInstance {
       // 如果没找到特定的内容元素，使用块元素本身
       if (!contentElement) {
         contentElement = element;
-        console.log(`块 ${index} 使用块元素本身作为内容元素:`, contentElement);
+        Console.info(`块 ${index} 使用块元素本身作为内容元素:`, contentElement);
       }
       
       this.applyStylesToElement(contentElement, styles);
-      console.log(`块 ${index} 样式应用完成`);
+      Console.info(`块 ${index} 样式应用完成`);
     } else {
       // 如果立即找不到元素，使用MutationObserver监听DOM变化
-      console.log(`块 ${index} 未找到DOM元素，使用观察者模式等待元素创建`);
+      Console.info(`块 ${index} 未找到DOM元素，使用观察者模式等待元素创建`);
       this.observeAndApplyStyles(index, styles);
     }
   }
@@ -741,9 +738,9 @@ export class EditorCore implements EditorInstance {
       const element = this.findBlockElement(index);
       if (element) {
         const contentElement = element.querySelector('.ce-paragraph, .ce-header, .cdx-block') || element;
-        console.log(`通过观察者找到块 ${index} 内容元素:`, contentElement);
+        Console.info(`通过观察者找到块 ${index} 内容元素:`, contentElement);
         this.applyStylesToElement(contentElement as HTMLElement, styles);
-        console.log(`块 ${index} 样式应用完成`);
+        Console.info(`块 ${index} 样式应用完成`);
         observer.disconnect(); // 停止观察
       }
     });
@@ -789,7 +786,7 @@ export class EditorCore implements EditorInstance {
         try {
           const element = method();
           if (element) {
-            console.log(`通过方法找到块 ${index}:`, element);
+            Console.info(`通过方法找到块 ${index}:`, element);
             return element;
           }
         } catch (e) {
@@ -809,7 +806,7 @@ export class EditorCore implements EditorInstance {
    * @param styles - 样式对象
    */
   private applyStylesToElement(element: HTMLElement, styles: any): void {
-    console.log('applyStylesToElement 开始应用样式到元素:', element, '样式:', styles);
+    Console.info('applyStylesToElement 开始应用样式到元素:', element, '样式:', styles);
     if (!element || !element.style) {
       console.warn('元素无效或没有style属性');
       return;
@@ -818,7 +815,7 @@ export class EditorCore implements EditorInstance {
     try {
       // 字体相关样式
       if (styles.fontFamily) {
-        console.log('应用字体:', styles.fontFamily);
+        Console.info('应用字体:', styles.fontFamily);
         element.style.fontFamily = styles.fontFamily;
         
         // 仿宋字体特殊处理
@@ -859,7 +856,7 @@ export class EditorCore implements EditorInstance {
       if (styles.paddingTop && element.classList.contains('ce-paragraph')) {
         const paddingValue = Math.min(parseFloat(styles.paddingTop), 12);
         element.style.paddingTop = `${paddingValue}px`;
-        console.log('应用段落paddingTop:', paddingValue + 'px');
+        Console.info('应用段落paddingTop:', paddingValue + 'px');
       }
 
       // 应用其他样式
@@ -872,10 +869,10 @@ export class EditorCore implements EditorInstance {
             // 对于颜色相关样式，使用setProperty确保优先级
             if (key === 'color' || key === 'backgroundColor') {
               element.style.setProperty(cssProperty, styles[key], 'important');
-              console.log(`应用重要样式 ${key}:`, styles[key]);
+              Console.info(`应用重要样式 ${key}:`, styles[key]);
             } else {
               (element.style as any)[camelCaseProperty] = styles[key];
-              console.log(`应用样式 ${key}:`, styles[key]);
+              Console.info(`应用样式 ${key}:`, styles[key]);
             }
           } catch (e) {
             console.warn(`应用样式 ${key} 失败:`, e);
@@ -889,14 +886,14 @@ export class EditorCore implements EditorInstance {
           try {
             const cssProperty = key.replace(/([A-Z])/g, '-$1').toLowerCase();
             element.style.setProperty(cssProperty, styles[key]);
-            console.log(`应用自定义样式 ${key}:`, styles[key]);
+            Console.info(`应用自定义样式 ${key}:`, styles[key]);
           } catch (e) {
             console.warn(`应用自定义样式 ${key} 失败:`, e);
           }
         }
       });
 
-      console.log('样式应用完成，最终元素样式:', element.style.cssText);
+      Console.info('样式应用完成，最终元素样式:', element.style.cssText);
     } catch (error) {
       console.warn('应用样式时发生错误:', error);
     }
@@ -987,7 +984,7 @@ destroy(): void {
       }
       return document.execCommand(command, false, value);
     } catch (error) {
-      console.error('执行命令失败:', error);
+      Console.error('执行命令失败:', error);
       return false;
     }
   }
@@ -1012,7 +1009,7 @@ destroy(): void {
       }
 
       const range = selection.getRangeAt(0);
-      console.log('设置字体大小:', fontSize);
+      Console.info('设置字体大小:', fontSize);
 
       // 如果有选中文本，应用到选中文本
       if (!range.collapsed) {
@@ -1022,7 +1019,7 @@ destroy(): void {
         return this.applyFontSizeToCurrentPosition(fontSize, range);
       }
     } catch (error) {
-      console.error('应用字体大小失败:', error);
+      Console.error('应用字体大小失败:', error);
       return false;
     }
   }
@@ -1035,7 +1032,7 @@ destroy(): void {
    */
   private applyFontSizeToSelectedText(fontSize: string, range: Range): boolean {
     try {
-      console.log('应用字体大小到选中文本:', fontSize);
+      Console.info('应用字体大小到选中文本:', fontSize);
       
       // 处理字体大小单位，统一转换为CSS可用的格式
       let cssSize: string;
@@ -1111,7 +1108,7 @@ destroy(): void {
       
       return true;
     } catch (error) {
-      console.error('应用字体大小到选中文本失败:', error);
+      Console.error('应用字体大小到选中文本失败:', error);
       return false;
     }
   }
@@ -1176,7 +1173,7 @@ destroy(): void {
    */
   private applyFontSizeToCurrentPosition(fontSize: string, range: Range): boolean {
     try {
-      console.log('应用字体大小到光标位置:', fontSize);
+      Console.info('应用字体大小到光标位置:', fontSize);
       
       // 处理字体大小单位，统一转换为CSS可用的格式
       let cssSize: string;
@@ -1208,7 +1205,7 @@ destroy(): void {
       if (fontSizeSpan) {
         // 如果已经在字体大小span内，直接更新字体大小
         fontSizeSpan.style.fontSize = cssSize;
-        console.log('更新现有span的字体大小');
+        Console.info('更新现有span的字体大小');
       } else {
         // 创建一个新的span元素用于设置字体大小
         const span = document.createElement('span');
@@ -1232,7 +1229,7 @@ destroy(): void {
       
       return true;
     } catch (error) {
-      console.error('应用字体大小到光标位置失败:', error);
+      Console.error('应用字体大小到光标位置失败:', error);
       return false;
     }
   }
@@ -1256,7 +1253,7 @@ destroy(): void {
       }
 
       const range = selection.getRangeAt(0);
-      console.log('应用斜体样式');
+      Console.info('应用斜体样式');
 
       // 如果有选中文本，应用到选中文本
       if (!range.collapsed) {
@@ -1266,7 +1263,7 @@ destroy(): void {
         return this.applyItalicToCurrentPosition(range);
       }
     } catch (error) {
-      console.error('应用斜体样式失败:', error);
+      Console.error('应用斜体样式失败:', error);
       return false;
     }
   }
@@ -1278,7 +1275,7 @@ destroy(): void {
    */
   private applyItalicToSelectedText(range: Range): boolean {
     try {
-      console.log('应用斜体样式到选中文本');
+      Console.info('应用斜体样式到选中文本');
       
       // 检查选中文本是否已经是斜体
       const selectedContent = range.cloneContents();
@@ -1314,7 +1311,7 @@ destroy(): void {
       
       return true;
     } catch (error) {
-      console.error('应用斜体样式到选中文本失败:', error);
+      Console.error('应用斜体样式到选中文本失败:', error);
       return false;
     }
   }
@@ -1326,7 +1323,7 @@ destroy(): void {
    */
   private applyItalicToCurrentPosition(range: Range): boolean {
     try {
-      console.log('应用斜体样式到光标位置');
+      Console.info('应用斜体样式到光标位置');
       
       // 创建一个span元素用于设置斜体样式
       const span = document.createElement('span');
@@ -1349,7 +1346,7 @@ destroy(): void {
       
       return true;
     } catch (error) {
-      console.error('应用斜体样式到光标位置失败:', error);
+      Console.error('应用斜体样式到光标位置失败:', error);
       return false;
     }
   }
@@ -1446,7 +1443,7 @@ destroy(): void {
       }
 
       const range = selection.getRangeAt(0);
-      console.log('当前选择范围:', {
+      Console.info('当前选择范围:', {
         collapsed: range.collapsed,
         startContainer: range.startContainer,
         endContainer: range.endContainer,
@@ -1462,7 +1459,7 @@ destroy(): void {
         return this.applyColorToCurrentPosition(command, color, range);
       }
     } catch (error) {
-      console.error('应用颜色失败:', error);
+      Console.error('应用颜色失败:', error);
       return false;
     }
   }
@@ -1476,7 +1473,7 @@ destroy(): void {
    */
   private applyColorToSelectedText(command: string, color: string, range: Range): boolean {
     try {
-      console.log('应用颜色到选中文本:', { command, color });
+      Console.info('应用颜色到选中文本:', { command, color });
       
       // 提取选中的内容
       const selectedContent = range.extractContents();
@@ -1505,10 +1502,10 @@ destroy(): void {
         selection.addRange(range);
       }
       
-      console.log('成功应用颜色到选中文本');
+      Console.info('成功应用颜色到选中文本');
       return true;
     } catch (error) {
-      console.error('应用颜色到选中文本失败:', error);
+      Console.error('应用颜色到选中文本失败:', error);
       return false;
     }
   }
@@ -1522,7 +1519,7 @@ destroy(): void {
    */
   private applyColorToCurrentPosition(command: string, color: string, range: Range): boolean {
     try {
-      console.log('应用颜色到当前光标位置:', { command, color });
+      Console.info('应用颜色到当前光标位置:', { command, color });
       
       // 创建一个不可见的span作为格式标记
       const span = document.createElement('span');
@@ -1554,10 +1551,10 @@ destroy(): void {
       // 监听下一次输入，将格式应用到新输入的文本
       this.setupColorFormatting(span, command, color);
       
-      console.log('成功设置光标位置的颜色格式');
+      Console.info('成功设置光标位置的颜色格式');
       return true;
     } catch (error) {
-      console.error('应用颜色到当前位置失败:', error);
+      Console.error('应用颜色到当前位置失败:', error);
       return false;
     }
   }
@@ -1651,7 +1648,7 @@ destroy(): void {
         this.historyIndex--;
       }
     } catch (error) {
-      console.error('保存历史记录失败:', error);
+      Console.error('保存历史记录失败:', error);
     }
   }
 
@@ -1674,7 +1671,7 @@ destroy(): void {
       });
       return true;
     } catch (error) {
-      console.error('撤销操作失败:', error);
+      Console.error('撤销操作失败:', error);
       this.isUndoRedoOperation = false;
       return false;
     }
@@ -1699,7 +1696,7 @@ destroy(): void {
       });
       return true;
     } catch (error) {
-      console.error('重做操作失败:', error);
+      Console.error('重做操作失败:', error);
       this.isUndoRedoOperation = false;
       return false;
     }
@@ -1726,7 +1723,7 @@ destroy(): void {
       const currentBlockIndex = await this.editor.blocks.getCurrentBlockIndex();
       await this.editor.blocks.insert(type, data, {}, currentBlockIndex + 1);
     } catch (error) {
-      console.error('插入块失败:', error);
+      Console.error('插入块失败:', error);
     }
   }
 
@@ -1741,7 +1738,7 @@ destroy(): void {
     try {
       return this.editor.blocks.getBlockByIndex(this.editor.blocks.getCurrentBlockIndex());
     } catch (error) {
-      console.error('获取当前块失败:', error);
+      Console.error('获取当前块失败:', error);
       return null;
     }
   }

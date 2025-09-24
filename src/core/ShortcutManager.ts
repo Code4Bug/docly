@@ -114,7 +114,7 @@ export class ShortcutManager {
         shortcut.callback();
         this.emit('shortcut-executed', { key: shortcutKey, shortcut });
       } catch (error) {
-        console.error(`执行快捷键 ${shortcutKey} 时出错:`, error);
+        Console.error(`执行快捷键 ${shortcutKey} 时出错:`, error);
         this.emit('shortcut-error', { key: shortcutKey, error });
       }
     }
@@ -351,7 +351,7 @@ export class ShortcutManager {
 
       this.emit('config-imported', { config });
     } catch (error) {
-      console.error('导入快捷键配置失败:', error);
+      Console.error('导入快捷键配置失败:', error);
       this.emit('config-import-error', { error });
     }
   }

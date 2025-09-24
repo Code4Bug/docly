@@ -48,6 +48,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useTheme } from '../composables/useTheme';
 import Tooltip from './Tooltip.vue';
 import { useTooltip } from '../composables/useTooltip';
+import { Console } from '../utils/Console';
 
 // Props
 interface Props {
@@ -144,7 +145,7 @@ onUnmounted(() => {
  * @param {string} color - 颜色值
  */
 const selectColor = (color: string): void => {
-  console.log('ColorPicker selectColor 被调用:', { type: props.type, color });
+  Console.info('ColorPicker selectColor 被调用:', { type: props.type, color });
   
   // 延迟执行以确保文本选择状态得到保持
   setTimeout(() => {
@@ -160,7 +161,7 @@ const selectColor = (color: string): void => {
 const handleCustomColorChange = (event: Event): void => {
   const target = event.target as HTMLInputElement;
   const color = target.value;
-  console.log('ColorPicker handleCustomColorChange 被调用:', { type: props.type, color });
+  Console.info('ColorPicker handleCustomColorChange 被调用:', { type: props.type, color });
   customColor.value = color;
   emit('color-change', color);
   showColorPicker.value = false;
