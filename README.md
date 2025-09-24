@@ -35,6 +35,9 @@ Docly 是一款基于 Vue 3 + Vite 的现代化在线文档编辑器，专注于
 - 工具提示系统
 - 插件化架构，易于扩展
 - 实时保存与状态管理
+- 统一的快捷键管理系统
+- 彩色控制台日志输出
+- 用户友好的消息提示系统
 
 ## 技术栈
 
@@ -60,7 +63,7 @@ Docly 是一款基于 Vue 3 + Vite 的现代化在线文档编辑器，专注于
   - jszip 3.10.1 (压缩文件处理)
 - **工具库**: @vueuse/core 13.9.0 (Vue组合式工具)
 - **类型支持**: TypeScript + @types/file-saver 2.0.7
-- **构建工具**: Vite + @vitejs/plugin-vue 5.2.4
+- **构建工具**: Vite 5.4.20 + @vitejs/plugin-vue 5.2.4 + TypeScript 5.9.2
 
 ## 项目结构
 
@@ -78,9 +81,12 @@ src/
 │   ├── useAnnotations.ts     # 批注功能组合式函数
 │   ├── useEditorState.ts     # 编辑器状态管理组合式函数
 │   ├── useFileHandler.ts     # 文件处理组合式函数
-│   └── useTheme.ts           # 主题管理组合式函数
+│   ├── useShortcuts.ts       # 快捷键管理组合式函数
+│   ├── useTheme.ts           # 主题管理组合式函数
+│   └── useTooltip.ts         # 工具提示组合式函数
 ├── core/               # 编辑器核心
-│   └── EditorCore.ts   # 编辑器核心类，提供完整的编辑器功能
+│   ├── EditorCore.ts   # 编辑器核心类，提供完整的编辑器功能
+│   └── ShortcutManager.ts    # 快捷键管理器，统一管理应用快捷键
 ├── plugins/            # 插件系统
 │   └── PluginManager.ts # 插件管理器，支持动态加载和管理插件
 ├── fileHandlers/       # 文件处理模块
@@ -92,7 +98,8 @@ src/
 │   ├── editorjs-marker.d.ts  # Editor.js标记插件类型定义
 │   └── index.ts        # 完整的类型定义文件
 ├── utils/              # 工具函数
-│   └── TextAnalyzer.ts # 文本分析工具，支持样式提取和字体处理
+│   ├── Console.ts      # 控制台工具类，提供彩色日志输出
+│   ├── Message.ts      # 消息提示工具，显示用户反馈信息
 ├── assets/             # 静态资源
 │   ├── css/            # 样式文件
 │   │   ├── components.css  # 组件样式
@@ -176,20 +183,6 @@ const editorData = await wordHandler.import(file)
 const exportedFile = await wordHandler.export(editorData)
 ```
 
-### 文本分析
-
-```javascript
-import { TextAnalyzer } from './utils/TextAnalyzer'
-
-const analyzer = new TextAnalyzer()
-
-// 分析文本样式
-const styles = analyzer.extractStyles(element)
-
-// 处理字体信息
-const fontInfo = analyzer.processFontFamily(styles.fontFamily)
-```
-
 ## 📖 API 文档
 
 ### EditorCore
@@ -237,7 +230,75 @@ Word 文档批注处理器，专门处理文档中的批注功能。
 - `unloadPlugin(name)`: 卸载插件
 - `getPlugin(name)`: 获取插件实例
 
+### ShortcutManager
+
+快捷键管理器，统一管理应用中的所有快捷键。
+
+#### 方法
+
+- `registerShortcut(key, config)`: 注册快捷键
+- `unregisterShortcut(key)`: 注销快捷键
+- `setShortcutEnabled(key, enabled)`: 启用/禁用指定快捷键
+- `setEnabled(enabled)`: 启用/禁用整个快捷键管理器
+- `getAllShortcuts()`: 获取所有快捷键
+- `getShortcutsByGroup(groupId)`: 根据分组获取快捷键
+- `addGroup(id, group)`: 添加快捷键分组
+- `exportConfig()`: 导出快捷键配置
+- `importConfig(config)`: 导入快捷键配置
+
+### Console
+
+控制台工具类，提供彩色日志输出功能。
+
+#### 方法
+
+- `success(...args)`: 输出成功日志（绿色）
+- `error(...args)`: 输出错误日志（红色）
+- `warn(...args)`: 输出警告日志（黄色）
+- `info(...args)`: 输出信息日志（蓝色）
+- `debug(...args)`: 输出调试日志（灰色）
+- `setLogLevel(level)`: 设置日志级别
+- `clear()`: 清空控制台
+- `table(data)`: 打印表格
+- `group(label)`: 开始分组
+- `groupEnd()`: 结束分组
+- `time(label)`: 开始计时
+- `timeEnd(label)`: 结束计时
+
+### Message
+
+消息提示工具，显示用户反馈信息。
+
+#### 方法
+
+- `showMessage(text, type, consoleTag)`: 显示消息提示
+  - `text`: 消息文本
+  - `type`: 消息类型（'success' | 'error' | 'warn' | 'info'）
+  - `consoleTag`: 是否同时在控制台输出（默认 true）
+
 ### 组合式函数 (Composables)
+
+#### useShortcuts
+
+快捷键管理的组合式函数。
+
+```javascript
+const {
+  isShortcutPanelVisible,
+  registerEditorShortcuts,
+  registerShortcut,
+  unregisterShortcut,
+  setShortcutEnabled,
+  setShortcutsEnabled,
+  showShortcutPanel,
+  hideShortcutPanel,
+  toggleShortcutPanel,
+  getAllShortcuts,
+  getShortcutsByGroup,
+  exportShortcutConfig,
+  importShortcutConfig
+} = useShortcuts()
+```
 
 #### useAnnotations
 
@@ -494,6 +555,22 @@ A: 修改 <mcfile name="ColorPicker.vue" path="src/components/ColorPicker.vue"><
 ### Q: 编辑器状态如何管理？
 
 A: 项目使用 Pinia 进行全局状态管理（<mcfile name="editorStore.ts" path="src/stores/editorStore.ts"></mcfile>），同时提供 <mcsymbol name="useEditorState" filename="useEditorState.ts" path="src/composables/useEditorState.ts" startline="1" type="function"></mcsymbol> 组合式函数进行局部状态管理。
+
+### Q: 如何使用快捷键系统？
+
+A: 使用 <mcsymbol name="useShortcuts" filename="useShortcuts.ts" path="src/composables/useShortcuts.ts" startline="1" type="function"></mcsymbol> 组合式函数来管理快捷键，或直接使用 <mcsymbol name="ShortcutManager" filename="ShortcutManager.ts" path="src/core/ShortcutManager.ts" startline="1" type="class"></mcsymbol> 类。按 `Ctrl+/` 可显示快捷键面板。
+
+### Q: 如何自定义控制台日志输出？
+
+A: 使用 <mcsymbol name="Console" filename="Console.ts" path="src/utils/Console.ts" startline="1" type="class"></mcsymbol> 类的静态方法，如 `Console.success()`、`Console.error()` 等。可通过 `Console.setLogLevel()` 设置日志级别。
+
+### Q: 如何显示用户消息提示？
+
+A: 使用 <mcsymbol name="showMessage" filename="Message.ts" path="src/utils/Message.ts" startline="1" type="function"></mcsymbol> 函数显示消息提示，支持成功、错误、警告和信息四种类型。
+
+### Q: 如何注册自定义快捷键？
+
+A: 使用 `ShortcutManager.registerShortcut(key, config)` 方法注册快捷键，或通过 `useShortcuts` 组合式函数的 `registerShortcut` 方法。
 
 ## 📄 许可证
 
