@@ -78,6 +78,53 @@
       style="display: none;"
     />
 
+    <!-- 快捷键面板 -->
+    <Teleport to="body">
+      <div 
+        v-if="isShortcutPanelVisible" 
+        class="shortcut-panel-overlay"
+        @click.self="hideShortcutPanel"
+      >
+        <div class="shortcut-panel-container">
+          <div class="shortcut-panel" :class="{ 'dark-theme': isDarkTheme }">
+            <!-- 面板头部 -->
+            <div class="panel-header">
+              <div class="header-left">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M20,12A8,8 0 0,0 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12M22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2A10,10 0 0,1 22,12M10,17L6,13L7.41,11.58L10,14.17L16.59,7.58L18,9L10,17Z" />
+                </svg>
+                <h3>快捷键设置</h3>
+              </div>
+              <div class="header-actions">
+                <button @click="hideShortcutPanel" class="close-btn">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <!-- 简化的快捷键列表 -->
+            <div class="panel-content">
+              <div class="shortcut-info">
+                <p>按 <kbd>Ctrl</kbd> + <kbd>/</kbd> 显示/隐藏此面板</p>
+                <p>快捷键系统已启用，您可以使用以下快捷键：</p>
+                <ul>
+                  <li><kbd>Ctrl</kbd> + <kbd>S</kbd> - 保存文档</li>
+                  <li><kbd>Ctrl</kbd> + <kbd>O</kbd> - 导入文档</li>
+                  <li><kbd>Ctrl</kbd> + <kbd>E</kbd> - 导出文档</li>
+                  <li><kbd>Ctrl</kbd> + <kbd>Z</kbd> - 撤销</li>
+                  <li><kbd>Ctrl</kbd> + <kbd>Y</kbd> - 重做</li>
+                  <li><kbd>Ctrl</kbd> + <kbd>B</kbd> - 粗体</li>
+                  <li><kbd>Ctrl</kbd> + <kbd>I</kbd> - 斜体</li>
+                  <li><kbd>Ctrl</kbd> + <kbd>K</kbd> - 插入链接</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- 自定义悬浮提示 -->
     <div 
       v-if="tooltip.visible" 
@@ -98,6 +145,7 @@ import { EditorCore } from '../core/EditorCore';
 import { PluginManager } from '../plugins/PluginManager';
 import { WordHandler } from '../fileHandlers/WordHandler';
 import { useEditorStore } from '../stores/editorStore';
+import { useShortcuts } from '../composables/useShortcuts';
 import EditorToolbar from './EditorToolbar.vue';
 import AnnotationSystem from './AnnotationSystem.vue';
 import EditorStatusBar from './EditorStatusBar.vue';
@@ -153,6 +201,15 @@ const selectedText = ref('');
 
 // Store
 const editorStore = useEditorStore();
+
+// 快捷键系统
+const {
+  isShortcutPanelVisible,
+  registerEditorShortcuts,
+  hideShortcutPanel,
+  showShortcutPanel,
+  toggleShortcutPanel
+} = useShortcuts();
 
 // 主题相关的响应式数据
 const isDarkMode = ref(false);
@@ -256,6 +313,28 @@ const initEditor = async (): Promise<void> => {
     
     // 应用初始主题
     updateEditorTheme();
+    
+    // 注册编辑器快捷键
+    registerEditorShortcuts({
+      importFile,
+      exportFile: handleExport,
+      save: () => editorStore.saveDocument(),
+      undo,
+      redo,
+      bold: () => formatText('bold'),
+      italic: () => formatText('italic'),
+      underline: () => formatText('underline'),
+      insertLink,
+      insertTable,
+      insertList,
+      insertQuote,
+      toggleTheme: () => {
+        isDarkMode.value = !isDarkMode.value;
+        updateEditorTheme();
+      },
+      toggleAnnotationMode,
+      showAnnotationList
+    });
     
     // 初始化完成后立即保存数据到 store
     setTimeout(async () => {
@@ -2433,5 +2512,158 @@ onUnmounted(() => {
     width: 95%;
     margin: 20px;
   }
+}
+
+/* 快捷键面板样式 */
+.shortcut-panel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+}
+
+.shortcut-panel-container {
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow: hidden;
+}
+
+.shortcut-panel {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.shortcut-panel.dark-theme {
+  background: #2d2d2d;
+  color: #e0e0e0;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.shortcut-panel.dark-theme .panel-header {
+  background: #3d3d3d;
+  border-bottom-color: #555;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-left h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.shortcut-panel.dark-theme .header-left h3 {
+  color: #e0e0e0;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.close-btn {
+  padding: 8px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #666;
+  transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.shortcut-panel.dark-theme .close-btn {
+  color: #aaa;
+}
+
+.shortcut-panel.dark-theme .close-btn:hover {
+  background: #555;
+  color: #e0e0e0;
+}
+
+.panel-content {
+  padding: 24px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.shortcut-info p {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  color: #666;
+  line-height: 1.5;
+}
+
+.shortcut-panel.dark-theme .shortcut-info p {
+  color: #aaa;
+}
+
+.shortcut-info ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.shortcut-info li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 14px;
+}
+
+.shortcut-panel.dark-theme .shortcut-info li {
+  border-bottom-color: #444;
+}
+
+.shortcut-info li:last-child {
+  border-bottom: none;
+}
+
+kbd {
+  display: inline-block;
+  padding: 4px 8px;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 2px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.shortcut-panel.dark-theme kbd {
+  background: #444;
+  border-color: #666;
+  color: #e0e0e0;
 }
 </style>

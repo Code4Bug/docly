@@ -4,6 +4,9 @@
  * @param {string} type - 消息类型 ('success' | 'error' | 'warning' | 'info')
  */
 const showMessage = (text: string, type: 'success' | 'error' | 'warning' | 'info' = 'info'): void => {
+  
+
+
   // 清除之前的消息
   const existingMessages = document.querySelectorAll('.docly-message');
   existingMessages.forEach(msg => msg.remove());
@@ -13,16 +16,16 @@ const showMessage = (text: string, type: 'success' | 'error' | 'warning' | 'info
   messageEl.className = `docly-message message-${type}`;
   messageEl.style.cssText = `
     position: fixed;
-    top: 20px;
+    bottom: 20px;
     right: 20px;
-    padding: 12px 16px;
-    border-radius: 6px;
+    padding: 8px 12px;
+    border-radius: 4px;
     color: white;
-    font-size: 14px;
+    font-size: 12px;
     z-index: 9999;
-    max-width: 300px;
+    max-width: 240px;
     word-wrap: break-word;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     transition: opacity 0.3s ease;
   `;
   

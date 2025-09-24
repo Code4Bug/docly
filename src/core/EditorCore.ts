@@ -164,6 +164,11 @@ export class EditorCore implements EditorInstance {
     if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey) {
       this.handleEnterKey(event);
     }
+    
+    // 处理 backspace 键
+    if (event.key === 'Backspace') {
+      this.handleBackspaceKey(event);
+    }
   }
   
   /**
@@ -195,6 +200,67 @@ export class EditorCore implements EditorInstance {
       event.preventDefault();
       this.splitTextAtCursor(selection, currentBlock);
     }
+  }
+  
+  /**
+   * 处理 backspace 键行为
+   * @param event - 键盘事件对象
+   */
+  private handleBackspaceKey(event: KeyboardEvent): void {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    
+    const range = selection.getRangeAt(0);
+    const currentNode = range.startContainer;
+    const currentBlock = this.findParentBlock(currentNode as Node);
+    
+    if (!currentBlock) return;
+    
+    // 检查当前块是否为空或即将为空
+    const blockText = currentBlock.textContent?.trim() || '';
+    
+    // 如果当前块内容为空，或者删除后将为空
+    if (blockText === '' || (blockText.length === 1 && range.startOffset === 1)) {
+      // 检查当前块是否有非左对齐的样式
+      const currentAlignment = this.getCurrentAlignment(currentBlock);
+      
+      if (currentAlignment && currentAlignment !== 'left') {
+        // 延迟执行，确保删除操作完成后再设置对齐
+        setTimeout(() => {
+          this.setBlockAlignment(currentBlock, 'left');
+        }, 0);
+      }
+    }
+  }
+  
+  /**
+   * 获取当前块的对齐方式
+   * @param block - 块元素
+   * @returns 对齐方式
+   */
+  private getCurrentAlignment(block: HTMLElement): string | null {
+    // 检查内联样式
+    const style = block.style.textAlign;
+    if (style) return style;
+    
+    // 检查计算样式
+    const computedStyle = window.getComputedStyle(block);
+    const textAlign = computedStyle.textAlign;
+    
+    // 如果是默认的 start 或 left，返回 left
+    if (textAlign === 'start' || textAlign === 'left') return 'left';
+    
+    return textAlign === 'initial' ? 'left' : textAlign;
+  }
+  
+  /**
+   * 设置块的对齐方式
+   * @param block - 块元素
+   * @param alignment - 对齐方式
+   */
+  private setBlockAlignment(block: HTMLElement, alignment: string): void {
+    block.style.textAlign = alignment;
+    console.log(`已将块设置为${alignment === 'left' ? '左对齐' : alignment}`);
   }
   
   /**

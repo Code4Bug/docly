@@ -320,7 +320,7 @@ export default {
 }
 
 .dark-theme .save-indicator.saved {
-  color: #68d391;
+  color: #176cff;
 }
 
 .dark-theme .save-indicator.unsaved {
