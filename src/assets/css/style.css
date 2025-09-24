@@ -81,3 +81,10 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+.unselectable {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}

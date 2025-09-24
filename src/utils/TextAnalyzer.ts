@@ -120,10 +120,10 @@ export class TextAnalyzer {
   /**
    * 检测文本的对齐方式
    * @param element - DOM元素
-   * @param textContent - 文本内容
+   * @param _textContent - 文本内容
    * @returns 对齐方式
    */
-  static detectTextAlignment(element: Element, textContent: string): string | null {
+  static detectTextAlignment(element: Element, _textContent: string): string | null {
     // 从内联样式中检测
     const style = element.getAttribute('style');
     if (style) {

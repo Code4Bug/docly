@@ -6,7 +6,7 @@
       class="annotation-sidebar"
       :class="{ 'dark-theme': isDarkTheme }"
     >
-      <div class="sidebar-header">
+      <div class="sidebar-header unselectable">
         <h3>批注列表</h3>
         <button 
           @click="$emit('close-sidebar')" 
@@ -29,14 +29,18 @@
           </div>
           
           <!-- 显示批注对应的原文 -->
-          <div v-if="annotation.text || annotation.range?.text" class="annotation-original-text">
+          <div v-if="annotation?.text" class="annotation-original-text">
             <label>原文：</label>
-            <p>{{ annotation.text || annotation.range?.text }}</p>
+            <div class="original-text-content">
+              "{{ annotation.text }}"
+            </div>
           </div>
           
           <div class="annotation-content">
             <label>批注：</label>
-            <p v-if="!annotation.editing">{{ annotation.content }}</p>
+            <div v-if="!annotation.editing" class="comment-text-content">
+              {{ annotation.content }}
+            </div>
             <textarea 
               v-else
               v-model="annotation.editContent"
@@ -44,6 +48,21 @@
               @keydown.enter.ctrl="confirmEdit(annotation)"
               @keydown.esc="cancelEdit(annotation)"
             ></textarea>
+          </div>
+          
+          <!-- 显示批注的回复 -->
+          <div v-if="annotation.replies && annotation.replies.length > 0" class="annotation-replies">
+            <div 
+              v-for="reply in annotation.replies" 
+              :key="reply.id"
+              class="reply-item"
+            >
+              <div class="reply-header">
+                <span class="reply-author">{{ reply.author || reply.user }}</span>
+                <span class="reply-time">{{ formatTime(reply.timestamp) }}</span>
+              </div>
+              <div class="reply-content">{{ reply.content }}</div>
+            </div>
           </div>
           
           <div class="annotation-actions">
@@ -88,7 +107,7 @@
           </div>
         </div>
         
-        <div v-if="annotations.length === 0" class="empty-state">
+        <div v-if="annotations.length === 0" class="empty-state unselectable">
           <p>暂无批注</p>
         </div>
       </div>
@@ -168,10 +187,11 @@
 import { ref, computed } from 'vue';
 
 // 接口定义
-interface Annotation {
+export interface Annotation {
   id: string;
   content: string;
   author: string;
+  user: string; // 用户名，与author相同
   timestamp: number;
   resolved: boolean;
   editing?: boolean;
@@ -182,6 +202,7 @@ interface Annotation {
     endOffset: number;
     text: string;
   };
+  replies?: Annotation[]; // 批注回复
 }
 
 // Props
@@ -333,15 +354,32 @@ export default {
   border: none;
   font-size: 20px;
   cursor: pointer;
-  color: #666;
+  /* color: #666; */
   padding: 4px;
   border-radius: 4px;
   transition: all 0.2s ease;
+  /* 移除按钮默认样式 */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  outline: none;
 }
 
 .close-btn:hover {
-  background: #e9ecef;
-  color: #333;
+  /* background: #e9ecef; */
+  color: #c9c9c9;
+}
+
+.close-btn:active {
+  border: none;
+}
+
+.dark-theme .close-btn {
+  color: #595959;
+}
+
+.dark-theme .close-btn:hover {
+  color: #c9c9c9;
 }
 
 .annotation-list {
@@ -386,6 +424,10 @@ export default {
   color: #666;
 }
 
+.dark-theme .annotation-time {
+  color: #999;
+}
+
 .annotation-original-text {
   margin-bottom: 8px;
   padding: 8px;
@@ -403,7 +445,11 @@ export default {
   text-align: left;
 }
 
-.annotation-original-text p {
+.dark-theme .annotation-original-text label {
+  color: #999;
+}
+
+.original-text-content {
   margin: 0;
   line-height: 1.4;
   color: #555;
@@ -425,12 +471,50 @@ export default {
   text-align: left;
 }
 
-.annotation-content p {
+.comment-text-content {
   margin: 0;
   line-height: 1.5;
   color: #333;
   font-size: 14px;
   text-align: left;
+}
+
+.annotation-replies {
+  margin-top: 12px;
+  padding-left: 16px;
+  border-left: 2px solid #e0e0e0;
+}
+
+.reply-item {
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  border: 1px solid #e9ecef;
+}
+
+.reply-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.reply-author {
+  font-weight: 600;
+  font-size: 12px;
+  color: #007bff;
+}
+
+.reply-time {
+  font-size: 11px;
+  color: #6c757d;
+}
+
+.reply-content {
+  font-size: 13px;
+  color: #495057;
+  line-height: 1.4;
 }
 
 .edit-textarea {
@@ -514,6 +598,7 @@ export default {
   padding: 16px;
   border-top: 1px solid #e0e0e0;
   background: #f8f9fa;
+  
 }
 
 .clear-btn {
@@ -693,16 +778,16 @@ export default {
 /* 暗色主题样式 */
 .annotation-sidebar.dark-theme,
 .annotation-modal.dark-theme {
-  background: #2d3748;
-  border-color: #4a5568;
+    background-color: #2d2d2d;
+    border-color: #404040;
 }
 
 .dark-theme .sidebar-header,
 .dark-theme .modal-header,
 .dark-theme .sidebar-footer,
 .dark-theme .modal-footer {
-  background: #1a202c;
-  border-color: #4a5568;
+    background-color: #2d2d2d;
+    border-color: #404040;
 }
 
 .dark-theme .sidebar-header h3,
@@ -718,8 +803,8 @@ export default {
 }
 
 .dark-theme .annotation-item {
-  background: #4a5568;
-  border-color: #718096;
+    background-color: #2d2d2d;
+    border-color: #404040;
 }
 
 .dark-theme .annotation-item.resolved {
@@ -732,11 +817,36 @@ export default {
 }
 
 .dark-theme .annotation-original-text {
-  background: #4a5568;
-  border-left-color: #63b3ed;
+  background: #494a4c;
+  border-left-color: #878787;
 }
 
-.dark-theme .annotation-original-text p {
+.dark-theme .original-text-content {
+  color: #cbd5e0;
+}
+
+.dark-theme .comment-text-content {
+  color: #e2e8f0;
+}
+
+.dark-theme .annotation-replies {
+  border-left-color: #718096;
+}
+
+.dark-theme .reply-item {
+  background: #2d3748;
+  border-color: #4a5568;
+}
+
+.dark-theme .reply-author {
+  color: #63b3ed;
+}
+
+.dark-theme .reply-time {
+  color: #a0aec0;
+}
+
+.dark-theme .reply-content {
   color: #cbd5e0;
 }
 

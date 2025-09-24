@@ -297,7 +297,8 @@
             
             const pxMatch = cssSize.match(/(\d+)px/);
             if (pxMatch) {
-                return Math.round(parseInt(pxMatch[1]) * 1.33 * 2); // px to pt * 2 (半点)
+                // 标准转换：1px = 0.75pt，Word使用半点单位，所以需要 * 0.75 * 2 = 1.5
+                return Math.round(parseInt(pxMatch[1]) * 0.75 * 2); // px to pt * 2 (半点)
             }
             
             const ptMatch = cssSize.match(/(\d+)pt/);

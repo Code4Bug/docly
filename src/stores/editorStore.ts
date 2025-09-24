@@ -29,7 +29,7 @@ export const useEditorStore = defineStore('editor', () => {
       if (block.data.text) {
         // 简单的单词计数，去除HTML标签
         const text = block.data.text.replace(/<[^>]*>/g, '');
-        count += text.trim().split(/\s+/).filter(word => word.length > 0).length;
+        count += text.trim().split(/\s+/).filter((word: string) => word.length > 0).length;
       }
     });
     return count;
@@ -121,7 +121,7 @@ export const useEditorStore = defineStore('editor', () => {
       console.log('editorData.value是否为null:', editorData.value === null);
     } catch (error) {
       console.error('加载文档失败，详细错误信息:', error);
-      console.error('错误堆栈:', error.stack);
+      console.error('错误堆栈:', (error as Error).stack);
       throw error;
     } finally {
       isLoading.value = false;

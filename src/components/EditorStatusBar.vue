@@ -236,9 +236,9 @@ export default {
   align-items: center;
   gap: 4px;
   padding: 4px 8px;
-  border: 1px solid #ddd;
+  border: none;
   border-radius: 4px;
-  background: #fff;
+  background: transparent;
   color: #666;
   font-size: 12px;
   cursor: pointer;
@@ -246,28 +246,23 @@ export default {
 }
 
 .readonly-toggle .toggle-button:hover {
-  background: #f5f5f5;
-  border-color: #ccc;
+  background: rgba(0, 0, 0, 0.05);
 }
 
 .readonly-toggle .toggle-button.readonly {
-  background: #fff3cd;
-  border-color: #ffc107;
   color: #856404;
 }
 
 .readonly-toggle .toggle-button.readonly:hover {
-  background: #ffeaa7;
+  background: rgba(255, 193, 7, 0.1);
 }
 
 .readonly-toggle .toggle-button.editable {
-  background: #d1ecf1;
-  border-color: #17a2b8;
   color: #0c5460;
 }
 
 .readonly-toggle .toggle-button.editable:hover {
-  background: #bee5eb;
+  background: rgba(23, 162, 184, 0.1);
 }
 
 .annotation-indicator {
@@ -332,8 +327,28 @@ export default {
   color: #fc8181;
 }
 
-.dark-theme .readonly-indicator {
+.dark-theme .readonly-toggle .toggle-button {
+  color: #a0aec0;
+}
+
+.dark-theme .readonly-toggle .toggle-button:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.dark-theme .readonly-toggle .toggle-button.readonly {
   color: #f6e05e;
+}
+
+.dark-theme .readonly-toggle .toggle-button.readonly:hover {
+  background: rgba(246, 224, 94, 0.1);
+}
+
+.dark-theme .readonly-toggle .toggle-button.editable {
+  color: #4fd1c7;
+}
+
+.dark-theme .readonly-toggle .toggle-button.editable:hover {
+  background: rgba(79, 209, 199, 0.1);
 }
 
 .dark-theme .annotation-indicator {

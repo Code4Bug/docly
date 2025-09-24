@@ -102,6 +102,8 @@ import EditorToolbar from './EditorToolbar.vue';
 import AnnotationSystem from './AnnotationSystem.vue';
 import EditorStatusBar from './EditorStatusBar.vue';
 import type { EditorConfig } from '../types';
+import { showMessage } from '../utils/Message';
+import { Annotation } from './AnnotationSystem.vue';
 
 // Props
 interface Props {
@@ -130,7 +132,7 @@ const charCount = ref(0);
 const currentTextColor = ref('#000000');
 const currentBgColor = ref('#ffffff');
 const currentFontFamily = ref('Arial, sans-serif');
-const currentFontSize = ref('14px');
+const currentFontSize = ref('10.5pt');
 
 
 // 悬浮提示相关状态
@@ -143,19 +145,7 @@ const tooltip = ref({
 
 // 批注相关状态
 const isAnnotationMode = ref(false);
-const annotations = ref<Array<{
-  id: string;
-  text: string;
-  content: string;
-  author: string;
-  timestamp: number;
-  position: {
-    startOffset: number;
-    endOffset: number;
-    blockId: string;
-  };
-  resolved: boolean;
-}>>([]);
+const annotations = ref<Array<Annotation>>([]);
 const showAnnotationPanel = ref(false);
 const selectedAnnotation = ref<string | null>(null);
 const annotationInput = ref('');
@@ -494,54 +484,7 @@ const handleImport = async (event: Event): Promise<void> => {
   }
 };
 
-/**
- * 显示消息提示
- * @param {string} text - 消息文本
- * @param {string} type - 消息类型 ('success' | 'error' | 'warning' | 'info')
- */
-const showMessage = (text: string, type: 'success' | 'error' | 'warning' | 'info' = 'info'): void => {
-  // 清除之前的消息
-  const existingMessages = document.querySelectorAll('.docly-message');
-  existingMessages.forEach(msg => msg.remove());
-  
-  // 创建消息元素
-  const messageEl = document.createElement('div');
-  messageEl.className = `docly-message message-${type}`;
-  messageEl.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    padding: 12px 16px;
-    border-radius: 6px;
-    color: white;
-    font-size: 14px;
-    z-index: 9999;
-    max-width: 300px;
-    word-wrap: break-word;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    transition: opacity 0.3s ease;
-  `;
-  
-  // 根据类型设置背景色
-  const colors = {
-    success: '#52c41a',
-    error: '#ff4d4f',
-    warning: '#faad14',
-    info: '#1890ff'
-  };
-  messageEl.style.backgroundColor = colors[type] || colors.info;
-  messageEl.textContent = text;
-  
-  // 添加到页面
-  document.body.appendChild(messageEl);
-  
-  // 3秒后自动移除
-  setTimeout(() => {
-    if (messageEl.parentNode) {
-      messageEl.parentNode.removeChild(messageEl);
-    }
-  }, 3000);
-};
+
 
 /**
  * 格式化文本
@@ -994,7 +937,7 @@ const applyFontFamily = (fontFamily: string): void => {
 
 /**
  * 应用字体大小
- * @param {string} fontSize - 字体大小
+ * @param {string} fontSize - 字体大小（支持px和pt单位）
  */
 const applyFontSize = (fontSize: string): void => {
   console.log('DoclyEditor applyFontSize 被调用:', fontSize);
@@ -1009,8 +952,19 @@ const applyFontSize = (fontSize: string): void => {
     return;
   }
 
-  // 将像素值转换为字号
-  const sizeValue = parseInt(fontSize.replace('px', ''));
+  // 处理不同单位的字体大小
+  let sizeValue: number;
+  if (fontSize.includes('pt')) {
+    // pt单位：直接使用数值
+    sizeValue = parseFloat(fontSize.replace('pt', ''));
+  } else if (fontSize.includes('px')) {
+    // px单位：转换为pt（1px = 0.75pt）
+    sizeValue = parseFloat(fontSize.replace('px', '')) * 0.75;
+  } else {
+    // 纯数字：当作pt处理
+    sizeValue = parseFloat(fontSize);
+  }
+
   const success = editorCore.value.execCommand('fontSize', sizeValue.toString());
   if (success) {
     currentFontSize.value = fontSize;
@@ -1108,17 +1062,13 @@ const createAnnotation = (selectedText: string, content: string): void => {
     return;
   }
 
-  const annotation = {
+  const annotation: Annotation = {
     id: `annotation-${Date.now()}`,
     text: selectedText,
     content: content,
     author: '当前用户', // 可以从用户系统获取
     timestamp: Date.now(),
-    position: {
-      startOffset: 0, // 需要根据实际选择位置计算
-      endOffset: selectedText.length,
-      blockId: 'current-block' // 需要获取当前块ID
-    },
+    user: '当前用户', // 可以从用户系统获取
     resolved: false
   };
 
@@ -1204,7 +1154,7 @@ const editAnnotation = (annotationId: string): void => {
   if (annotation) {
     selectedAnnotation.value = annotationId;
     annotationInput.value = annotation.content;
-    selectedText.value = annotation.text;
+    selectedText.value = annotation.text || '';
     isAnnotationMode.value = true;
     showMessage('编辑模式已开启', 'info');
   }
