@@ -38,6 +38,8 @@ export interface EditorInstance {
   destroy(): void;
   on(event: string, callback: Function): void;
   off(event: string, callback: Function): void;
+  setReadOnly(readOnly: boolean): Promise<void>;
+  isReadOnly(): boolean;
 }
 
 /**

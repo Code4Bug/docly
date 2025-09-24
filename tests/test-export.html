@@ -740,7 +740,7 @@
                 showStatus(`✅ DOCX文件生成成功！文件名: ${fileName}`, 'success');
                 
             } catch (error) {
-                console.error('生成DOCX时发生错误:', error);
+                Console.error('生成DOCX时发生错误:', error);
                 showStatus(`❌ 生成失败: ${error.message}`, 'error');
             } finally {
                 generateBtn.disabled = false;

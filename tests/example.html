@@ -282,7 +282,7 @@
         saveButton.click();
       },
       onChange: function(api, event) {
-        console.log('something changed', event);
+        Console.debug('something changed', event);
       }
     });
 
@@ -306,7 +306,7 @@
           cPreview.show(savedData, document.getElementById("output"));
         })
         .catch((error) => {
-          console.error('Saving error', error);
+          Console.error('Saving error', error);
         });
     });
 

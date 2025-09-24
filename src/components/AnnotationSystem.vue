@@ -7,7 +7,7 @@
       :class="{ 'dark-theme': isDarkTheme }"
     >
       <div class="sidebar-header unselectable">
-        <h3>批注列表</h3>
+        <h4>批注列表</h4>
         <button 
           @click="$emit('close-sidebar')" 
           class="close-btn"
@@ -310,31 +310,22 @@ export default {
 
 /* 批注侧边栏样式 */
 .annotation-sidebar {
-  position: fixed;
+  position: relative;
   top: 0;
   right: 0;
   width: 320px;
-  height: 100vh;
+  height: calc(100%);
   background: #ffffff;
   border-left: 1px solid #e0e0e0;
   box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
   z-index: 1000;
   display: flex;
   flex-direction: column;
-  animation: slideIn 0.3s ease-out;
-}
-
-@keyframes slideIn {
-  from {
-    transform: translateX(100%);
-  }
-  to {
-    transform: translateX(0);
-  }
+  /* animation: slideIn 0.3s ease-out; */
 }
 
 .sidebar-header {
-  padding: 16px;
+  padding: 4px 12px;
   border-bottom: 1px solid #e0e0e0;
   display: flex;
   justify-content: space-between;
@@ -342,7 +333,7 @@ export default {
   background: #f8f9fa;
 }
 
-.sidebar-header h3 {
+.sidebar-header h4 {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
@@ -357,7 +348,7 @@ export default {
   /* color: #666; */
   padding: 4px;
   border-radius: 4px;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   /* 移除按钮默认样式 */
   -webkit-appearance: none;
   -moz-appearance: none;
@@ -790,7 +781,7 @@ export default {
     border-color: #404040;
 }
 
-.dark-theme .sidebar-header h3,
+.dark-theme .sidebar-header h4,
 .dark-theme .modal-header h3,
 .dark-theme .annotation-author,
 .dark-theme .annotation-content p,

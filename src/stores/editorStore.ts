@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import type { EditorData, Comment, EditorInstance } from '../types';
+import { Console } from '../utils/Console';
 
 /**
  * 编辑器状态管理
@@ -54,7 +55,7 @@ export const useEditorStore = defineStore('editor', () => {
       // 自动同步编辑器数据
       try {
         const currentData = await instance.save();
-        console.log('自动同步编辑器数据:', currentData);
+        Console.debug('自动同步编辑器数据:', currentData);
         editorData.value = currentData;
       } catch (error) {
         console.warn('自动同步编辑器数据失败:', error);
@@ -66,10 +67,10 @@ export const useEditorStore = defineStore('editor', () => {
    * 更新编辑器数据
    */
   const updateEditorData = (data: EditorData) => {
-    console.log('updateEditorData 被调用，传入数据:', data);
-    console.log('更新前 editorData.value:', editorData.value);
+    Console.debug('updateEditorData 被调用，传入数据:', data);
+    Console.debug('更新前 editorData.value:', editorData.value);
     editorData.value = data;
-    console.log('更新后 editorData.value:', editorData.value);
+    Console.debug('更新后 editorData.value:', editorData.value);
     hasUnsavedChanges.value = false;
   };
 
@@ -78,7 +79,7 @@ export const useEditorStore = defineStore('editor', () => {
    */
   const saveDocument = async (): Promise<void> => {
     if (!editorInstance.value) {
-      console.warn('编辑器实例不存在，无法保存');
+      Console.warn('编辑器实例不存在，无法保存');
       return;
     }
 
@@ -87,7 +88,7 @@ export const useEditorStore = defineStore('editor', () => {
       const data = await editorInstance.value.save();
       updateEditorData(data);
     } catch (error) {
-      console.error('保存文档失败:', error);
+      Console.error('保存文档失败:', error);
       throw error;
     } finally {
       isSaving.value = false;
@@ -98,8 +99,8 @@ export const useEditorStore = defineStore('editor', () => {
    * 加载文档
    */
   const loadDocument = async (data: EditorData): Promise<void> => {
-    console.log('editorStore.loadDocument 开始加载文档，数据:', data);
-    console.log('检查编辑器实例状态:', {
+    Console.debug('editorStore.loadDocument 开始加载文档，数据:', data);
+    Console.debug('检查编辑器实例状态:', {
       hasInstance: !!editorInstance.value,
       instanceType: typeof editorInstance.value,
       instanceValue: editorInstance.value
@@ -113,15 +114,11 @@ export const useEditorStore = defineStore('editor', () => {
 
     try {
       isLoading.value = true;
-      console.log('调用编辑器实例的render方法...');
       await editorInstance.value.render(data);
-      console.log('编辑器render完成，更新编辑器数据...');
       updateEditorData(data);
-      console.log('文档加载完成，当前编辑器数据:', editorData.value);
-      console.log('editorData.value是否为null:', editorData.value === null);
     } catch (error) {
-      console.error('加载文档失败，详细错误信息:', error);
-      console.error('错误堆栈:', (error as Error).stack);
+      Console.error('加载文档失败，详细错误信息:', error);
+      Console.error('错误堆栈:', (error as Error).stack);
       throw error;
     } finally {
       isLoading.value = false;

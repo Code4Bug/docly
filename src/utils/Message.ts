@@ -1,9 +1,16 @@
+import { Console } from './Console.ts';
 /**
  * 显示消息提示
  * @param {string} text - 消息文本
- * @param {string} type - 消息类型 ('success' | 'error' | 'warning' | 'info')
+ * @param {string} type - 消息类型 ('success' | 'error' | 'warn' | 'info')
  */
-export const showMessage = (text: string, type: 'success' | 'error' | 'warning' | 'info' = 'info'): void => {
+const showMessage = (text: string, type: 'success' | 'error' | 'warn' | 'info', consoleTag: boolean = true): void => {
+  
+  if (consoleTag) {
+    Console[type](text)
+    return
+  }
+
   // 清除之前的消息
   const existingMessages = document.querySelectorAll('.docly-message');
   existingMessages.forEach(msg => msg.remove());
@@ -13,16 +20,16 @@ export const showMessage = (text: string, type: 'success' | 'error' | 'warning' 
   messageEl.className = `docly-message message-${type}`;
   messageEl.style.cssText = `
     position: fixed;
-    top: 20px;
+    bottom: 20px;
     right: 20px;
-    padding: 12px 16px;
-    border-radius: 6px;
+    padding: 8px 12px;
+    border-radius: 4px;
     color: white;
-    font-size: 14px;
+    font-size: 12px;
     z-index: 9999;
-    max-width: 300px;
+    max-width: 240px;
     word-wrap: break-word;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     transition: opacity 0.3s ease;
   `;
   
@@ -30,7 +37,7 @@ export const showMessage = (text: string, type: 'success' | 'error' | 'warning' 
   const colors = {
     success: '#52c41a',
     error: '#ff4d4f',
-    warning: '#faad14',
+    warn: '#faad14',
     info: '#1890ff'
   };
   messageEl.style.backgroundColor = colors[type] || colors.info;
@@ -46,3 +53,6 @@ export const showMessage = (text: string, type: 'success' | 'error' | 'warning' 
     }
   }, 3000);
 };
+
+// 导出函数
+export { showMessage };
