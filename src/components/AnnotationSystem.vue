@@ -29,14 +29,18 @@
           </div>
           
           <!-- 显示批注对应的原文 -->
-          <div v-if="annotation.text || annotation.range?.text" class="annotation-original-text">
+          <div v-if="annotation.range?.text" class="annotation-original-text">
             <label>原文：</label>
-            <p>{{ annotation.text || annotation.range?.text }}</p>
+            <div class="original-text-content">
+              "{{ annotation.range.text }}"
+            </div>
           </div>
           
           <div class="annotation-content">
             <label>批注：</label>
-            <p v-if="!annotation.editing">{{ annotation.content }}</p>
+            <div v-if="!annotation.editing" class="comment-text-content">
+              {{ annotation.content }}
+            </div>
             <textarea 
               v-else
               v-model="annotation.editContent"
@@ -44,6 +48,21 @@
               @keydown.enter.ctrl="confirmEdit(annotation)"
               @keydown.esc="cancelEdit(annotation)"
             ></textarea>
+          </div>
+          
+          <!-- 显示批注的回复 -->
+          <div v-if="annotation.replies && annotation.replies.length > 0" class="annotation-replies">
+            <div 
+              v-for="reply in annotation.replies" 
+              :key="reply.id"
+              class="reply-item"
+            >
+              <div class="reply-header">
+                <span class="reply-author">{{ reply.author || reply.user }}</span>
+                <span class="reply-time">{{ formatTime(reply.timestamp) }}</span>
+              </div>
+              <div class="reply-content">{{ reply.content }}</div>
+            </div>
           </div>
           
           <div class="annotation-actions">
@@ -172,6 +191,7 @@ interface Annotation {
   id: string;
   content: string;
   author: string;
+  user: string; // 用户名，与author相同
   timestamp: number;
   resolved: boolean;
   editing?: boolean;
@@ -182,6 +202,7 @@ interface Annotation {
     endOffset: number;
     text: string;
   };
+  replies?: Annotation[]; // 批注回复
 }
 
 // Props
@@ -386,6 +407,10 @@ export default {
   color: #666;
 }
 
+.dark-theme .annotation-time {
+  color: #999;
+}
+
 .annotation-original-text {
   margin-bottom: 8px;
   padding: 8px;
@@ -403,7 +428,11 @@ export default {
   text-align: left;
 }
 
-.annotation-original-text p {
+.dark-theme .annotation-original-text label {
+  color: #999;
+}
+
+.original-text-content {
   margin: 0;
   line-height: 1.4;
   color: #555;
@@ -425,12 +454,50 @@ export default {
   text-align: left;
 }
 
-.annotation-content p {
+.comment-text-content {
   margin: 0;
   line-height: 1.5;
   color: #333;
   font-size: 14px;
   text-align: left;
+}
+
+.annotation-replies {
+  margin-top: 12px;
+  padding-left: 16px;
+  border-left: 2px solid #e0e0e0;
+}
+
+.reply-item {
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  border: 1px solid #e9ecef;
+}
+
+.reply-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.reply-author {
+  font-weight: 600;
+  font-size: 12px;
+  color: #007bff;
+}
+
+.reply-time {
+  font-size: 11px;
+  color: #6c757d;
+}
+
+.reply-content {
+  font-size: 13px;
+  color: #495057;
+  line-height: 1.4;
 }
 
 .edit-textarea {
@@ -514,6 +581,7 @@ export default {
   padding: 16px;
   border-top: 1px solid #e0e0e0;
   background: #f8f9fa;
+  
 }
 
 .clear-btn {
@@ -693,16 +761,16 @@ export default {
 /* 暗色主题样式 */
 .annotation-sidebar.dark-theme,
 .annotation-modal.dark-theme {
-  background: #2d3748;
-  border-color: #4a5568;
+    background-color: #2d2d2d;
+    border-color: #404040;
 }
 
 .dark-theme .sidebar-header,
 .dark-theme .modal-header,
 .dark-theme .sidebar-footer,
 .dark-theme .modal-footer {
-  background: #1a202c;
-  border-color: #4a5568;
+    background-color: #2d2d2d;
+    border-color: #404040;
 }
 
 .dark-theme .sidebar-header h3,
@@ -718,8 +786,8 @@ export default {
 }
 
 .dark-theme .annotation-item {
-  background: #4a5568;
-  border-color: #718096;
+    background-color: #2d2d2d;
+    border-color: #404040;
 }
 
 .dark-theme .annotation-item.resolved {
@@ -736,7 +804,32 @@ export default {
   border-left-color: #63b3ed;
 }
 
-.dark-theme .annotation-original-text p {
+.dark-theme .original-text-content {
+  color: #cbd5e0;
+}
+
+.dark-theme .comment-text-content {
+  color: #e2e8f0;
+}
+
+.dark-theme .annotation-replies {
+  border-left-color: #718096;
+}
+
+.dark-theme .reply-item {
+  background: #2d3748;
+  border-color: #4a5568;
+}
+
+.dark-theme .reply-author {
+  color: #63b3ed;
+}
+
+.dark-theme .reply-time {
+  color: #a0aec0;
+}
+
+.dark-theme .reply-content {
   color: #cbd5e0;
 }
 

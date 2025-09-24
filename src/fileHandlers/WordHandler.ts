@@ -42,14 +42,86 @@ export class WordHandler {
   }
 
   /**
+   * 从主文档XML中提取批注范围对应的原文
+   * @param documentXml - 主文档XML内容
+   * @param commentRangeTextMap - 批注ID到原文的映射
+   */
+  private extractCommentRangeText(documentXml: string, commentRangeTextMap: Map<string, string>): void {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(documentXml, 'text/xml');
+    
+    // 查找所有批注范围标记
+    const commentRangeStarts = doc.querySelectorAll('w\\:commentRangeStart, commentRangeStart');
+    const commentRangeEnds = doc.querySelectorAll('w\\:commentRangeEnd, commentRangeEnd');
+    
+    // 为每个批注范围提取文本
+    commentRangeStarts.forEach(start => {
+      const commentId = start.getAttribute('w:id') || start.getAttribute('id');
+      if (!commentId) return;
+      
+      // 查找对应的结束标记
+      const endMarker = Array.from(commentRangeEnds).find(end => 
+        (end.getAttribute('w:id') || end.getAttribute('id')) === commentId
+      );
+      
+      if (endMarker) {
+        // 提取范围内的文本
+        const rangeText = this.extractTextBetweenNodes(start, endMarker);
+        if (rangeText.trim()) {
+          commentRangeTextMap.set(commentId, rangeText.trim());
+        }
+      }
+    });
+  }
+
+  /**
+   * 提取两个节点之间的文本内容
+   * @param startNode - 开始节点
+   * @param endNode - 结束节点
+   * @returns 提取的文本内容
+   */
+  private extractTextBetweenNodes(startNode: Element, endNode: Element): string {
+    let text = '';
+    let currentNode: Node | null = startNode.nextSibling;
+    
+    while (currentNode && currentNode !== endNode) {
+      if (currentNode.nodeType === Node.TEXT_NODE) {
+        text += currentNode.textContent || '';
+      } else if (currentNode.nodeType === Node.ELEMENT_NODE) {
+        const element = currentNode as Element;
+        // 查找文本元素
+        const textElements = element.querySelectorAll('w\\:t, t');
+        textElements.forEach(textEl => {
+          text += textEl.textContent || '';
+        });
+        
+        // 如果没有找到w:t元素，直接获取文本内容
+        if (textElements.length === 0) {
+          text += element.textContent || '';
+        }
+      }
+      currentNode = currentNode.nextSibling;
+    }
+    
+    return text;
+  }
+
+  /**
    * 解析Word XML中的注释并转换为Editor.js格式
    * @param xmlContent - Word文档的XML内容
+   * @param documentXml - 主文档XML内容，用于提取批注对应的原文
    * @returns Editor.js注释数据
    */
-  private parseWordXmlToComments(xmlContent: string): EditorData['comments'] {
+  private parseWordXmlToComments(xmlContent: string, documentXml?: string): EditorData['comments'] {
     const parser = new DOMParser();
     const doc = parser.parseFromString(xmlContent, 'text/xml');
     const comments: EditorData['comments'] = [];
+    
+    // 如果有主文档XML，解析批注范围映射
+    const commentRangeTextMap = new Map<string, string>();
+    if (documentXml) {
+      this.extractCommentRangeText(documentXml, commentRangeTextMap);
+    }
     
     // 获取所有注释元素
     const commentElements = doc.querySelectorAll('w\\:comment, comment');
@@ -72,6 +144,9 @@ export class WordHandler {
         commentContent = comment.textContent || '';
       }
       
+      // 获取批注对应的原文
+      const originalText = commentRangeTextMap.get(commentId || '') || '';
+      
       // 解析时间戳
       let timestamp = Date.now();
       if (commentDate) {
@@ -89,8 +164,8 @@ export class WordHandler {
         timestamp: timestamp,
         range: {
           startOffset: 0,
-          endOffset: commentContent.trim().length,
-          text: commentContent.trim()
+          endOffset: originalText.length || commentContent.trim().length,
+          text: originalText || commentContent.trim()
         },
         // Word文档特有字段
         author: commentAuthor || '未知作者',
@@ -326,7 +401,7 @@ export class WordHandler {
     // 解析批注信息（如果提供了批注XML）
     let comments: Comment[] = [];
     if (commentsXml) {
-      const parsedComments = this.parseWordXmlToComments(commentsXml);
+      const parsedComments = this.parseWordXmlToComments(commentsXml, xmlContent);
       comments = parsedComments || [];
     }
     
