@@ -2,25 +2,39 @@
 
 Docly 是一款基于 Vue 3 + Vite 的现代化在线文档编辑器，专注于 Word 文件的编辑、导入导出与高级文本处理功能。
 
-## 核心特性
+## 界面预览
 
+![Docly 编辑器界面 白色](./snapshots/light_theme.jpg)
+![Docly 编辑器界面 黑色](./snapshots/dark_theme.jpg)
+
+*Docly 编辑器主界面展示了完整的富文本编辑功能，包括工具栏、编辑区域和状态栏*
+
+## 功能特色
+
+### 🚀 现代化架构
 - 基于 Vue 3 + Vite 的现代化架构
-- 强大的富文本编辑功能（基于 Editor.js）
-- 完整的 Word 文档导入导出支持
-- 高级文本分析与样式保持功能
-- 智能字体处理（支持楷体、仿宋、小标宋等中文字体）
-- 插件化架构，易于扩展
+- 组合式API架构设计
 - 响应式设计，支持多设备
-- 实时保存与状态管理
-- 文档预览功能
-- 完整的批注系统支持
+
+### ✏️ 强大的编辑功能
+- 强大的富文本编辑功能（基于 Editor.js）
 - 多种编辑器工具（标题、段落、列表、引用、表格、代码块、图片、下划线、标记等）
 - 自定义字体样式和格式化选项
 - 文档结构化编辑和导航
+
+### 📄 Word 文档支持
+- 完整的 Word 文档导入导出支持
+- 高级文本分析与样式保持功能
+- 智能字体处理（支持楷体、仿宋、小标宋等中文字体）
+- 文档预览功能
+
+### 🔧 高级功能
+- 完整的批注系统支持
 - 颜色选择器和主题支持
 - 编辑器状态栏显示
 - 工具提示系统
-- 组合式API架构设计
+- 插件化架构，易于扩展
+- 实时保存与状态管理
 
 ## 技术栈
 
@@ -98,39 +112,36 @@ src/
 
 ## 快速开始
 
-### 环境要求
+### 📋 环境要求
 
 - Node.js 16.0+ 
 - npm 7.0+ 或 yarn 1.22+
 - 现代浏览器（Chrome 88+, Firefox 85+, Safari 14+, Edge 88+）
 
-### 安装依赖
+### 🛠️ 安装与运行
 
-```bash
-npm install
-```
+1. **安装依赖**
+   ```bash
+   npm install
+   ```
 
-### 启动开发服务器
+2. **启动开发服务器**
+   ```bash
+   npm run dev
+   ```
+   访问 `http://localhost:5173` 查看应用
 
-```bash
-npm run dev
-```
+3. **构建生产版本**
+   ```bash
+   npm run build
+   ```
 
-访问 `http://localhost:5173` 查看应用
+4. **预览生产构建**
+   ```bash
+   npm run preview
+   ```
 
-### 构建生产版本
-
-```bash
-npm run build
-```
-
-### 预览生产构建
-
-```bash
-npm run preview
-```
-
-## 核心功能使用
+## 📚 核心功能使用
 
 ### 编辑器初始化
 
@@ -179,7 +190,7 @@ const styles = analyzer.extractStyles(element)
 const fontInfo = analyzer.processFontFamily(styles.fontFamily)
 ```
 
-## API 文档
+## 📖 API 文档
 
 ### EditorCore
 
@@ -282,7 +293,7 @@ const {
 } = useTheme()
 ```
 
-## 开发指南
+## 🛠️ 开发指南
 
 ### 开发环境设置
 
@@ -428,7 +439,7 @@ npm run preview
 npm run analyze
 ```
 
-## 贡献指南
+## 🤝 贡献指南
 
 我们欢迎所有形式的贡献！请遵循以下步骤：
 
@@ -450,7 +461,7 @@ npm run analyze
 - `test`: 测试相关
 - `chore`: 构建过程或辅助工具的变动
 
-## 常见问题
+## ❓ 常见问题
 
 ### Q: 如何添加自定义字体支持？
 
@@ -484,6 +495,6 @@ A: 修改 <mcfile name="ColorPicker.vue" path="src/components/ColorPicker.vue"><
 
 A: 项目使用 Pinia 进行全局状态管理（<mcfile name="editorStore.ts" path="src/stores/editorStore.ts"></mcfile>），同时提供 <mcsymbol name="useEditorState" filename="useEditorState.ts" path="src/composables/useEditorState.ts" startline="1" type="function"></mcsymbol> 组合式函数进行局部状态管理。
 
-## 许可证
+## 📄 许可证
 
 本项目采用 Apache License 2.0 许可证 - 详见 [LICENSE](LICENSE) 文件。

@@ -261,6 +261,12 @@
 .toolbar-btn svg {
   width: 14px;
   height: 14px;
+  fill: rgb(30, 30, 30);
+}
+
+.dark-theme .toolbar-btn svg {
+  width: 14px;
+  height: 14px;
   fill: rgb(224, 224, 224);
 }
 

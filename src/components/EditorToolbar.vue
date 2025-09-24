@@ -597,8 +597,8 @@ export default {
 }
 
 .font-category {
-  border-color: #4285f4;
-  background: rgba(66, 133, 244, 0.05);
+      border: 1px solid #dadce0;
+  background: rgba(255, 255, 255, 0.8);
 }
 
 .layout-category {
@@ -627,9 +627,9 @@ export default {
   align-items: center;
   gap: 4px;
   padding: 8px 12px;
-  border: 1px solid #ea4335;
+  border: 1px solid #e1e5e9;
   border-radius: 6px;
-  background: rgba(234, 67, 53, 0.05);
+  background: #ffffff;
 }
 
 .toolbar-btn {
