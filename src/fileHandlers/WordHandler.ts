@@ -324,36 +324,8 @@ export class WordHandler {
   private parseWordXmlToEditorData(xmlContent: string, commentsXml?: string): EditorData {
     const parser = new DOMParser();
     const doc = parser.parseFromString(xmlContent, 'text/xml');
-    const blocks: any[] = [];
-    
-    // 解析批注引用映射
-    const commentRangeMap = new Map<string, { startId: string; endId: string; commentId: string }>();
-    
-    // 查找批注范围标记
-    const commentRangeStarts = doc.querySelectorAll('w\\:commentRangeStart, commentRangeStart');
-    const commentRangeEnds = doc.querySelectorAll('w\\:commentRangeEnd, commentRangeEnd');
-    const commentReferences = doc.querySelectorAll('w\\:commentReference, commentReference');
-    
-    // 建立批注范围映射
-    commentRangeStarts.forEach(start => {
-      const commentId = start.getAttribute('w:id') || start.getAttribute('id');
-      if (commentId) {
-        const existing = commentRangeMap.get(commentId) || { startId: '', endId: '', commentId };
-        existing.startId = commentId;
-        existing.commentId = commentId;
-        commentRangeMap.set(commentId, existing);
-      }
-    });
-    
-    commentRangeEnds.forEach(end => {
-      const commentId = end.getAttribute('w:id') || end.getAttribute('id');
-      if (commentId) {
-        const existing = commentRangeMap.get(commentId) || { startId: '', endId: '', commentId };
-        existing.endId = commentId;
-        existing.commentId = commentId;
-        commentRangeMap.set(commentId, existing);
-      }
-    });
+    console.log('解析后的XML文档:', doc);
+    const blocks: any[] = []
     
     // 获取所有段落元素
     const paragraphs = doc.querySelectorAll('w\\:p, p');
@@ -361,16 +333,19 @@ export class WordHandler {
     paragraphs.forEach((p, index) => {
       const blockId = `block-${Date.now()}-${index}`;
       
+      // 解析段落属性
+      const pPrElement = p.querySelector('w\\:pPr, pPr');
+      const paragraphStyles = this.parseParagraphProperties(pPrElement);
+      
       // 检查是否是标题
-      const styleElement = p.querySelector('w\\:pStyle, pStyle');
-      const styleVal = styleElement?.getAttribute('w:val') || styleElement?.getAttribute('val');
+      const styleElement = pPrElement?.querySelector('w\\:pStyle, pStyle');
+      const styleVal = styleElement?.getAttribute('w:val') || styleElement?.getAttribute('val'); 
       
-      // 提取文本内容和批注信息
-      const textElements = p.querySelectorAll('w\\:t, t');
-      let text = '';
+      // 解析格式化的文本运行
+      const formattedRuns = this.parseFormattedTextRuns(p);
+      
+      // 提取批注信息
       const blockCommentIds: string[] = [];
-      
-      // 检查段落中的批注引用
       const commentRefs = p.querySelectorAll('w\\:commentReference, commentReference');
       commentRefs.forEach(ref => {
         const commentId = ref.getAttribute('w:id') || ref.getAttribute('id');
@@ -379,12 +354,20 @@ export class WordHandler {
         }
       });
       
-      textElements.forEach(t => {
-        text += t.textContent || '';
-      });
+      // 合并所有文本运行的文本内容
+      let combinedText = '';
+      if (formattedRuns.length > 0) {
+        combinedText = formattedRuns.map(run => run.text).join('');
+      } else {
+        // 如果没有格式化运行，使用传统方法提取文本
+        const textElements = p.querySelectorAll('w\\:t, t');
+        textElements.forEach(t => {
+          combinedText += t.textContent || '';
+        });
+      }
       
       // 跳过空段落
-      if (!text.trim()) {
+      if (!combinedText.trim()) {
         return;
       }
       
@@ -392,7 +375,11 @@ export class WordHandler {
       let blockData: any = {
         id: blockId,
         data: {
-          text: text.trim()
+          text: combinedText.trim(),
+          // 保存段落样式
+          paragraphStyles: paragraphStyles,
+          // 保存格式化的文本运行信息
+          formattedRuns: formattedRuns.length > 0 ? formattedRuns : undefined
         }
       };
       
@@ -1310,4 +1297,260 @@ export class WordHandler {
     </w:font>
 </w:fonts>`;
   }
+
+  /**
+   * 解析段落属性 (w:pPr) 中的样式信息
+   * @param pPrElement - 段落属性元素
+   * @returns 解析后的段落样式对象
+   */
+  private parseParagraphProperties(pPrElement: Element | null): any {
+    if (!pPrElement) return {};
+
+    const styles: any = {};
+
+    // 解析对齐方式
+    const jcElement = pPrElement.querySelector('w\\:jc, jc');
+    if (jcElement) {
+      const alignment = jcElement.getAttribute('w:val') || jcElement.getAttribute('val');
+      switch (alignment) {
+        case 'center':
+          styles.textAlign = 'center';
+          break;
+        case 'right':
+          styles.textAlign = 'right';
+          break;
+        case 'justify':
+          styles.textAlign = 'justify';
+          break;
+        case 'left':
+        default:
+          styles.textAlign = 'left';
+          break;
+      }
+    }
+
+    // 解析行间距
+    const spacingElement = pPrElement.querySelector('w\\:spacing, spacing');
+    if (spacingElement) {
+      const line = spacingElement.getAttribute('w:line') || spacingElement.getAttribute('line');
+      const lineRule = spacingElement.getAttribute('w:lineRule') || spacingElement.getAttribute('lineRule');
+      
+      if (line && lineRule) {
+        if (lineRule === 'exact') {
+          // 精确行距，单位为 twips (1/20 point)
+          styles.lineHeight = `${Math.round(parseInt(line) / 20)}pt`;
+        } else if (lineRule === 'atLeast') {
+          // 最小行距
+          styles.lineHeight = `${Math.round(parseInt(line) / 20)}pt`;
+        } else if (lineRule === 'auto') {
+          // 自动行距，通常是倍数
+          styles.lineHeight = (parseInt(line) / 240).toString();
+        }
+      }
+    }
+
+    // 解析缩进
+    const indElement = pPrElement.querySelector('w\\:ind, ind');
+    if (indElement) {
+      const left = indElement.getAttribute('w:left') || indElement.getAttribute('left');
+      const right = indElement.getAttribute('w:right') || indElement.getAttribute('right');
+      const firstLine = indElement.getAttribute('w:firstLine') || indElement.getAttribute('firstLine');
+      const hanging = indElement.getAttribute('w:hanging') || indElement.getAttribute('hanging');
+
+      if (left) {
+        styles.marginLeft = `${Math.round(parseInt(left) / 20)}pt`;
+      }
+      if (right) {
+        styles.marginRight = `${Math.round(parseInt(right) / 20)}pt`;
+      }
+      if (firstLine) {
+        styles.textIndent = `${Math.round(parseInt(firstLine) / 20)}pt`;
+      } else if (hanging) {
+        styles.textIndent = `-${Math.round(parseInt(hanging) / 20)}pt`;
+      }
+    }
+
+    // 解析段前段后间距
+    const spacingBefore = spacingElement?.getAttribute('w:before') || spacingElement?.getAttribute('before');
+    const spacingAfter = spacingElement?.getAttribute('w:after') || spacingElement?.getAttribute('after');
+    
+    if (spacingBefore) {
+      styles.marginTop = `${Math.round(parseInt(spacingBefore) / 20)}pt`;
+    }
+    if (spacingAfter) {
+      styles.marginBottom = `${Math.round(parseInt(spacingAfter) / 20)}pt`;
+    }
+
+    return styles;
+  }
+
+  /**
+   * 解析文本运行属性 (w:rPr) 中的格式信息
+   * @param rPrElement - 文本运行属性元素
+   * @returns 解析后的文本样式对象
+   */
+  private parseRunProperties(rPrElement: Element | null): any {
+    if (!rPrElement) return {};
+
+    const styles: any = {};
+
+    // 解析字体信息
+    const rFontsElement = rPrElement.querySelector('w\\:rFonts, rFonts');
+    if (rFontsElement) {
+      const fontInfo = this.extractFontDefinitions(rFontsElement);
+      if (fontInfo.fontFamily) {
+        styles.fontFamily = fontInfo.fontFamily;
+      }
+    }
+
+    // 解析字体大小
+    const szElement = rPrElement.querySelector('w\\:sz, sz');
+    if (szElement) {
+      const size = szElement.getAttribute('w:val') || szElement.getAttribute('val');
+      if (size) {
+        // Word中字体大小单位是半点 (half-points)
+        styles.fontSize = `${parseInt(size) / 2}pt`;
+      }
+    }
+
+    // 解析字体颜色
+    const colorElement = rPrElement.querySelector('w\\:color, color');
+    if (colorElement) {
+      const color = colorElement.getAttribute('w:val') || colorElement.getAttribute('val');
+      if (color && color !== 'auto') {
+        styles.color = `#${color}`;
+      }
+    }
+
+    // 解析粗体
+    const boldElement = rPrElement.querySelector('w\\:b, b');
+    if (boldElement) {
+      const val = boldElement.getAttribute('w:val') || boldElement.getAttribute('val');
+      if (val !== '0' && val !== 'false') {
+        styles.fontWeight = 'bold';
+      }
+    }
+
+    // 解析斜体
+    const italicElement = rPrElement.querySelector('w\\:i, i');
+    if (italicElement) {
+      const val = italicElement.getAttribute('w:val') || italicElement.getAttribute('val');
+      if (val !== '0' && val !== 'false') {
+        styles.fontStyle = 'italic';
+      }
+    }
+
+    // 解析下划线
+    const underlineElement = rPrElement.querySelector('w\\:u, u');
+    if (underlineElement) {
+      const val = underlineElement.getAttribute('w:val') || underlineElement.getAttribute('val');
+      if (val && val !== 'none') {
+        styles.textDecoration = 'underline';
+      }
+    }
+
+    // 解析删除线
+    const strikeElement = rPrElement.querySelector('w\\:strike, strike');
+    if (strikeElement) {
+      const val = strikeElement.getAttribute('w:val') || strikeElement.getAttribute('val');
+      if (val !== '0' && val !== 'false') {
+        styles.textDecoration = styles.textDecoration ? 
+          `${styles.textDecoration} line-through` : 'line-through';
+      }
+    }
+
+    // 解析背景色/高亮
+    const shdElement = rPrElement.querySelector('w\\:shd, shd');
+    if (shdElement) {
+      const fill = shdElement.getAttribute('w:fill') || shdElement.getAttribute('fill');
+      if (fill && fill !== 'auto' && fill !== 'FFFFFF') {
+        styles.backgroundColor = `#${fill}`;
+      }
+    }
+
+    // 解析上标/下标
+    const vertAlignElement = rPrElement.querySelector('w\\:vertAlign, vertAlign');
+    if (vertAlignElement) {
+      const val = vertAlignElement.getAttribute('w:val') || vertAlignElement.getAttribute('val');
+      if (val === 'superscript') {
+        styles.verticalAlign = 'super';
+      } else if (val === 'subscript') {
+        styles.verticalAlign = 'sub';
+      }
+    }
+
+    return styles;
+  }
+
+  /**
+   * 从 w:rFonts 元素中提取字体定义信息
+   * @param rFontsElement - 字体定义元素
+   * @returns 字体信息对象
+   */
+  private extractFontDefinitions(rFontsElement: Element): any {
+    const fontInfo: any = {};
+
+    // 获取各种字体定义
+    const ascii = rFontsElement.getAttribute('w:ascii') || rFontsElement.getAttribute('ascii');
+    const hAnsi = rFontsElement.getAttribute('w:hAnsi') || rFontsElement.getAttribute('hAnsi');
+    const eastAsia = rFontsElement.getAttribute('w:eastAsia') || rFontsElement.getAttribute('eastAsia');
+    const cs = rFontsElement.getAttribute('w:cs') || rFontsElement.getAttribute('cs');
+    const hint = rFontsElement.getAttribute('w:hint') || rFontsElement.getAttribute('hint');
+
+    // 根据提示选择合适的字体
+    if (hint === 'eastAsia' && eastAsia) {
+      fontInfo.fontFamily = eastAsia;
+      fontInfo.fontType = 'eastAsia';
+    } else if (ascii) {
+      fontInfo.fontFamily = ascii;
+      fontInfo.fontType = 'ascii';
+    } else if (hAnsi) {
+      fontInfo.fontFamily = hAnsi;
+      fontInfo.fontType = 'hAnsi';
+    } else if (cs) {
+      fontInfo.fontFamily = cs;
+      fontInfo.fontType = 'cs';
+    }
+
+    // 保存所有字体定义以备后用
+    fontInfo.fonts = {
+      ascii,
+      hAnsi,
+      eastAsia,
+      cs
+    };
+
+    return fontInfo;
+  }
+
+  /**
+   * 处理同一段落中不同文本运行的混合格式
+   * @param paragraph - 段落元素
+   * @returns 包含格式化文本片段的数组
+   */
+  private parseFormattedTextRuns(paragraph: Element): any[] {
+    const runs: any[] = [];
+    const textRuns = paragraph.querySelectorAll('w\\:r, r');
+
+    textRuns.forEach((run, index) => {
+      const rPrElement = run.querySelector('w\\:rPr, rPr');
+      const textElements = run.querySelectorAll('w\\:t, t');
+      
+      let text = '';
+      textElements.forEach(t => {
+        text += t.textContent || '';
+      });
+
+      if (text.trim()) {
+        const runStyles = this.parseRunProperties(rPrElement);
+        runs.push({
+          text: text,
+          styles: runStyles,
+          index: index
+        });
+      }
+    });
+
+    return runs;
+   }
 }
