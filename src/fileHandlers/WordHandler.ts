@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import type { EditorData } from '../types';
+import type { EditorData, Comment } from '../types';
 
 /**
  * Word文档处理器
@@ -24,9 +24,14 @@ export class WordHandler {
       if (!documentXml) {
         throw new Error('无法找到Word文档内容');
       }
-      
+  
       // 解析XML并转换为Editor.js数据
       const editorData = this.parseWordXmlToEditorData(documentXml);
+
+      const commentXml = await zip.file('word/comments.xml')?.async('text');
+      if (commentXml) {
+        editorData.comments = this.parseWordXmlToComments(commentXml);
+      }
       
       console.log('Word文档导入成功:', editorData);
       return editorData;
@@ -34,6 +39,118 @@ export class WordHandler {
       console.error('导入Word文档时发生错误:', error);
       throw new Error(`导入失败: ${(error as Error).message}`);
     }
+  }
+
+  /**
+   * 解析Word XML中的注释并转换为Editor.js格式
+   * @param xmlContent - Word文档的XML内容
+   * @returns Editor.js注释数据
+   */
+  private parseWordXmlToComments(xmlContent: string): EditorData['comments'] {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xmlContent, 'text/xml');
+    const comments: EditorData['comments'] = [];
+    
+    // 获取所有注释元素
+    const commentElements = doc.querySelectorAll('w\\:comment, comment');
+    
+    commentElements.forEach((comment) => {
+      const commentId = comment.getAttribute('w:id') || comment.getAttribute('id');
+      const commentAuthor = comment.getAttribute('w:author') || comment.getAttribute('author');
+      const commentDate = comment.getAttribute('w:date') || comment.getAttribute('date');
+      const commentInitials = comment.getAttribute('w:initials') || comment.getAttribute('initials');
+      
+      // 提取批注的文本内容
+      let commentContent = '';
+      const textElements = comment.querySelectorAll('w\\:t, t');
+      textElements.forEach(textEl => {
+        commentContent += textEl.textContent || '';
+      });
+      
+      // 如果没有找到w:t元素，使用整个注释的文本内容
+      if (!commentContent.trim()) {
+        commentContent = comment.textContent || '';
+      }
+      
+      // 解析时间戳
+      let timestamp = Date.now();
+      if (commentDate) {
+        const parsedDate = new Date(commentDate);
+        if (!isNaN(parsedDate.getTime())) {
+          timestamp = parsedDate.getTime();
+        }
+      }
+      
+      // 创建批注对象
+      const commentObj: Comment = {
+        id: commentId || `comment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        content: commentContent.trim(),
+        user: commentAuthor || '未知作者',
+        timestamp: timestamp,
+        range: {
+          startOffset: 0,
+          endOffset: commentContent.trim().length,
+          text: commentContent.trim()
+        },
+        // Word文档特有字段
+        author: commentAuthor || '未知作者',
+        date: commentDate || new Date(timestamp).toISOString(),
+        initials: commentInitials || (commentAuthor ? commentAuthor.substring(0, 2).toUpperCase() : 'UN'),
+        resolved: false
+      };
+      
+      // 检查是否有回复批注（嵌套的批注）
+      const replyElements = comment.querySelectorAll('w\\:comment, comment');
+      if (replyElements.length > 1) {
+        commentObj.replies = [];
+        // 跳过第一个元素（它是父批注本身）
+        for (let i = 1; i < replyElements.length; i++) {
+          const reply = replyElements[i];
+          const replyId = reply.getAttribute('w:id') || reply.getAttribute('id');
+          const replyAuthor = reply.getAttribute('w:author') || reply.getAttribute('author');
+          const replyDate = reply.getAttribute('w:date') || reply.getAttribute('date');
+          
+          let replyContent = '';
+          const replyTextElements = reply.querySelectorAll('w\\:t, t');
+          replyTextElements.forEach(textEl => {
+            replyContent += textEl.textContent || '';
+          });
+          
+          if (!replyContent.trim()) {
+            replyContent = reply.textContent || '';
+          }
+          
+          let replyTimestamp = Date.now();
+          if (replyDate) {
+            const parsedReplyDate = new Date(replyDate);
+            if (!isNaN(parsedReplyDate.getTime())) {
+              replyTimestamp = parsedReplyDate.getTime();
+            }
+          }
+          
+          commentObj.replies.push({
+            id: replyId || `reply-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            content: replyContent.trim(),
+            user: replyAuthor || '未知作者',
+            timestamp: replyTimestamp,
+            range: {
+              startOffset: 0,
+              endOffset: replyContent.trim().length,
+              text: replyContent.trim()
+            },
+            author: replyAuthor || '未知作者',
+            date: replyDate || new Date(replyTimestamp).toISOString(),
+            parentId: commentObj.id,
+            resolved: false
+          });
+        }
+      }
+      
+      comments.push(commentObj);
+    });
+    
+    console.log(`从Word文档中提取了 ${comments.length} 个批注`);
+    return comments;
   }
 
   /**
@@ -69,12 +186,42 @@ export class WordHandler {
   /**
    * 解析Word XML并转换为Editor.js数据
    * @param xmlContent - Word文档的XML内容
+   * @param commentsXml - Word文档的批注XML内容（可选）
    * @returns Editor.js数据
    */
-  private parseWordXmlToEditorData(xmlContent: string): EditorData {
+  private parseWordXmlToEditorData(xmlContent: string, commentsXml?: string): EditorData {
     const parser = new DOMParser();
     const doc = parser.parseFromString(xmlContent, 'text/xml');
     const blocks: any[] = [];
+    
+    // 解析批注引用映射
+    const commentRangeMap = new Map<string, { startId: string; endId: string; commentId: string }>();
+    
+    // 查找批注范围标记
+    const commentRangeStarts = doc.querySelectorAll('w\\:commentRangeStart, commentRangeStart');
+    const commentRangeEnds = doc.querySelectorAll('w\\:commentRangeEnd, commentRangeEnd');
+    const commentReferences = doc.querySelectorAll('w\\:commentReference, commentReference');
+    
+    // 建立批注范围映射
+    commentRangeStarts.forEach(start => {
+      const commentId = start.getAttribute('w:id') || start.getAttribute('id');
+      if (commentId) {
+        const existing = commentRangeMap.get(commentId) || { startId: '', endId: '', commentId };
+        existing.startId = commentId;
+        existing.commentId = commentId;
+        commentRangeMap.set(commentId, existing);
+      }
+    });
+    
+    commentRangeEnds.forEach(end => {
+      const commentId = end.getAttribute('w:id') || end.getAttribute('id');
+      if (commentId) {
+        const existing = commentRangeMap.get(commentId) || { startId: '', endId: '', commentId };
+        existing.endId = commentId;
+        existing.commentId = commentId;
+        commentRangeMap.set(commentId, existing);
+      }
+    });
     
     // 获取所有段落元素
     const paragraphs = doc.querySelectorAll('w\\:p, p');
@@ -86,9 +233,20 @@ export class WordHandler {
       const styleElement = p.querySelector('w\\:pStyle, pStyle');
       const styleVal = styleElement?.getAttribute('w:val') || styleElement?.getAttribute('val');
       
-      // 提取文本内容
+      // 提取文本内容和批注信息
       const textElements = p.querySelectorAll('w\\:t, t');
       let text = '';
+      const blockCommentIds: string[] = [];
+      
+      // 检查段落中的批注引用
+      const commentRefs = p.querySelectorAll('w\\:commentReference, commentReference');
+      commentRefs.forEach(ref => {
+        const commentId = ref.getAttribute('w:id') || ref.getAttribute('id');
+        if (commentId) {
+          blockCommentIds.push(commentId);
+        }
+      });
+      
       textElements.forEach(t => {
         text += t.textContent || '';
       });
@@ -98,37 +256,34 @@ export class WordHandler {
         return;
       }
       
+      // 创建基础块数据
+      let blockData: any = {
+        id: blockId,
+        data: {
+          text: text.trim()
+        }
+      };
+      
+      // 如果有关联的批注，添加批注ID信息
+      if (blockCommentIds.length > 0) {
+        blockData.data.commentIds = blockCommentIds;
+      }
+      
       // 根据样式确定块类型
       if (styleVal && styleVal.startsWith('Heading')) {
         const level = parseInt(styleVal.replace('Heading', '')) || 1;
-        blocks.push({
-          id: blockId,
-          type: 'header',
-          data: {
-            text: text.trim(),
-            level: Math.min(level, 6)
-          }
-        });
+        blockData.type = 'header';
+        blockData.data.level = Math.min(level, 6);
       } else if (styleVal === 'Quote') {
-        blocks.push({
-          id: blockId,
-          type: 'quote',
-          data: {
-            text: text.trim(),
-            caption: '',
-            alignment: 'left'
-          }
-        });
+        blockData.type = 'quote';
+        blockData.data.caption = '';
+        blockData.data.alignment = 'left';
       } else {
         // 默认为段落
-        blocks.push({
-          id: blockId,
-          type: 'paragraph',
-          data: {
-            text: text.trim()
-          }
-        });
+        blockData.type = 'paragraph';
       }
+      
+      blocks.push(blockData);
     });
     
     // 处理表格
@@ -162,27 +317,24 @@ export class WordHandler {
           type: 'table',
           data: {
             withHeadings: true,
-            content: content
+            content
           }
         });
       }
     });
     
-    // 如果没有找到任何内容，添加一个默认段落
-    if (blocks.length === 0) {
-      blocks.push({
-        id: `block-${Date.now()}`,
-        type: 'paragraph',
-        data: {
-          text: '文档导入成功，但未找到可识别的内容。'
-        }
-      });
+    // 解析批注信息（如果提供了批注XML）
+    let comments: Comment[] = [];
+    if (commentsXml) {
+      const parsedComments = this.parseWordXmlToComments(commentsXml);
+      comments = parsedComments || [];
     }
     
     return {
       time: Date.now(),
-      blocks: blocks,
-      version: '2.28.2'
+      blocks,
+      version: '2.28.2',
+      comments
     };
   }
   
@@ -190,11 +342,6 @@ export class WordHandler {
    * 将Editor.js数据转换为HTML字符串
    * @param editorData - Editor.js数据
    * @returns HTML字符串
-   */
-  /**
-   * 将Editor.js数据转换为HTML，优先使用保存的htmlContent
-   * @param editorData - Editor.js数据
-   * @returns 转换后的HTML字符串
    */
   private convertEditorDataToHtml(editorData: EditorData): string {
     /**
@@ -489,7 +636,8 @@ export class WordHandler {
     
     const pxMatch = cssSize.match(/(\d+)px/);
     if (pxMatch) {
-      return Math.round(parseInt(pxMatch[1]) * 1.33 * 2); // px to pt * 2 (半点)
+      // 标准转换：1px = 0.75pt，Word使用半点单位，所以需要 * 0.75 * 2 = 1.5
+      return Math.round(parseInt(pxMatch[1]) * 0.75 * 2); // px to pt * 2 (半点)
     }
     
     const ptMatch = cssSize.match(/(\d+)pt/);

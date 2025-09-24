@@ -928,7 +928,7 @@ destroy(): void {
 
   /**
    * 应用字体大小到选中文本或当前位置
-   * @param fontSize - 字体大小（像素值字符串，如 '16'）
+   * @param fontSize - 字体大小（支持px和pt单位，如 '16px' 或 '12pt'）
    * @returns 是否成功
    */
   private applyFontSizeToCurrentBlock(fontSize: string): boolean {
@@ -946,7 +946,7 @@ destroy(): void {
       }
 
       const range = selection.getRangeAt(0);
-      console.log('设置字体大小:', fontSize + 'px');
+      console.log('设置字体大小:', fontSize);
 
       // 如果有选中文本，应用到选中文本
       if (!range.collapsed) {
@@ -963,13 +963,24 @@ destroy(): void {
 
   /**
    * 应用字体大小到选中的文本
-   * @param fontSize - 字体大小（像素值字符串）
+   * @param fontSize - 字体大小（支持px和pt单位）
    * @param range - 选择范围
    * @returns 是否成功
    */
   private applyFontSizeToSelectedText(fontSize: string, range: Range): boolean {
     try {
-      console.log('应用字体大小到选中文本:', fontSize + 'px');
+      console.log('应用字体大小到选中文本:', fontSize);
+      
+      // 处理字体大小单位，统一转换为CSS可用的格式
+      let cssSize: string;
+      if (fontSize.includes('pt')) {
+        cssSize = fontSize; // pt单位直接使用
+      } else if (fontSize.includes('px')) {
+        cssSize = fontSize; // px单位直接使用
+      } else {
+        // 纯数字当作pt处理
+        cssSize = fontSize + 'pt';
+      }
       
       // 检查选中内容是否已经被字体大小的span包装
       const commonAncestor = range.commonAncestorContainer;
@@ -999,7 +1010,7 @@ destroy(): void {
       
       if (existingSpan) {
         // 更新现有span的字体大小
-        existingSpan.style.fontSize = fontSize + 'px';
+        existingSpan.style.fontSize = cssSize;
         
         // 重新选择内容
         const newRange = document.createRange();
@@ -1016,7 +1027,7 @@ destroy(): void {
         
         // 创建一个span元素来包装优化后的内容
         const span = document.createElement('span');
-        span.style.fontSize = fontSize + 'px';
+        span.style.fontSize = cssSize;
         span.appendChild(optimizedContent);
         
         // 将包装后的内容插入到原位置
@@ -1093,13 +1104,24 @@ destroy(): void {
 
   /**
    * 应用字体大小到当前光标位置
-   * @param fontSize - 字体大小（像素值字符串）
+   * @param fontSize - 字体大小（支持px和pt单位）
    * @param range - 选择范围
    * @returns 是否成功
    */
   private applyFontSizeToCurrentPosition(fontSize: string, range: Range): boolean {
     try {
-      console.log('应用字体大小到光标位置:', fontSize + 'px');
+      console.log('应用字体大小到光标位置:', fontSize);
+      
+      // 处理字体大小单位，统一转换为CSS可用的格式
+      let cssSize: string;
+      if (fontSize.includes('pt')) {
+        cssSize = fontSize; // pt单位直接使用
+      } else if (fontSize.includes('px')) {
+        cssSize = fontSize; // px单位直接使用
+      } else {
+        // 纯数字当作pt处理
+        cssSize = fontSize + 'pt';
+      }
       
       // 检查光标是否在现有的字体大小span内
        let currentNode: Node | null = range.startContainer;
@@ -1119,12 +1141,12 @@ destroy(): void {
       
       if (fontSizeSpan) {
         // 如果已经在字体大小span内，直接更新字体大小
-        fontSizeSpan.style.fontSize = fontSize + 'px';
+        fontSizeSpan.style.fontSize = cssSize;
         console.log('更新现有span的字体大小');
       } else {
         // 创建一个新的span元素用于设置字体大小
         const span = document.createElement('span');
-        span.style.fontSize = fontSize + 'px';
+        span.style.fontSize = cssSize;
         span.appendChild(document.createTextNode('\u200B')); // 零宽度空格
         
         // 在光标位置插入span

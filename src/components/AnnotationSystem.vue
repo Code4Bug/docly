@@ -340,8 +340,8 @@ export default {
 }
 
 .close-btn:hover {
-  background: #e9ecef;
-  color: #333;
+  /* background: #e9ecef; */
+  color: #c9c9c9;
 }
 
 .annotation-list {

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>字号转换修复测试</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f7fa;
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e1e8ed;
+            border-radius: 8px;
+        }
+        
+        .font-sample {
+            margin: 10px 0;
+            padding: 10px;
+            border-left: 4px solid #3498db;
+            background: #f8f9fa;
+        }
+        
+        .conversion-info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .old-conversion {
+            background: #ffe6e6;
+            border-left-color: #e74c3c;
+        }
+        
+        .new-conversion {
+            background: #e6ffe6;
+            border-left-color: #27ae60;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>字号转换修复测试</h1>
+        
+        <div class="test-section">
+            <h3>问题说明</h3>
+            <p>在导出DOCX文档时，web中设置的字号与Word中显示的字号不一致。</p>
+            <p><strong>原因：</strong>px到pt的转换系数不正确。之前使用1.33，正确应该是0.75。</p>
+        </div>
+        
+        <div class="test-section">
+            <h3>转换对比测试</h3>
+            
+            <div class="font-sample old-conversion">
+                <div style="font-size: 16px;">16px 文本样例（旧转换）</div>
+                <div class="conversion-info">旧转换：16px × 1.33 × 2 = 42.56 ≈ 43 半点 = 21.5pt</div>
+            </div>
+            
+            <div class="font-sample new-conversion">
+                <div style="font-size: 16px;">16px 文本样例（新转换）</div>
+                <div class="conversion-info">新转换：16px × 0.75 × 2 = 24 半点 = 12pt</div>
+            </div>
+            
+            <div class="font-sample old-conversion">
+                <div style="font-size: 20px;">20px 文本样例（旧转换）</div>
+                <div class="conversion-info">旧转换：20px × 1.33 × 2 = 53.2 ≈ 53 半点 = 26.5pt</div>
+            </div>
+            
+            <div class="font-sample new-conversion">
+                <div style="font-size: 20px;">20px 文本样例（新转换）</div>
+                <div class="conversion-info">新转换：20px × 0.75 × 2 = 30 半点 = 15pt</div>
+            </div>
+            
+            <div class="font-sample old-conversion">
+                <div style="font-size: 24px;">24px 文本样例（旧转换）</div>
+                <div class="conversion-info">旧转换：24px × 1.33 × 2 = 63.84 ≈ 64 半点 = 32pt</div>
+            </div>
+            
+            <div class="font-sample new-conversion">
+                <div style="font-size: 24px;">24px 文本样例（新转换）</div>
+                <div class="conversion-info">新转换：24px × 0.75 × 2 = 36 半点 = 18pt</div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h3>标准转换公式</h3>
+            <ul>
+                <li><strong>CSS像素到点：</strong>1px = 0.75pt</li>
+                <li><strong>Word半点单位：</strong>1pt = 2半点</li>
+                <li><strong>完整转换：</strong>px × 0.75 × 2 = 半点数</li>
+            </ul>
+        </div>
+        
+        <div class="test-section">
+            <h3>修复内容</h3>
+            <ol>
+                <li>修复了 <code>WordHandler.ts</code> 中的 <code>convertFontSize</code> 函数</li>
+                <li>修复了 <code>test-export.html</code> 中的 <code>convertFontSize</code> 函数</li>
+                <li>将转换系数从 1.33 改为 0.75</li>
+                <li>添加了详细的注释说明转换逻辑</li>
+            </ol>
+        </div>
+        
+        <div class="test-section">
+            <h3>验证方法</h3>
+            <p>1. 在编辑器中设置不同字号的文本</p>
+            <p>2. 导出为DOCX文档</p>
+            <p>3. 在Word中打开，检查字号是否与预期一致</p>
+            <p>4. 预期结果：16px应显示为12pt，20px应显示为15pt，24px应显示为18pt</p>
+        </div>
+    </div>
+</body>
+</html>

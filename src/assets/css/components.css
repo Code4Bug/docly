@@ -261,7 +261,7 @@
 .toolbar-btn svg {
   width: 14px;
   height: 14px;
-  fill: currentColor;
+  fill: rgb(224, 224, 224);
 }
 
 /* 选择框样式 - WPS风格 */
@@ -308,6 +308,57 @@
   background-color: #f9f9f9;
   overflow: auto;
   transition: all 0.3s ease;
+  
+  /* Firefox 滚动条样式 */
+  scrollbar-width: thin;
+  scrollbar-color: #c1c1c1 #f1f1f1;
+}
+
+/* Webkit 浏览器滚动条样式 - 亮色主题 */
+.docly-editor-container::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.docly-editor-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.docly-editor-container::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+  transition: background 0.3s ease;
+}
+
+.docly-editor-container::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+.docly-editor-container::-webkit-scrollbar-corner {
+  background: #f1f1f1;
+}
+
+/* 暗色主题滚动条样式 */
+.dark-theme .docly-editor-container {
+  /* Firefox 暗色主题滚动条 */
+  scrollbar-color: #555555 #2d2d2d;
+}
+
+.dark-theme .docly-editor-container::-webkit-scrollbar-track {
+  background: #2d2d2d;
+}
+
+.dark-theme .docly-editor-container::-webkit-scrollbar-thumb {
+  background: #555555;
+}
+
+.dark-theme .docly-editor-container::-webkit-scrollbar-thumb:hover {
+  background: #777777;
+}
+
+.dark-theme .docly-editor-container::-webkit-scrollbar-corner {
+  background: #2d2d2d;
 }
 
 .docly-editor-container.with-sidebar {

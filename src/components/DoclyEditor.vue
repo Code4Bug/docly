@@ -994,7 +994,7 @@ const applyFontFamily = (fontFamily: string): void => {
 
 /**
  * 应用字体大小
- * @param {string} fontSize - 字体大小
+ * @param {string} fontSize - 字体大小（支持px和pt单位）
  */
 const applyFontSize = (fontSize: string): void => {
   console.log('DoclyEditor applyFontSize 被调用:', fontSize);
@@ -1009,8 +1009,19 @@ const applyFontSize = (fontSize: string): void => {
     return;
   }
 
-  // 将像素值转换为字号
-  const sizeValue = parseInt(fontSize.replace('px', ''));
+  // 处理不同单位的字体大小
+  let sizeValue: number;
+  if (fontSize.includes('pt')) {
+    // pt单位：直接使用数值
+    sizeValue = parseFloat(fontSize.replace('pt', ''));
+  } else if (fontSize.includes('px')) {
+    // px单位：转换为pt（1px = 0.75pt）
+    sizeValue = parseFloat(fontSize.replace('px', '')) * 0.75;
+  } else {
+    // 纯数字：当作pt处理
+    sizeValue = parseFloat(fontSize);
+  }
+
   const success = editorCore.value.execCommand('fontSize', sizeValue.toString());
   if (success) {
     currentFontSize.value = fontSize;

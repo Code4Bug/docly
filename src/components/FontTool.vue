@@ -1,5 +1,5 @@
 <template>
-  <div class="font-tool">
+  <div class="font-tool" :class="{ 'dark-theme': isDarkTheme }">
     <!-- 字体族选择 -->
     <div class="font-control">
       <select 
@@ -9,16 +9,70 @@
         @mouseenter="showTooltip($event, '字体族')"
         @mouseleave="hideTooltip"
       >
-        <option value="Arial, sans-serif">Arial</option>
-        <option value="'Times New Roman', serif">Times New Roman</option>
-        <option value="'Courier New', monospace">Courier New</option>
-        <option value="'Microsoft YaHei', sans-serif">微软雅黑</option>
-        <option value="'SimSun', serif">宋体</option>
-        <option value="'SimHei', sans-serif">黑体</option>
-        <option value="'KaiTi', serif">楷体</option>
-        <option value="'FangSong', serif">仿宋</option>
-        <option value="'Helvetica Neue', sans-serif">Helvetica Neue</option>
-        <option value="'Georgia', serif">Georgia</option>
+        <!-- Web安全字体 -->
+        <optgroup label="Web安全字体">
+          <option value="Arial, sans-serif">Arial</option>
+          <option value="'Times New Roman', serif">Times New Roman</option>
+          <option value="'Courier New', monospace">Courier New</option>
+          <option value="'Helvetica Neue', Helvetica, Arial, sans-serif">Helvetica Neue</option>
+          <option value="'Georgia', serif">Georgia</option>
+          <option value="Verdana, sans-serif">Verdana</option>
+          <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+          <option value="'Comic Sans MS', cursive">Comic Sans MS</option>
+          <option value="Impact, sans-serif">Impact</option>
+          <option value="'Lucida Console', monospace">Lucida Console</option>
+          <option value="'Palatino Linotype', serif">Palatino Linotype</option>
+          <option value="Tahoma, sans-serif">Tahoma</option>
+        </optgroup>
+        
+        <!-- 系统中文字体 -->
+        <optgroup label="系统中文字体">
+          <option value="'Microsoft YaHei', '微软雅黑', sans-serif">微软雅黑</option>
+          <option value="'SimSun', '宋体', serif">宋体</option>
+          <option value="'SimHei', '黑体', sans-serif">黑体</option>
+          <option value="'KaiTi', '楷体', serif">楷体</option>
+          <option value="'FangSong', '仿宋', serif">仿宋</option>
+          <option value="'Microsoft JhengHei', '微软正黑体', sans-serif">微软正黑体</option>
+          <option value="'NSimSun', '新宋体', serif">新宋体</option>
+          <option value="'LiSu', '隶书', serif">隶书</option>
+          <option value="'YouYuan', '幼圆', sans-serif">幼圆</option>
+        </optgroup>
+        
+        <!-- 方正字体系列 -->
+        <optgroup label="方正字体">
+          <option value="'FangSong_GB2312', serif">方正仿宋_GB2312</option>
+          <option value="'KaiTi_GB2312', serif">方正楷体_GB2312</option>
+          <option value="'FZXiaoBiaoSong-B05S', serif">方正小标宋简体</option>
+          <option value="'FZShuTi', serif">方正舒体</option>
+          <option value="'FZYaoti', serif">方正姚体</option>
+          <option value="'FZZhunYuan-M02S', sans-serif">方正准圆简体</option>
+          <option value="'FZLanTingHei-R-GBK', sans-serif">方正兰亭黑</option>
+          <option value="'FZLanTingKanHei-R-GBK', sans-serif">方正兰亭刊黑</option>
+        </optgroup>
+        
+        <!-- Mac系统字体 -->
+        <optgroup label="Mac系统字体">
+          <option value="'PingFang SC', '苹方', sans-serif">苹方</option>
+          <option value="'Hiragino Sans GB', '冬青黑体简体中文', sans-serif">冬青黑体简体中文</option>
+          <option value="'STHeiti', '华文黑体', sans-serif">华文黑体</option>
+          <option value="'STKaiti', '华文楷体', serif">华文楷体</option>
+          <option value="'STSong', '华文宋体', serif">华文宋体</option>
+          <option value="'STFangsong', '华文仿宋', serif">华文仿宋</option>
+          <option value="'STXihei', '华文细黑', sans-serif">华文细黑</option>
+          <option value="'STLiti', '华文隶书', serif">华文隶书</option>
+          <option value="'STXingkai', '华文行楷', serif">华文行楷</option>
+          <option value="'STXinwei', '华文新魏', serif">华文新魏</option>
+        </optgroup>
+        
+        <!-- 其他常用字体 -->
+        <optgroup label="其他字体">
+          <option value="'Source Han Sans CN', '思源黑体', sans-serif">思源黑体</option>
+          <option value="'Source Han Serif CN', '思源宋体', serif">思源宋体</option>
+          <option value="'Noto Sans CJK SC', sans-serif">Noto Sans CJK SC</option>
+          <option value="'Noto Serif CJK SC', serif">Noto Serif CJK SC</option>
+          <option value="'WenQuanYi Micro Hei', sans-serif">文泉驿微米黑</option>
+          <option value="'WenQuanYi Zen Hei', sans-serif">文泉驿正黑</option>
+        </optgroup>
       </select>
     </div>
 
@@ -31,18 +85,49 @@
         @mouseenter="showTooltip($event, '字体大小')"
         @mouseleave="hideTooltip"
       >
-        <option value="10px">10</option>
-        <option value="11px">11</option>
-        <option value="12px">12</option>
-        <option value="14px">14</option>
-        <option value="16px">16</option>
-        <option value="18px">18</option>
-        <option value="20px">20</option>
-        <option value="24px">24</option>
-        <option value="28px">28</option>
-        <option value="32px">32</option>
-        <option value="36px">36</option>
-        <option value="48px">48</option>
+        <!-- 中文字号列表 -->
+        <option value="42pt">初号</option>
+        <option value="36pt">小初</option>
+        <option value="26pt">一号</option>
+        <option value="24pt">小一</option>
+        <option value="22pt">二号</option>
+        <option value="18pt">小二</option>
+        <option value="16pt">三号</option>
+        <option value="15pt">小三</option>
+        <option value="14pt">四号</option>
+        <option value="12pt">小四</option>
+        <option value="10.5pt">五号</option>
+        <option value="9pt">小五</option>
+        <option value="7.5pt">六号</option>
+        <option value="6.5pt">小六</option>
+        <option value="5.5pt">七号</option>
+        <option value="5pt">八号</option>
+        <!-- 数字字号列表 -->
+        <option value="5pt">5</option>
+        <option value="5.5pt">5.5</option>
+        <option value="6.5pt">6.5</option>
+        <option value="7.5pt">7.5</option>
+        <option value="8pt">8</option>
+        <option value="9pt">9</option>
+        <option value="10pt">10</option>
+        <option value="10.5pt">10.5</option>
+        <option value="11pt">11</option>
+        <option value="12pt">12</option>
+        <option value="14pt">14</option>
+        <option value="15pt">15</option>
+        <option value="16pt">16</option>
+        <option value="18pt">18</option>
+        <option value="20pt">20</option>
+        <option value="22pt">22</option>
+        <option value="24pt">24</option>
+        <option value="26pt">26</option>
+        <option value="28pt">28</option>
+        <option value="36pt">36</option>
+        <option value="48pt">48</option>
+        <option value="54pt">54</option>
+        <option value="56pt">56</option>
+        <option value="63pt">63</option>
+        <option value="72pt">72</option>
       </select>
     </div>
 
@@ -86,6 +171,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
+import { useTheme } from '../composables/useTheme';
 
 // Props
 interface Props {
@@ -104,6 +190,9 @@ const emit = defineEmits<{
   'font-size-change': [fontSize: string];
   'font-style-change': [action: string];
 }>();
+
+// 主题系统
+const { isDarkTheme } = useTheme();
 
 // 悬浮提示相关状态
 const tooltip = ref({
@@ -304,6 +393,77 @@ export default {
     transform: translateX(-50%) translateY(0) scale(1);
   }
 }
+
+/* 暗色主题样式 */
+.font-tool.dark-theme .font-select,
+.font-tool.dark-theme .font-size-select {
+  background-color: #2d2d2d;
+  border-color: #404040;
+  color: #e0e0e0;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23e0e0e0' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+}
+
+.font-tool.dark-theme .font-select:hover,
+.font-tool.dark-theme .font-size-select:hover {
+  border-color: #4285f4;
+  background-color: #404040;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.font-tool.dark-theme .font-select:focus,
+.font-tool.dark-theme .font-size-select:focus {
+  border-color: #4285f4;
+  background-color: #404040;
+  box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.3);
+}
+
+.font-tool.dark-theme .font-style-group {
+  background: #2d2d2d;
+  border-color: #404040;
+}
+
+.font-tool.dark-theme .font-btn {
+  color: #e0e0e0;
+  background: transparent;
+  border-radius: 0;
+}
+
+.font-tool.dark-theme .font-btn:hover {
+  background: rgba(66, 133, 244, 0.15);
+  color: #4285f4;
+}
+
+.font-tool.dark-theme .font-btn:active {
+   background: rgba(66, 133, 244, 0.25);
+ }
+ 
+ .font-tool.dark-theme .font-select optgroup,
+  .font-tool.dark-theme .font-size-select optgroup {
+    background-color: #2d2d2d !important;
+    color: #e0e0e0 !important;
+    font-weight: 600;
+  }
+  
+  .font-tool.dark-theme .font-select option,
+  .font-tool.dark-theme .font-size-select option {
+    background-color: #2d2d2d !important;
+    color: #e0e0e0 !important;
+    border: none;
+  }
+  
+  .font-tool.dark-theme .font-select option:hover,
+  .font-tool.dark-theme .font-size-select option:hover,
+  .font-tool.dark-theme .font-select option:focus,
+  .font-tool.dark-theme .font-size-select option:focus {
+    background-color: #404040 !important;
+    color: #4285f4 !important;
+  }
+  
+  .font-tool.dark-theme .font-select option:checked,
+  .font-tool.dark-theme .font-size-select option:checked {
+    background-color: #4285f4 !important;
+    color: #ffffff !important;
+  }
 
 /* 响应式设计 */
 @media (max-width: 768px) {
