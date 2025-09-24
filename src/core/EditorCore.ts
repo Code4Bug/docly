@@ -170,6 +170,12 @@ export class EditorCore implements EditorInstance {
     if (event.key === 'Backspace') {
       this.handleBackspaceKey(event);
     }
+
+    // 处理保存快捷键
+    if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+      event.preventDefault();
+      
+    }
   }
   
   /**
@@ -178,15 +184,15 @@ export class EditorCore implements EditorInstance {
    */
   private handleEnterKey(event: KeyboardEvent): void {
     const selection = window.getSelection();
-    Console.debug('handleEnterKey', selection)
+    Console.info('handleEnterKey', selection)
     if (!selection || selection.rangeCount === 0) {
       return
     };
     
     const range = selection.getRangeAt(0);
-    Console.debug('range', range)
+    Console.info('range', range)
     const currentNode = range.startContainer;
-    Console.debug('currentNode', currentNode)
+    Console.info('currentNode', currentNode)
     const currentBlock = this.findParentBlock(currentNode as Node);
     
     if (!currentBlock) return;

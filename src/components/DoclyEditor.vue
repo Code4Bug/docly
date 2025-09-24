@@ -466,7 +466,7 @@ const handleExport = async (): Promise<void> => {
     
     // 检查是否有数据可导出
     if (!dataToExport || !dataToExport.blocks || dataToExport.blocks.length === 0) {
-      showMessage('没有内容可导出，请先添加一些内容', 'warning');
+      showMessage('没有内容可导出，请先添加一些内容', 'warn');
       return;
     }
 
@@ -695,7 +695,7 @@ const formatText = (format: string): void => {
 
   const selection = editorCore.value.getSelection();
   if (!selection || selection.rangeCount === 0) {
-    showMessage('请先选择要格式化的文本', 'warning');
+    showMessage('请先选择要格式化的文本', 'warn');
     return;
   }
 
@@ -849,13 +849,13 @@ const insertLink = (): void => {
 
   const selection = editorCore.value.getSelection();
   if (!selection || selection.rangeCount === 0) {
-    showMessage('请先选择要添加链接的文本', 'warning');
+    showMessage('请先选择要添加链接的文本', 'warn');
     return;
   }
 
   const selectedText = selection.toString();
   if (!selectedText) {
-    showMessage('请先选择要添加链接的文本', 'warning');
+    showMessage('请先选择要添加链接的文本', 'warn');
     return;
   }
 
@@ -955,7 +955,7 @@ const undo = (): void => {
   if (success) {
     showMessage('已撤销', 'success');
   } else {
-    showMessage('无法撤销', 'warning');
+    showMessage('无法撤销', 'warn');
   }
 };
 
@@ -972,7 +972,7 @@ const redo = (): void => {
   if (success) {
     showMessage('已重做', 'success');
   } else {
-    showMessage('无法重做', 'warning');
+    showMessage('无法重做', 'warn');
   }
 };
 
@@ -988,7 +988,7 @@ const setAlignment = (alignment: string): void => {
 
   const selection = editorCore.value.getSelection();
   if (!selection || selection.rangeCount === 0) {
-    showMessage('请先选择要对齐的文本', 'warning');
+    showMessage('请先选择要对齐的文本', 'warn');
     return;
   }
 
@@ -1135,7 +1135,7 @@ const applyFontFamily = (fontFamily: string): void => {
 
   const selection = editorCore.value.getSelection();
   if (!selection || selection.rangeCount === 0) {
-    showMessage('请先选择要设置字体的文本', 'warning');
+    showMessage('请先选择要设置字体的文本', 'warn');
     return;
   }
 
@@ -1161,7 +1161,7 @@ const applyFontSize = (fontSize: string): void => {
 
   const selection = editorCore.value.getSelection();
   if (!selection || selection.rangeCount === 0) {
-    showMessage('请先选择要设置字体大小的文本', 'warning');
+    showMessage('请先选择要设置字体大小的文本', 'warn');
     return;
   }
 
@@ -1200,7 +1200,7 @@ const handleFontStyleChange = (action: string): void => {
 
   const selection = editorCore.value.getSelection();
   if (!selection || selection.rangeCount === 0) {
-    showMessage('请先选择要调整的文本', 'warning');
+    showMessage('请先选择要调整的文本', 'warn');
     return;
   }
 
@@ -1271,7 +1271,7 @@ const showAnnotationList = (): void => {
  */
 const createAnnotation = (selectedText: string, content: string): void => {
   if (!selectedText.trim() || !content.trim()) {
-    showMessage('请选择文本并输入批注内容', 'warning');
+    showMessage('请选择文本并输入批注内容', 'warn');
     return;
   }
 
@@ -1342,7 +1342,7 @@ const deleteAnnotation = (annotationId: string): void => {
      selectedText.value = '';
      annotationInput.value = '';
    } else {
-     showMessage('请输入批注内容', 'warning');
+     showMessage('请输入批注内容', 'warn');
    }
  };
 
