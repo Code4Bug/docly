@@ -446,114 +446,173 @@ export class WordHandler {
    * // 输出: <b><span style="color: #FF0000;">红色粗体</span></b>
    */
   private convertRunsToEditorFormat(runs: any[]): string {
+    if (!runs?.length) return "";
+
     return runs
-      .map((run) => {
-        if (!run.text) return "";
-
-        let text = this.escapeHtml(run.text); // 转义HTML特殊字符
-        const styles = run.styles || {};
-
-        // 收集内联样式
-        const inlineStyles: string[] = [];
-
-        // 处理字体系列 (w:rFonts)
-        if (styles.fontFamily) {
-          // 使用单引号包围字体名称，避免双引号嵌套问题
-          // 同时处理字体名称中可能存在的单引号
-          const safeFontFamily = styles.fontFamily.replace(/'/g, "\\'");
-          inlineStyles.push(`font-family: '${safeFontFamily}'`);
-        }
-
-        // 处理字体大小 (w:sz)
-        if (styles.fontSize) {
-          inlineStyles.push(`font-size: ${styles.fontSize}`);
-        }
-
-        // 处理字体颜色 (w:color)
-        if (styles.color) {
-          inlineStyles.push(`color: ${styles.color}`);
-        }
-
-        // 处理背景色/阴影 (w:shd)
-        if (styles.backgroundColor && styles.backgroundColor !== "#FFFFFF") {
-          inlineStyles.push(`background-color: ${styles.backgroundColor}`);
-        }
-
-        // 处理高亮颜色 (w:highlight)
-        if (styles.highlight && styles.highlight !== "none") {
-          // 将Word的高亮颜色名称转换为CSS颜色
-          const highlightColors: Record<string, string> = {
-            yellow: "#FFFF00",
-            green: "#00FF00",
-            cyan: "#00FFFF",
-            magenta: "#FF00FF",
-            blue: "#0000FF",
-            red: "#FF0000",
-            darkBlue: "#000080",
-            darkCyan: "#008080",
-            darkGreen: "#008000",
-            darkMagenta: "#800080",
-            darkRed: "#800000",
-            darkYellow: "#808000",
-            darkGray: "#808080",
-            lightGray: "#C0C0C0",
-            black: "#000000",
-          };
-          const highlightColor =
-            highlightColors[styles.highlight] || styles.highlight;
-          inlineStyles.push(`background-color: ${highlightColor}`);
-        }
-
-        // 处理字符间距 (w:spacing)
-        if (styles.letterSpacing) {
-          inlineStyles.push(`letter-spacing: ${styles.letterSpacing}`);
-        }
-
-        // 处理上标/下标 (w:vertAlign)
-        if (styles.verticalAlign) {
-          inlineStyles.push(`vertical-align: ${styles.verticalAlign}`);
-        }
-
-        // 应用内联样式
-        if (inlineStyles.length > 0) {
-          // 确保样式字符串中的引号被正确转义
-          const styleString = inlineStyles.join("; ").replace(/"/g, "&quot;");
-          text = `<span style="${styleString}">${text}</span>`;
-        }
-
-        // 按优先级应用HTML标记（从外到内）
-        // 粗体 (w:b)
-        if (styles.fontWeight === "bold") {
-          text = `<b>${text}</b>`;
-        }
-
-        // 斜体 (w:i)
-        if (styles.fontStyle === "italic") {
-          text = `<i>${text}</i>`;
-        }
-
-        // 下划线 (w:u)
-        if (styles.textDecoration?.includes("underline")) {
-          // 如果有下划线颜色，使用span包装
-          if (styles.underlineColor) {
-            const safeColor = styles.underlineColor.replace(/"/g, "&quot;");
-            text = `<u><span style="text-decoration-color: ${safeColor};">${text}</span></u>`;
-          } else {
-            text = `<u>${text}</u>`;
-          }
-        }
-
-        // 删除线 (w:strike, w:dstrike)
-        if (styles.textDecoration?.includes("line-through")) {
-          text = `<s>${text}</s>`;
-        }
-
-        return text;
-      })
+      .map((run) => this.convertSingleRunToHtml(run))
+      .filter(Boolean)
       .join("");
   }
 
+  /**
+   * 转换单个文本运行为HTML格式
+   * @param run - 单个文本运行对象
+   * @returns HTML字符串
+   */
+  private convertSingleRunToHtml(run: any): string {
+    if (!run?.text) return "";
 
+    let text = this.escapeHtml(run.text);
+    const styles = run.styles || {};
+
+    // 应用内联样式
+    text = this.applyInlineStyles(text, styles);
+    
+    // 应用HTML标记（按优先级从外到内）
+    text = this.applyHtmlTags(text, styles);
+
+    return text;
+  }
+
+  /**
+   * 应用内联样式到文本
+   * @param text - 文本内容
+   * @param styles - 样式对象
+   * @returns 应用样式后的HTML字符串
+   */
+  private applyInlineStyles(text: string, styles: any): string {
+    const inlineStyles = this.buildInlineStyles(styles);
+    
+    if (inlineStyles.length === 0) return text;
+
+    const styleString = inlineStyles.join("; ").replace(/"/g, "&quot;");
+    return `<span style="${styleString}">${text}</span>`;
+  }
+
+  /**
+   * 构建内联样式数组
+   * @param styles - 样式对象
+   * @returns 样式字符串数组
+   */
+  private buildInlineStyles(styles: any): string[] {
+    const inlineStyles: string[] = [];
+    const styleHandlers = this.getStyleHandlers();
+
+    for (const [property, handler] of Object.entries(styleHandlers)) {
+      const value = styles[property];
+      if (value != null) {
+        const styleValue = handler(value);
+        if (styleValue) {
+          inlineStyles.push(styleValue);
+        }
+      }
+    }
+
+    return inlineStyles;
+  }
+
+  /**
+   * 获取样式处理器映射
+   * @returns 样式处理器对象
+   */
+  private getStyleHandlers(): Record<string, (value: any) => string | null> {
+    return {
+      fontFamily: (value: string) => {
+        const safeFontFamily = value.replace(/'/g, "\\'");
+        return `font-family: '${safeFontFamily}'`;
+      },
+      fontSize: (value: string) => `font-size: ${value}`,
+      color: (value: string) => `color: ${value}`,
+      backgroundColor: (value: string) => 
+        value !== "#FFFFFF" ? `background-color: ${value}` : null,
+      highlight: (value: string) => {
+        if (value === "none") return null;
+        const highlightColor = this.getHighlightColor(value);
+        return `background-color: ${highlightColor}`;
+      },
+      letterSpacing: (value: string) => `letter-spacing: ${value}`,
+      verticalAlign: (value: string) => `vertical-align: ${value}`,
+    };
+  }
+
+  /**
+   * 获取高亮颜色映射
+   * @param highlight - 高亮颜色名称
+   * @returns CSS颜色值
+   */
+  private getHighlightColor(highlight: string): string {
+    const highlightColors: Record<string, string> = {
+      yellow: "#FFFF00",
+      green: "#00FF00",
+      cyan: "#00FFFF",
+      magenta: "#FF00FF",
+      blue: "#0000FF",
+      red: "#FF0000",
+      darkBlue: "#000080",
+      darkCyan: "#008080",
+      darkGreen: "#008000",
+      darkMagenta: "#800080",
+      darkRed: "#800000",
+      darkYellow: "#808000",
+      darkGray: "#808080",
+      lightGray: "#C0C0C0",
+      black: "#000000",
+    };
+    
+    return highlightColors[highlight] || highlight;
+  }
+
+  /**
+   * 应用HTML标记到文本
+   * @param text - 文本内容
+   * @param styles - 样式对象
+   * @returns 应用标记后的HTML字符串
+   */
+  private applyHtmlTags(text: string, styles: any): string {
+    const tagHandlers = this.getHtmlTagHandlers();
+    
+    for (const [property, handler] of Object.entries(tagHandlers)) {
+      const value = styles[property];
+      if (value != null) {
+        const result = handler(text, value, styles);
+        if (result !== text) {
+          text = result;
+        }
+      }
+    }
+
+    return text;
+  }
+
+  /**
+   * 获取HTML标记处理器映射
+   * @returns HTML标记处理器对象
+   */
+  private getHtmlTagHandlers(): Record<string, (text: string, value: any, styles: any) => string> {
+    return {
+      fontWeight: (text: string, value: string) => 
+        value === "bold" ? `<b>${text}</b>` : text,
+      
+      fontStyle: (text: string, value: string) => 
+        value === "italic" ? `<i>${text}</i>` : text,
+      
+      textDecoration: (text: string, value: string, styles: any) => {
+        if (value?.includes("underline")) {
+          if (styles.underlineColor) {
+            const safeColor = styles.underlineColor.replace(/"/g, "&quot;");
+            return `<u><span style="text-decoration-color: ${safeColor};">${text}</span></u>`;
+          }
+          return `<u>${text}</u>`;
+        }
+        
+        if (value?.includes("line-through")) {
+          return `<s>${text}</s>`;
+        }
+        
+        return text;
+      },
+    };
+  }
 
   /**
    * 处理段落元素，生成对应的编辑器块
