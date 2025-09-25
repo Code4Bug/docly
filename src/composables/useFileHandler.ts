@@ -1,5 +1,6 @@
 import { ref } from 'vue';
 import { WordHandler } from '../fileHandlers/WordHandler';
+import { Console } from '../utils/Console';
 
 /**
  * 文件处理组合式函数

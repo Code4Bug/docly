@@ -1,3 +1,4 @@
+import { Console } from "@/utils/Console";
 /**
  * 快捷键管理器
  * 统一管理应用中的所有快捷键

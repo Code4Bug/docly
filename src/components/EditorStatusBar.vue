@@ -186,7 +186,8 @@ const updateTime = (): void => {
   currentTime.value = now.toLocaleTimeString('zh-CN', {
     hour12: false,
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    second: '2-digit'
   });
 };
 
@@ -200,7 +201,7 @@ const handleToggleReadOnly = (): void => {
 // 生命周期钩子
 onMounted(() => {
   updateTime();
-  timeInterval = setInterval(updateTime, 60000); // 每分钟更新一次
+  timeInterval = setInterval(updateTime, 1000); // 每秒更新一次
 });
 
 onUnmounted(() => {

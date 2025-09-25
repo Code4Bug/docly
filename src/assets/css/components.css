@@ -310,7 +310,6 @@
 .docly-editor-container {
   display: flex;
   flex: 1;
-  padding: 20px;
   background-color: #f9f9f9;
   overflow: auto;
   transition: all 0.3s ease;
@@ -379,7 +378,6 @@
   background-color: #ffffff;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  min-height: 500px;
   transition: all 0.3s ease;
 }
 
@@ -414,7 +412,6 @@
   flex-direction: column;
   height: 100%;
   background-color: #ffffff;
-  border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
