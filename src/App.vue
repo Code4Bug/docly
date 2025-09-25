@@ -37,8 +37,7 @@ import DoclyEditor from './components/DoclyEditor.vue'
 
 .app-main {
   flex: 1;
-  padding: 24px;
   background-color: #f5f5f5;
-  overflow: hidden;
+  overflow: auto;
 }
 </style>

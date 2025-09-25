@@ -1,12 +1,19 @@
 import JSZip from 'jszip';
 import type { EditorData, Comment } from '../types';
 import { Console } from '../utils/Console';
+import { TiptapDataAdapter } from '../adapters/TiptapDataAdapter';
 
 /**
  * Word文档处理器
  * 基于JSZip实现完整的DOCX文件生成
+ * 支持 Editor.js 和 Tiptap HTML 格式
  */
 export class WordHandler {
+  private tiptapAdapter: TiptapDataAdapter;
+
+  constructor() {
+    this.tiptapAdapter = new TiptapDataAdapter();
+  }
   /**
    * 导入Word文档并转换为Editor.js数据
    * @param file - 要导入的Word文档文件
@@ -311,6 +318,47 @@ export class WordHandler {
       return { blob: docxBlob, name: finalFilename };
     } catch (error) {
       Console.error('导出Word文档时发生错误:', error);  
+      throw error;
+    }
+  }
+
+  /**
+   * 导出 Tiptap HTML 为 Word 文档
+   * @param html - Tiptap 编辑器的 HTML 内容
+   * @param filename - 导出的文件名
+   */
+  async exportFromHtml(html: string, filename: string = 'document'): Promise<{ blob: Blob; name: string }> {
+    try {
+      Console.debug('开始从 HTML 导出Word文档:', html);
+      
+      // 将 HTML 转换为 Editor.js 数据格式，然后导出
+      const editorData = this.tiptapAdapter.htmlToEditorData(html);
+      return await this.export(editorData, filename);
+    } catch (error) {
+      Console.error('从 HTML 导出Word文档时发生错误:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 导入 Word 文档并转换为 Tiptap HTML 格式
+   * @param file - 要导入的Word文档文件
+   * @returns Promise<string> - Tiptap 可用的 HTML 内容
+   */
+  async importToHtml(file: File): Promise<string> {
+    try {
+      Console.debug('开始导入Word文档并转换为HTML:', file.name);
+      
+      // 先导入为 Editor.js 格式
+      const editorData = await this.import(file);
+      
+      // 转换为 Tiptap HTML 格式
+      const html = this.tiptapAdapter.editorDataToHtml(editorData);
+      
+      Console.debug('转换为HTML成功:', html);
+      return html;
+    } catch (error) {
+      Console.error('导入Word文档并转换为HTML时发生错误:', error);
       throw error;
     }
   }
