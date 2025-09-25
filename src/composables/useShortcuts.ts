@@ -85,7 +85,11 @@ export function useShortcuts() {
 
     // 编辑操作快捷键
     if (callbacks.undo) {
-      shortcutManager.registerShortcut('Ctrl+Z', {
+      // 检测操作系统，Mac使用Cmd+Z，Windows/Linux使用Ctrl+Z
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const undoKey = isMac ? 'Cmd+Z' : 'Ctrl+Z';
+      
+      shortcutManager.registerShortcut(undoKey, {
         description: '撤销',
         group: 'edit',
         callback: callbacks.undo,
@@ -96,7 +100,11 @@ export function useShortcuts() {
     }
 
     if (callbacks.redo) {
-      shortcutManager.registerShortcut('Ctrl+Y', {
+      // 检测操作系统，Mac使用Cmd+Shift+Z，Windows/Linux使用Ctrl+Y
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const redoKey = isMac ? 'Cmd+Shift+Z' : 'Ctrl+Y';
+      
+      shortcutManager.registerShortcut(redoKey, {
         description: '重做',
         group: 'edit',
         callback: callbacks.redo,

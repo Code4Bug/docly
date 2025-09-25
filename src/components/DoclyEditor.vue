@@ -10,6 +10,9 @@
       :annotation-mode="isAnnotationMode"
       :show-annotation-panel="showAnnotationPanel"
       :read-only="readOnly"
+      :current-font-family="currentFontFamily"
+      :current-font-size="currentFontSize"
+      :editor-instance="editorCore"
       @import-file="importFile"
       @export-file="exportFile"
       @undo="undo"
@@ -19,8 +22,6 @@
       @set-alignment="setAlignment"
       @text-color-change="applyTextColor"
       @bg-color-change="applyBgColor"
-      :current-font-family="currentFontFamily"
-      :current-font-size="currentFontSize"
       @font-family-change="applyFontFamily"
       @font-size-change="applyFontSize"
       @font-style-change="handleFontStyleChange"
@@ -1076,6 +1077,12 @@ onMounted(async () => {
   if (systemThemeQuery.value) {
     systemThemeQuery.value.addEventListener('change', handleThemeChange);
   }
+  
+  // 注册撤销和重做快捷键
+  registerEditorShortcuts({
+    undo,
+    redo
+  });
   
   // 初始化编辑器
   await initEditor();

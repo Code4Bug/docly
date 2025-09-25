@@ -559,12 +559,14 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useTheme } from "../composables/useTheme";
 import { useTooltip } from "../composables/useTooltip";
 import ColorPicker from "./ColorPicker.vue";
 import FontTool from "./FontTool.vue";
 import Tooltip from "./Tooltip.vue";
 import TableSizeSelector from "./TableSizeSelector.vue";
+import type { TiptapCore } from "../core/TiptapCore";
 
 // 主题系统
 const { isDarkTheme } = useTheme();
@@ -588,9 +590,10 @@ interface Props {
   annotationMode?: boolean;
   showAnnotationPanel?: boolean;
   readOnly?: boolean;
+  editorInstance?: TiptapCore | null; // 新增编辑器实例
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   currentHeading: "",
   currentAlignment: "left",
   currentTextColor: "#000000",
@@ -601,6 +604,23 @@ withDefaults(defineProps<Props>(), {
   annotationMode: false,
   showAnnotationPanel: false,
   readOnly: false,
+  editorInstance: null,
+});
+
+// 动态格式状态
+const formatStates = ref({
+  bold: false,
+  italic: false,
+  underline: false,
+  strike: false,
+  superscript: false,
+  subscript: false,
+  heading: "",
+  alignment: "left",
+  fontFamily: "Arial, sans-serif",
+  fontSize: "10.5pt",
+  textColor: "#000000",
+  bgColor: "#ffffff",
 });
 
 // Emits
@@ -632,17 +652,206 @@ const emit = defineEmits<{
 }>();
 
 /**
+ * 更新格式状态
+ * 从编辑器实例获取当前光标位置的格式状态
+ */
+const updateFormatStates = (): void => {
+  if (!props.editorInstance) {
+    return;
+  }
+
+  const editor = props.editorInstance.getEditor();
+  if (!editor) {
+    return;
+  }
+  
+  try {
+    // 更新文本格式状态
+    formatStates.value.bold = editor.isActive('bold');
+    formatStates.value.italic = editor.isActive('italic');
+    formatStates.value.underline = editor.isActive('underline');
+    formatStates.value.strike = editor.isActive('strike');
+    formatStates.value.superscript = editor.isActive('superscript');
+    formatStates.value.subscript = editor.isActive('subscript');
+
+    // 更新标题状态
+    if (editor.isActive('heading', { level: 1 })) {
+      formatStates.value.heading = "1";
+    } else if (editor.isActive('heading', { level: 2 })) {
+      formatStates.value.heading = "2";
+    } else if (editor.isActive('heading', { level: 3 })) {
+      formatStates.value.heading = "3";
+    } else {
+      formatStates.value.heading = "";
+    }
+
+    // 更新对齐状态
+    if (editor.isActive({ textAlign: 'left' })) {
+      formatStates.value.alignment = 'left';
+    } else if (editor.isActive({ textAlign: 'center' })) {
+      formatStates.value.alignment = 'center';
+    } else if (editor.isActive({ textAlign: 'right' })) {
+      formatStates.value.alignment = 'right';
+    } else if (editor.isActive({ textAlign: 'justify' })) {
+      formatStates.value.alignment = 'justify';
+    } else {
+      formatStates.value.alignment = 'left';
+    }
+
+    // 获取当前字体属性
+    const { state } = editor;
+    const { selection } = state;
+    const { from, to } = selection;
+    
+    // 获取选中区域的样式属性
+    if (from !== to) {
+      // 有选中文本时，获取选中文本的样式
+      const selectedText = state.doc.textBetween(from, to);
+      if (selectedText) {
+        // 这里可以进一步解析选中文本的样式属性
+        // 由于Tiptap的限制，我们使用props传入的当前值作为fallback
+        formatStates.value.fontFamily = props.currentFontFamily || "Arial, sans-serif";
+        formatStates.value.fontSize = props.currentFontSize || "10.5pt";
+        formatStates.value.textColor = props.currentTextColor || "#000000";
+        formatStates.value.bgColor = props.currentBgColor || "#ffffff";
+      }
+    } else {
+      // 无选中文本时，使用当前光标位置的样式
+      formatStates.value.fontFamily = props.currentFontFamily || "Arial, sans-serif";
+      formatStates.value.fontSize = props.currentFontSize || "10.5pt";
+      formatStates.value.textColor = props.currentTextColor || "#000000";
+      formatStates.value.bgColor = props.currentBgColor || "#ffffff";
+    }
+  } catch (error) {
+    console.warn('更新格式状态失败:', error);
+  }
+};
+
+/**
+ * 监听编辑器选择变化
+ */
+const setupEditorListeners = (): void => {
+  if (!props.editorInstance) {
+    return;
+  }
+
+  const editor = props.editorInstance.getEditor();
+  if (!editor) {
+    return;
+  }
+  
+  // 监听选择变化事件
+  editor.on('selectionUpdate', () => {
+    updateFormatStates();
+  });
+
+  // 监听内容变化事件
+  editor.on('update', () => {
+    updateFormatStates();
+  });
+
+  // 监听焦点事件
+  editor.on('focus', () => {
+    updateFormatStates();
+  });
+
+  // 初始化格式状态
+  updateFormatStates();
+};
+
+/**
+ * 清理编辑器监听器
+ */
+const cleanupEditorListeners = (): void => {
+  if (!props.editorInstance) {
+    return;
+  }
+
+  const editor = props.editorInstance.getEditor();
+  if (!editor) {
+    return;
+  }
+  
+  // 移除事件监听器
+  editor.off('selectionUpdate');
+  editor.off('update');
+  editor.off('focus');
+};
+
+/**
  * 检查格式是否激活
  * @param {string} format - 格式类型
  * @returns {boolean} 是否激活
  */
 const isFormatActive = (format: string): boolean => {
-  try {
-    return document.queryCommandState(format);
-  } catch (error) {
-    return false;
+  // 使用动态状态而不是document.queryCommandState
+  switch (format) {
+    case 'bold':
+      return formatStates.value.bold;
+    case 'italic':
+      return formatStates.value.italic;
+    case 'underline':
+      return formatStates.value.underline;
+    case 'strike':
+      return formatStates.value.strike;
+    case 'superscript':
+      return formatStates.value.superscript;
+    case 'subscript':
+      return formatStates.value.subscript;
+    default:
+      return false;
   }
 };
+
+// 计算属性，用于模板中的动态值
+const currentHeading = computed(() => formatStates.value.heading);
+const currentAlignment = computed(() => formatStates.value.alignment);
+const currentFontFamily = computed(() => formatStates.value.fontFamily);
+const currentFontSize = computed(() => formatStates.value.fontSize);
+const currentTextColor = computed(() => formatStates.value.textColor);
+const currentBgColor = computed(() => formatStates.value.bgColor);
+
+// 监听编辑器实例变化
+watch(() => props.editorInstance, (newInstance, oldInstance) => {
+  if (oldInstance) {
+    cleanupEditorListeners();
+  }
+  if (newInstance) {
+    // 延迟设置监听器，确保编辑器已完全初始化
+    setTimeout(() => {
+      setupEditorListeners();
+    }, 100);
+  }
+}, { immediate: true });
+
+// 监听props变化，更新本地状态
+watch([
+  () => props.currentFontFamily,
+  () => props.currentFontSize,
+  () => props.currentTextColor,
+  () => props.currentBgColor,
+  () => props.currentAlignment,
+  () => props.currentHeading,
+], () => {
+  // 当props变化时，更新本地状态
+  if (props.currentFontFamily) formatStates.value.fontFamily = props.currentFontFamily;
+  if (props.currentFontSize) formatStates.value.fontSize = props.currentFontSize;
+  if (props.currentTextColor) formatStates.value.textColor = props.currentTextColor;
+  if (props.currentBgColor) formatStates.value.bgColor = props.currentBgColor;
+  if (props.currentAlignment) formatStates.value.alignment = props.currentAlignment;
+  if (props.currentHeading) formatStates.value.heading = props.currentHeading;
+});
+
+// 生命周期钩子
+onMounted(() => {
+  if (props.editorInstance) {
+    setupEditorListeners();
+  }
+});
+
+onUnmounted(() => {
+  cleanupEditorListeners();
+});
 
 /**
  * 处理标题级别变化
