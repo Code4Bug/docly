@@ -17,8 +17,8 @@ Docly 是一款基于 Vue 3 + Vite 的现代化在线文档编辑器，专注于
 - 响应式设计，支持多设备
 
 ### ✏️ 强大的编辑功能
-- 强大的富文本编辑功能（基于 Editor.js）
-- 多种编辑器工具（标题、段落、列表、引用、表格、代码块、图片、下划线、标记等）
+- 强大的富文本编辑功能（基于 Tiptap）
+- 多种编辑器工具（标题、段落、列表、引用、表格、代码块、链接、下划线、高亮等）
 - 自定义字体样式和格式化选项
 - 文档结构化编辑和导航
 
@@ -42,17 +42,17 @@ Docly 是一款基于 Vue 3 + Vite 的现代化在线文档编辑器，专注于
 ## 技术栈
 
 - **前端框架**: Vue 3.5.18 + Vite 5.4.20
-- **编辑器核心**: Editor.js 2.31.0 + 多个官方插件
-  - @editorjs/header 2.8.8 (标题)
-  - @editorjs/paragraph 2.11.7 (段落)
-  - @editorjs/list 2.0.8 (列表)
-  - @editorjs/quote 2.7.6 (引用)
-  - @editorjs/table 2.4.5 (表格)
-  - @editorjs/code 2.9.3 (代码块)
-  - @editorjs/image 2.10.3 (图片)
-  - @editorjs/marker 1.4.0 (标记)
-  - @editorjs/underline 1.2.1 (下划线)
-  - @editorjs/inline-code 1.5.2 (行内代码)
+- **编辑器核心**: Tiptap 3.5.3 + 多个官方扩展
+  - @tiptap/starter-kit 3.5.3 (基础功能包)
+  - @tiptap/extension-underline 3.5.3 (下划线)
+  - @tiptap/extension-text-style 3.5.3 (文本样式)
+  - @tiptap/extension-table 3.5.3 (表格)
+  - @tiptap/extension-table-row 3.5.3 (表格行)
+  - @tiptap/extension-table-cell 3.5.3 (表格单元格)
+  - @tiptap/extension-table-header 3.5.3 (表格头)
+  - @tiptap/extension-code-block-lowlight 3.5.3 (代码块)
+  - @tiptap/extension-highlight 3.5.3 (高亮)
+  - @tiptap/extension-history 3.5.3 (历史记录)
 - **状态管理**: Pinia 3.0.3
 - **UI 组件库**: Naive UI 2.43.1
 - **文件处理**: 
@@ -76,6 +76,8 @@ src/
 │   ├── EditorStatusBar.vue   # 编辑器状态栏组件
 │   ├── EditorToolbar.vue     # 编辑器工具栏组件
 │   ├── FontTool.vue          # 字体工具组件
+│   ├── ShortcutPanel.vue     # 快捷键面板组件
+│   ├── TiptapEditor.vue      # Tiptap 编辑器组件
 │   └── Tooltip.vue           # 工具提示组件
 ├── composables/        # Vue 组合式函数
 │   ├── useAnnotations.ts     # 批注功能组合式函数
@@ -85,13 +87,18 @@ src/
 │   ├── useTheme.ts           # 主题管理组合式函数
 │   └── useTooltip.ts         # 工具提示组合式函数
 ├── core/               # 编辑器核心
-│   ├── EditorCore.ts   # 编辑器核心类，提供完整的编辑器功能
+│   ├── TiptapCore.ts   # Tiptap 编辑器核心类，提供完整的编辑器功能
 │   └── ShortcutManager.ts    # 快捷键管理器，统一管理应用快捷键
+├── adapters/           # 数据适配器
+│   └── TiptapDataAdapter.ts  # Tiptap 数据适配器，处理数据格式转换
+├── extensions/         # Tiptap 扩展
+│   ├── FontFamily.ts   # 字体族扩展
+│   ├── FontSize.ts     # 字体大小扩展
+│   └── TextAlign.ts    # 文本对齐扩展
 ├── plugins/            # 插件系统
 │   └── PluginManager.ts # 插件管理器，支持动态加载和管理插件
 ├── fileHandlers/       # 文件处理模块
-│   ├── WordHandler.ts        # Word文件处理器，支持导入导出和预览
-│   └── WordHandlerComments.ts # Word文档批注处理器
+│   └── WordHandler.ts        # Word文件处理器，支持导入导出和预览
 ├── stores/             # 状态管理
 │   └── editorStore.ts  # 编辑器状态管理，基于 Pinia
 ├── types/              # TypeScript类型定义
@@ -99,7 +106,7 @@ src/
 │   └── index.ts        # 完整的类型定义文件
 ├── utils/              # 工具函数
 │   ├── Console.ts      # 控制台工具类，提供彩色日志输出
-│   ├── Message.ts      # 消息提示工具，显示用户反馈信息
+│   └── Message.ts      # 消息提示工具，显示用户反馈信息
 ├── assets/             # 静态资源
 │   ├── css/            # 样式文件
 │   │   ├── components.css  # 组件样式
@@ -153,15 +160,14 @@ src/
 ### 编辑器初始化
 
 ```javascript
-import { EditorCore } from './core/EditorCore'
+import { TiptapCore } from './core/TiptapCore'
 
-const editor = new EditorCore({
+const editor = new TiptapCore({
   holder: 'editor-container',
-  plugins: [
-    { name: 'header', enabled: true },
-    { name: 'paragraph', enabled: true },
-    { name: 'list', enabled: true }
-  ]
+  config: {
+    placeholder: '开始编写您的文档...',
+    autofocus: true
+  }
 })
 
 await editor.init()
@@ -177,17 +183,34 @@ const wordHandler = new WordHandler()
 // 导入 Word 文档
 const fileInput = document.querySelector('#file-input')
 const file = fileInput.files[0]
-const editorData = await wordHandler.import(file)
+const html = await wordHandler.importToHtml(file)
 
 // 导出为 Word 文档
-const exportedFile = await wordHandler.export(editorData)
+const html = editor.getHTML()
+const exportedFile = await wordHandler.exportFromHtml(html)
+```
+
+### 数据格式转换
+
+```javascript
+import { TiptapDataAdapter } from './adapters/TiptapDataAdapter'
+
+const adapter = new TiptapDataAdapter()
+
+// 将 Tiptap HTML 转换为 Editor.js 数据格式
+const html = editor.getHTML()
+const editorData = adapter.htmlToEditorData(html)
+
+// 将 Editor.js 数据格式转换为 Tiptap HTML
+const html = adapter.editorDataToHtml(editorData)
+editor.setContent(html)
 ```
 
 ## 📖 API 文档
 
-### EditorCore
+### TiptapCore
 
-编辑器核心类，提供完整的编辑器功能。
+Tiptap 编辑器核心类，提供完整的编辑器功能。
 
 #### 方法
 
@@ -195,8 +218,21 @@ const exportedFile = await wordHandler.export(editorData)
 - `save()`: 保存编辑器数据
 - `render(data)`: 渲染编辑器数据
 - `destroy()`: 销毁编辑器实例
-- `insertBlock(type, data)`: 插入新块
-- `getCurrentBlock()`: 获取当前块
+- `getHTML()`: 获取编辑器 HTML 内容
+- `getText()`: 获取编辑器纯文本内容
+- `setContent(content)`: 设置编辑器内容
+- `focus()`: 聚焦编辑器
+- `isEmpty()`: 检查编辑器是否为空
+
+### TiptapDataAdapter
+
+Tiptap 数据适配器，负责在 Tiptap HTML 格式和 Editor.js 数据格式之间进行转换。
+
+#### 方法
+
+- `htmlToEditorData(html)`: 将 Tiptap HTML 转换为 Editor.js 数据格式
+- `editorDataToHtml(data)`: 将 Editor.js 数据格式转换为 Tiptap HTML
+- `sanitizeHtml(html)`: 清理和验证 HTML 内容
 
 ### WordHandler
 
@@ -204,20 +240,9 @@ Word 文档处理器，支持导入导出和预览。
 
 #### 方法
 
-- `import(file)`: 导入 Word 文档
-- `export(data)`: 导出为 Word 文档
+- `importToHtml(file)`: 导入 Word 文档并转换为 HTML
+- `exportFromHtml(html)`: 从 HTML 导出为 Word 文档
 - `preview(data)`: 生成预览
-
-### WordHandlerComments
-
-Word 文档批注处理器，专门处理文档中的批注功能。
-
-#### 方法
-
-- `extractComments(document)`: 提取文档批注
-- `insertComments(document, comments)`: 插入批注到文档
-- `updateComment(id, content)`: 更新指定批注
-- `deleteComment(id)`: 删除指定批注
 
 ### PluginManager
 
@@ -530,11 +555,19 @@ A: 在 <mcfolder name="fonts" path="src/assets/fonts/"></mcfolder> 目录下添�
 
 ### Q: 如何扩展 Word 文档的导入支持？
 
-A: 修改 <mcfile name="WordHandler.ts" path="src/fileHandlers/WordHandler.ts"></mcfile> 中的 `htmlToEditorData` 方法，添加对新元素类型的处理逻辑。
+A: 修改 <mcfile name="WordHandler.ts" path="src/fileHandlers/WordHandler.ts"></mcfile> 中的 `importToHtml` 方法，添加对新元素类型的处理逻辑。
 
 ### Q: 如何自定义编辑器工具栏？
 
-A: 在 <mcsymbol name="EditorCore" filename="EditorCore.ts" path="src/core/EditorCore.ts" startline="1" type="class"></mcsymbol> 初始化时配置 `plugins` 参数，启用或禁用特定的编辑器工具。
+A: 在 <mcsymbol name="TiptapCore" filename="TiptapCore.ts" path="src/core/TiptapCore.ts" startline="1" type="class"></mcsymbol> 初始化时配置扩展参数，启用或禁用特定的编辑器工具。
+
+### Q: 如何使用 Tiptap 编辑器组件？
+
+A: 使用 <mcfile name="TiptapEditor.vue" path="src/components/TiptapEditor.vue"></mcfile> 组件，它提供了完整的 Tiptap 编辑器功能和工具栏。
+
+### Q: 如何显示快捷键面板？
+
+A: 使用 <mcfile name="ShortcutPanel.vue" path="src/components/ShortcutPanel.vue"></mcfile> 组件，或通过 `useShortcuts` 组合式函数的 `showShortcutPanel` 方法显示。
 
 ### Q: 支持哪些中文字体？
 

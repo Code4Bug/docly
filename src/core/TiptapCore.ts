@@ -1,8 +1,12 @@
 import { Editor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
+import Strike from '@tiptap/extension-strike'
+import Superscript from '@tiptap/extension-superscript'
+import Subscript from '@tiptap/extension-subscript'
 import Link from '@tiptap/extension-link'
 import { TextStyle } from '@tiptap/extension-text-style'
+import { Color } from '@tiptap/extension-color'
 import { Table } from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableCell from '@tiptap/extension-table-cell'
@@ -241,9 +245,16 @@ export class TiptapCore implements EditorInstance {
         codeBlock: false,
         // 禁用 StarterKit 中的 History，使用自定义历史记录
         undoRedo: false,
+        // 禁用 StarterKit 中的 Link，使用自定义配置的 Link
+        link: false,
+        underline: false,
       }),
       Underline,
+      Strike,
+      Superscript,
+      Subscript,
       TextStyle,
+      Color,
       FontSize,
       FontFamily,
       TextAlign,
@@ -262,7 +273,9 @@ export class TiptapCore implements EditorInstance {
       CodeBlockLowlight.configure({
         lowlight,
       }),
-      Highlight,
+      Highlight.configure({
+        multicolor: true,
+      }),
     ]
 
     // 准备初始内容
@@ -481,6 +494,12 @@ export class TiptapCore implements EditorInstance {
       case 'strike':
         this.editor.chain().focus().toggleStrike().run()
         break
+      case 'superscript':
+        this.editor.chain().focus().toggleSuperscript().run()
+        break
+      case 'subscript':
+        this.editor.chain().focus().toggleSubscript().run()
+        break
       case 'code':
         this.editor.chain().focus().toggleCode().run()
         break
@@ -638,6 +657,40 @@ export class TiptapCore implements EditorInstance {
   unsetTextAlign(): void {
     if (!this.editor) return
     this.editor.chain().focus().unsetTextAlign().run()
+  }
+
+  /**
+   * 设置文本颜色
+   * @param color - 颜色值（如 '#ff0000', 'red'）
+   */
+  setTextColor(color: string): void {
+    if (!this.editor) return
+    this.editor.chain().focus().setColor(color).run()
+  }
+
+  /**
+   * 取消文本颜色设置
+   */
+  unsetTextColor(): void {
+    if (!this.editor) return
+    this.editor.chain().focus().unsetColor().run()
+  }
+
+  /**
+   * 设置背景颜色（高亮）
+   * @param color - 颜色值（如 '#ffff00', 'yellow'）
+   */
+  setBackgroundColor(color: string): void {
+    if (!this.editor) return
+    this.editor.chain().focus().setHighlight({ color }).run()
+  }
+
+  /**
+   * 取消背景颜色设置
+   */
+  unsetBackgroundColor(): void {
+    if (!this.editor) return
+    this.editor.chain().focus().unsetHighlight().run()
   }
 
   /**

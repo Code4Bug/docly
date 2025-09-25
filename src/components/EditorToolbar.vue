@@ -4,55 +4,81 @@
       <!-- 左侧功能区域 -->
       <div class="toolbar-left">
         <!-- 文件操作和撤销重做 -->
-        <div class="toolbar-section file-operations">
-          <button
-            @click="$emit('import-file')"
-            class="toolbar-btn"
-            @mouseenter="showTooltip($event, '导入文档')"
-            @mouseleave="hideTooltip"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path
-                d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20M12,19L8,15H10.5V12H13.5V15H16L12,19Z"
-              />
-            </svg>
-          </button>
-          <button
-            @click="$emit('export-file')"
-            class="toolbar-btn"
-            @mouseenter="showTooltip($event, '导出文档')"
-            @mouseleave="hideTooltip"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path
-                d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20M12,19L8,15H10.5V12H13.5V15H16L12,19Z"
-              />
-            </svg>
-          </button>
-          <button
-            @click="$emit('undo')"
-            class="toolbar-btn"
-            @mouseenter="showTooltip($event, '撤销')"
-            @mouseleave="hideTooltip"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path
-                d="M12.5,8C9.85,8 7.45,9 5.6,10.6L2,7V16H11L7.38,12.38C8.77,11.22 10.54,10.5 12.5,10.5C16.04,10.5 19.05,12.81 20.1,16L22.47,15.22C21.08,11.03 17.15,8 12.5,8Z"
-              />
-            </svg>
-          </button>
-          <button
-            @click="$emit('redo')"
-            class="toolbar-btn"
-            @mouseenter="showTooltip($event, '重做')"
-            @mouseleave="hideTooltip"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path
-                d="M18.4,10.6C16.55,9 14.15,8 11.5,8C6.85,8 2.92,11.03 1.53,15.22L3.9,16C4.95,12.81 7.96,10.5 11.5,10.5C13.46,10.5 15.23,11.22 16.62,12.38L13,16H22V7L18.4,10.6Z"
-              />
-            </svg>
-          </button>
+        <div class="toolbar-row">
+          <div class="toolbar-section file-operations">
+            <div class="button-group">
+              <button
+                @click="$emit('import-file')"
+                class="toolbar-btn"
+                @mouseenter="showTooltip($event, '导入文档')"
+                @mouseleave="hideTooltip"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <path
+                    d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20M12,19L8,15H10.5V12H13.5V15H16L12,19Z"
+                  />
+                </svg>
+              </button>
+              <button
+                @click="$emit('export-file')"
+                class="toolbar-btn"
+                @mouseenter="showTooltip($event, '导出文档')"
+                @mouseleave="hideTooltip"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <path
+                    d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20M12,19L8,15H10.5V12H13.5V15H16L12,19Z"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div class="button-group">
+              <button
+                @click="$emit('undo')"
+                class="toolbar-btn"
+                @mouseenter="showTooltip($event, '撤销')"
+                @mouseleave="hideTooltip"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <path
+                    d="M12.5,8C9.85,8 7.45,9 5.6,10.6L2,7V16H11L7.38,12.38C8.77,11.22 10.54,10.5 12.5,10.5C16.04,10.5 19.05,12.81 20.1,16L22.47,15.22C21.08,11.03 17.15,8 12.5,8Z"
+                  />
+                </svg>
+              </button>
+              <button
+                @click="$emit('redo')"
+                class="toolbar-btn"
+                @mouseenter="showTooltip($event, '重做')"
+                @mouseleave="hideTooltip"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <path
+                    d="M18.4,10.6C16.55,9 14.15,8 11.5,8C6.85,8 2.92,11.03 1.53,15.22L3.9,16C4.95,12.81 7.96,10.5 11.5,10.5C13.46,10.5 15.23,11.22 16.62,12.38L13,16H22V7L18.4,10.6Z"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- 第一类：字体相关功能区域 -->
@@ -127,6 +153,65 @@
                     />
                   </svg>
                 </button>
+                <button
+                  @click="$emit('format-text', 'strike')"
+                  class="toolbar-btn"
+                  :class="{ active: isFormatActive('strike') }"
+                  @mouseenter="showTooltip($event, '删除线')"
+                  @mouseleave="hideTooltip"
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path
+                      d="M3,14H21V12H3M5,4V7H10V10H14V7H19V4M10,19H14V16H10V19Z"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              <div class="toolbar-section">
+                <div class="button-group">
+                  <button
+                    @click="$emit('format-text', 'superscript')"
+                    class="toolbar-btn"
+                    :class="{ active: isFormatActive('superscript') }"
+                    @mouseenter="showTooltip($event, '上标')"
+                    @mouseleave="hideTooltip"
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
+                      <path
+                        d="M16,7.41L11.41,12L16,16.59L14.59,18L10,13.41L5.41,18L4,16.59L8.59,12L4,7.41L5.41,6L10,10.59L14.59,6L16,7.41M21.85,9H16.97L20.09,5.89C20.42,5.56 20.42,5 20.09,4.67C19.76,4.34 19.2,4.34 18.87,4.67L15.04,8.5C14.71,8.83 14.71,9.39 15.04,9.72L18.87,13.55C19.2,13.88 19.76,13.88 20.09,13.55C20.42,13.22 20.42,12.66 20.09,12.33L16.97,9.22H21.85C22.3,9.22 22.67,8.85 22.67,8.4C22.67,7.95 22.3,7.58 21.85,7.58Z"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    @click="$emit('format-text', 'subscript')"
+                    class="toolbar-btn"
+                    :class="{ active: isFormatActive('subscript') }"
+                    @mouseenter="showTooltip($event, '下标')"
+                    @mouseleave="hideTooltip"
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
+                      <path
+                        d="M16,7.41L11.41,12L16,16.59L14.59,18L10,13.41L5.41,18L4,16.59L8.59,12L4,7.41L5.41,6L10,10.59L14.59,6L16,7.41M22,16H17.14L20.25,12.89C20.59,12.56 20.59,12 20.25,11.67C19.92,11.34 19.36,11.34 19.03,11.67L15.2,15.5C14.87,15.83 14.87,16.39 15.2,16.72L19.03,20.55C19.36,20.88 19.92,20.88 20.25,20.55C20.59,20.22 20.59,19.66 20.25,19.33L17.14,16.22H22C22.45,16.22 22.82,15.85 22.82,15.4C22.82,14.95 22.45,14.58 22,14.58Z"
+                      />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
               <div class="toolbar-section">
@@ -238,11 +323,7 @@
                   </svg>
                 </button>
               </div>
-            </div>
-          </div>
-          <!-- 第一行：列表、表格、链接、引用 -->
-          <div class="toolbar-row">
-            <div class="toolbar-section">
+
               <div class="button-group">
                 <button
                   @click="$emit('insert-list', 'unordered')"
@@ -279,23 +360,122 @@
                   </svg>
                 </button>
               </div>
-              <button
-                @click="$emit('insert-table')"
-                class="toolbar-btn"
-                @mouseenter="showTooltip($event, '插入表格')"
-                @mouseleave="hideTooltip"
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
+            </div>
+          </div>
+          <!-- 第一行：列表、表格、链接、引用 -->
+          <div class="toolbar-row">
+            <div class="toolbar-section">
+              <TableSizeSelector
+                @table-size-selected="handleTableSizeSelected"
+                @custom-table-requested="handleCustomTableRequested"
+              />
+
+              <!-- 表格操作按钮组 -->
+              <div class="button-group table-operations">
+                <button
+                  @click="$emit('add-column-before')"
+                  class="toolbar-btn"
+                  @mouseenter="showTooltip($event, '在前面插入列')"
+                  @mouseleave="hideTooltip"
                 >
-                  <path
-                    d="M5,4H19A2,2 0 0,1 21,6V18A2,2 0 0,1 19,20H5A2,2 0 0,1 3,18V6A2,2 0 0,1 5,4M5,8V12H11V8H5M13,8V12H19V8H13M5,14V18H11V14H5M13,14V18H19V14H13Z"
-                  />
-                </svg>
-              </button>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path
+                      d="M13,2A2,2 0 0,1 15,4V20A2,2 0 0,1 13,22H11A2,2 0 0,1 9,20V4A2,2 0 0,1 11,2H13M13,4H11V20H13V4M17,13H19V11H17V8L14,12L17,16V13M7,16V13H5V11H7V8L10,12L7,16Z"
+                    />
+                  </svg>
+                </button>
+                <button
+                  @click="$emit('add-column-after')"
+                  class="toolbar-btn"
+                  @mouseenter="showTooltip($event, '在后面插入列')"
+                  @mouseleave="hideTooltip"
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path
+                      d="M11,2A2,2 0 0,1 13,4V20A2,2 0 0,1 11,22H9A2,2 0 0,1 7,20V4A2,2 0 0,1 9,2H11M11,4H9V20H11V4M15,8V11H17V13H15V16L18,12L15,8M5,8L8,12L5,16V13H3V11H5V8Z"
+                    />
+                  </svg>
+                </button>
+                <button
+                  @click="$emit('delete-column')"
+                  class="toolbar-btn"
+                  @mouseenter="showTooltip($event, '删除当前列')"
+                  @mouseleave="hideTooltip"
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path
+                      d="M4,2A2,2 0 0,1 6,4V20A2,2 0 0,1 4,22H2A2,2 0 0,1 0,20V4A2,2 0 0,1 2,2H4M4,4H2V20H4V4M22,2A2,2 0 0,1 24,4V20A2,2 0 0,1 22,22H20A2,2 0 0,1 18,20V4A2,2 0 0,1 20,2H22M22,4H20V20H22V4M9,6V8H15V6H9M9,10V12H15V10H9M9,14V16H15V14H9M9,18V20H15V18H9Z"
+                    />
+                  </svg>
+                </button>
+                <button
+                  @click="$emit('add-row-before')"
+                  class="toolbar-btn"
+                  @mouseenter="showTooltip($event, '在上方插入行')"
+                  @mouseleave="hideTooltip"
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path
+                      d="M22,13A2,2 0 0,1 20,15H4A2,2 0 0,1 2,13V11A2,2 0 0,1 4,9H20A2,2 0 0,1 22,11V13M20,13V11H4V13H20M16,7V5H13V7H11V5H8L12,1L16,5V7M8,19V17H11V19H13V17H16L12,21L8,17V19Z"
+                    />
+                  </svg>
+                </button>
+                <button
+                  @click="$emit('add-row-after')"
+                  class="toolbar-btn"
+                  @mouseenter="showTooltip($event, '在下方插入行')"
+                  @mouseleave="hideTooltip"
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path
+                      d="M2,11A2,2 0 0,1 4,9H20A2,2 0 0,1 22,11V13A2,2 0 0,1 20,15H4A2,2 0 0,1 2,13V11M4,11V13H20V11H4M8,5V7H11V5H13V7H16L12,11L8,7V5M16,19V17H13V19H11V17H8L12,21L16,17V19Z"
+                    />
+                  </svg>
+                </button>
+                <button
+                  @click="$emit('delete-row')"
+                  class="toolbar-btn"
+                  @mouseenter="showTooltip($event, '删除当前行')"
+                  @mouseleave="hideTooltip"
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path
+                      d="M9.41,13L12,15.59L14.59,13L16,14.41L13.41,17L16,19.59L14.59,21L12,18.41L9.41,21L8,19.59L10.59,17L8,14.41L9.41,13M22,9A2,2 0 0,1 20,11H4A2,2 0 0,1 2,9V7A2,2 0 0,1 4,5H20A2,2 0 0,1 22,7V9M20,9V7H4V9H20Z"
+                    />
+                  </svg>
+                </button>
+              </div>
+
               <button
                 @click="$emit('insert-link')"
                 class="toolbar-btn"
@@ -369,7 +549,7 @@
     </div>
 
     <!-- Tooltip 组件 -->
-    <Tooltip 
+    <Tooltip
       :visible="tooltip.visible"
       :text="tooltip.text"
       :x="tooltip.x"
@@ -384,6 +564,7 @@ import { useTooltip } from "../composables/useTooltip";
 import ColorPicker from "./ColorPicker.vue";
 import FontTool from "./FontTool.vue";
 import Tooltip from "./Tooltip.vue";
+import TableSizeSelector from "./TableSizeSelector.vue";
 
 // 主题系统
 const { isDarkTheme } = useTheme();
@@ -408,7 +589,6 @@ interface Props {
   showAnnotationPanel?: boolean;
   readOnly?: boolean;
 }
-
 
 withDefaults(defineProps<Props>(), {
   currentHeading: "",
@@ -439,8 +619,14 @@ const emit = defineEmits<{
   "font-style-change": [action: string];
   "insert-list": [type: string];
   "insert-link": [];
-  "insert-table": [];
+  "insert-table": [size?: { rows: number; cols: number }];
   "insert-quote": [];
+  "add-column-before": [];
+  "add-column-after": [];
+  "delete-column": [];
+  "add-row-before": [];
+  "add-row-after": [];
+  "delete-row": [];
   "toggle-annotation-mode": [];
   "show-annotation-list": [];
 }>();
@@ -505,6 +691,25 @@ const handleTextColorChange = (color: string): void => {
  */
 const handleBgColorChange = (color: string): void => {
   emit("bg-color-change", color);
+};
+
+/**
+ * 处理表格尺寸选择
+ * @param {object} size - 表格尺寸 {rows: number, cols: number}
+ */
+const handleTableSizeSelected = (size: {
+  rows: number;
+  cols: number;
+}): void => {
+  emit("insert-table", size);
+};
+
+/**
+ * 处理自定义表格请求
+ */
+const handleCustomTableRequested = (): void => {
+  // 可以在这里添加自定义表格对话框逻辑
+  emit("insert-table", { rows: 3, cols: 3 });
 };
 </script>
 
@@ -573,7 +778,7 @@ export default {
 }
 
 .font-category {
-      border: 1px solid #dadce0;
+  border: 1px solid #dadce0;
   background: rgba(255, 255, 255, 0.8);
 }
 
@@ -626,7 +831,11 @@ export default {
 }
 
 .toolbar-btn.annotation-open {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.1));
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.1),
+    rgba(147, 51, 234, 0.1)
+  );
   border-color: #3b82f6;
   color: #3b82f6;
   transform: translateY(-1px);
@@ -634,7 +843,11 @@ export default {
 }
 
 .toolbar-btn:hover {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.1));
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.1),
+    rgba(147, 51, 234, 0.1)
+  );
   border-color: #3b82f6;
   color: #3b82f6;
   transform: translateY(-1px);
@@ -642,7 +855,11 @@ export default {
 }
 
 .toolbar-btn.active {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(147, 51, 234, 0.15));
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.15),
+    rgba(147, 51, 234, 0.15)
+  );
   color: #3b82f6;
   border-color: #3b82f6;
   box-shadow: 0 2px 4px rgba(59, 130, 246, 0.15);
@@ -672,7 +889,11 @@ export default {
 }
 
 .button-group .toolbar-btn:hover {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.1));
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.1),
+    rgba(147, 51, 234, 0.1)
+  );
   border-color: transparent;
   color: #3b82f6;
   z-index: 1;
@@ -681,7 +902,11 @@ export default {
 }
 
 .button-group .toolbar-btn.active {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(147, 51, 234, 0.15));
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.15),
+    rgba(147, 51, 234, 0.15)
+  );
   color: #3b82f6;
   border-color: transparent;
   z-index: 1;
@@ -717,7 +942,8 @@ export default {
 .compact-select:focus {
   outline: none;
   border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1), 0 2px 4px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1),
+    0 2px 4px rgba(59, 130, 246, 0.15);
   transform: translateY(-1px);
 }
 
@@ -763,8 +989,8 @@ export default {
 }
 
 .docly-toolbar.dark-theme .font-category {
-    background: rgba(45, 45, 45, 0.8);
-    border-color: #404040;
+  background: rgba(45, 45, 45, 0.8);
+  border-color: #404040;
 }
 
 .docly-toolbar.dark-theme .layout-category {
@@ -784,7 +1010,11 @@ export default {
 }
 
 .docly-toolbar.dark-theme .toolbar-btn:hover {
-  background: linear-gradient(135deg, rgba(66, 133, 244, 0.15), rgba(147, 51, 234, 0.15));
+  background: linear-gradient(
+    135deg,
+    rgba(66, 133, 244, 0.15),
+    rgba(147, 51, 234, 0.15)
+  );
   border-color: #4285f4;
   color: #4285f4;
   transform: translateY(-1px);
@@ -792,7 +1022,11 @@ export default {
 }
 
 .docly-toolbar.dark-theme .toolbar-btn.active {
-  background: linear-gradient(135deg, rgba(66, 133, 244, 0.25), rgba(147, 51, 234, 0.25));
+  background: linear-gradient(
+    135deg,
+    rgba(66, 133, 244, 0.25),
+    rgba(147, 51, 234, 0.25)
+  );
   color: #4285f4;
   border-color: #4285f4;
   box-shadow: 0 2px 4px rgba(66, 133, 244, 0.15);
@@ -815,7 +1049,8 @@ export default {
 .docly-toolbar.dark-theme .compact-select:focus {
   border-color: #4285f4;
   background-color: #404040;
-  box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.1), 0 2px 4px rgba(66, 133, 244, 0.15);
+  box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.1),
+    0 2px 4px rgba(66, 133, 244, 0.15);
   transform: translateY(-1px);
 }
 

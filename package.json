@@ -11,8 +11,11 @@
   },
   "dependencies": {
     "@tiptap/extension-code-block-lowlight": "^3.5.3",
+    "@tiptap/extension-color": "^3.6.0",
     "@tiptap/extension-highlight": "^3.5.3",
     "@tiptap/extension-history": "^3.5.3",
+    "@tiptap/extension-subscript": "^3.6.0",
+    "@tiptap/extension-superscript": "^3.6.0",
     "@tiptap/extension-table": "^3.5.3",
     "@tiptap/extension-table-cell": "^3.5.3",
     "@tiptap/extension-table-header": "^3.5.3",

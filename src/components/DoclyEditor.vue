@@ -28,6 +28,12 @@
       @insert-link="insertLink"
       @insert-table="insertTable"
       @insert-quote="insertQuote"
+      @add-column-before="addColumnBefore"
+      @add-column-after="addColumnAfter"
+      @delete-column="deleteColumn"
+      @add-row-before="addRowBefore"
+      @add-row-after="addRowAfter"
+      @delete-row="deleteRow"
       @toggle-annotation-mode="toggleAnnotationMode"
       @show-annotation-list="showAnnotationList"
     />
@@ -143,7 +149,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import { TiptapCore } from '../core/TiptapCore';
 import { PluginManager } from '../plugins/PluginManager';
 import { WordHandler } from '../fileHandlers/WordHandler';
@@ -368,6 +374,9 @@ const initEditor = async (): Promise<void> => {
       bold: () => formatText('bold'),
       italic: () => formatText('italic'),
       underline: () => formatText('underline'),
+      strikethrough: () => formatText('strike'),
+      superscript: () => formatText('superscript'),
+      subscript: () => formatText('subscript'),
       insertLink,
       insertTable,
       insertList,
@@ -614,8 +623,9 @@ const insertLink = (): void => {
 
 /**
  * 插入表格
+ * @param {object} size - 表格尺寸 {rows: number, cols: number}
  */
-const insertTable = (): void => {
+const insertTable = (size?: { rows: number; cols: number }): void => {
   if (!editorCore.value) {
     showMessage('编辑器未初始化', 'error');
     return;
@@ -624,12 +634,156 @@ const insertTable = (): void => {
   try {
     const editor = editorCore.value.getEditor();
     if (editor) {
-      editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
-      showMessage('表格插入成功', 'success');
+      // 使用传入的尺寸或默认尺寸
+      const tableSize = size || { rows: 3, cols: 3 };
+      editor.chain().focus().insertTable({ 
+        rows: tableSize.rows, 
+        cols: tableSize.cols, 
+        withHeaderRow: true 
+      }).run();
+      showMessage(`${tableSize.rows}×${tableSize.cols} 表格插入成功`, 'success');
     }
   } catch (error) {
     Console.error('插入表格失败:', error);
     showMessage('插入表格失败', 'error');
+  }
+};
+
+/**
+ * 在当前列之前添加列
+ */
+const addColumnBefore = (): void => {
+  if (!editorCore.value) {
+    showMessage('编辑器未初始化', 'error');
+    return;
+  }
+
+  try {
+    const editor = editorCore.value.getEditor();
+    if (!editor) {
+      showMessage('编辑器实例获取失败', 'error');
+      return;
+    }
+    editor.chain().focus().addColumnBefore().run();
+    showMessage('列添加成功', 'success');
+  } catch (error) {
+    Console.error('添加列失败:', error);
+    showMessage('添加列失败', 'error');
+  }
+};
+
+/**
+ * 在当前列之后添加列
+ */
+const addColumnAfter = (): void => {
+  if (!editorCore.value) {
+    showMessage('编辑器未初始化', 'error');
+    return;
+  }
+
+  try {
+    const editor = editorCore.value.getEditor();
+    if (!editor) {
+      showMessage('编辑器实例获取失败', 'error');
+      return;
+    }
+    editor.chain().focus().addColumnAfter().run();
+    showMessage('列添加成功', 'success');
+  } catch (error) {
+    Console.error('添加列失败:', error);
+    showMessage('添加列失败', 'error');
+  }
+};
+
+/**
+ * 删除当前列
+ */
+const deleteColumn = (): void => {
+  if (!editorCore.value) {
+    showMessage('编辑器未初始化', 'error');
+    return;
+  }
+
+  try {
+    const editor = editorCore.value.getEditor();
+    if (!editor) {
+      showMessage('编辑器实例获取失败', 'error');
+      return;
+    }
+    editor.chain().focus().deleteColumn().run();
+    showMessage('列删除成功', 'success');
+  } catch (error) {
+    Console.error('删除列失败:', error);
+    showMessage('删除列失败', 'error');
+  }
+};
+
+/**
+ * 在当前行之前添加行
+ */
+const addRowBefore = (): void => {
+  if (!editorCore.value) {
+    showMessage('编辑器未初始化', 'error');
+    return;
+  }
+
+  try {
+    const editor = editorCore.value.getEditor();
+    if (!editor) {
+      showMessage('编辑器实例获取失败', 'error');
+      return;
+    }
+    editor.chain().focus().addRowBefore().run();
+    showMessage('行添加成功', 'success');
+  } catch (error) {
+    Console.error('添加行失败:', error);
+    showMessage('添加行失败', 'error');
+  }
+};
+
+/**
+ * 在当前行之后添加行
+ */
+const addRowAfter = (): void => {
+  if (!editorCore.value) {
+    showMessage('编辑器未初始化', 'error');
+    return;
+  }
+
+  try {
+    const editor = editorCore.value.getEditor();
+    if (!editor) {
+      showMessage('编辑器实例获取失败', 'error');
+      return;
+    }
+    editor.chain().focus().addRowAfter().run();
+    showMessage('行添加成功', 'success');
+  } catch (error) {
+    Console.error('添加行失败:', error);
+    showMessage('添加行失败', 'error');
+  }
+};
+
+/**
+ * 删除当前行
+ */
+const deleteRow = (): void => {
+  if (!editorCore.value) {
+    showMessage('编辑器未初始化', 'error');
+    return;
+  }
+
+  try {
+    const editor = editorCore.value.getEditor();
+    if (!editor) {
+      showMessage('编辑器实例获取失败', 'error');
+      return;
+    }
+    editor.chain().focus().deleteRow().run();
+    showMessage('行删除成功', 'success');
+  } catch (error) {
+    Console.error('删除行失败:', error);
+    showMessage('删除行失败', 'error');
   }
 };
 
@@ -714,6 +868,9 @@ const setAlignment = (alignment: string): void => {
  */
 const applyTextColor = (color: string): void => {
   currentTextColor.value = color;
+  if (editorCore.value) {
+    editorCore.value.setTextColor(color);
+  }
   showMessage('文本颜色已应用', 'success');
 };
 
@@ -722,6 +879,9 @@ const applyTextColor = (color: string): void => {
  */
 const applyBgColor = (color: string): void => {
   currentBgColor.value = color;
+  if (editorCore.value) {
+    editorCore.value.setBackgroundColor(color);
+  }
   showMessage('背景颜色已应用', 'success');
 };
 
@@ -900,6 +1060,14 @@ const toggleReadOnly = (): void => {
   editorStore.setReadOnly(!editorStore.isReadOnly);
   showMessage(editorStore.isReadOnly ? '已开启只读模式' : '已关闭只读模式', 'info');
 };
+
+// 监听只读状态变化
+watch(isReadOnly, (newReadOnly: boolean) => {
+  if (editorCore.value) {
+    editorCore.value.setReadOnly(newReadOnly);
+    Console.debug('只读模式已更新:', newReadOnly);
+  }
+}, { immediate: true });
 
 // 生命周期钩子
 onMounted(async () => {
