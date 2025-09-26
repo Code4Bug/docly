@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import type { EditorData, Comment } from '../types';
 import { Console } from '../utils/Console';
 import { TiptapDataAdapter } from '../adapters/TiptapDataAdapter';
+import { TextStyleHandler } from './TextStyleHandler';
 
 /**
  * Word文档处理器
@@ -10,9 +11,11 @@ import { TiptapDataAdapter } from '../adapters/TiptapDataAdapter';
  */
 export class WordHandler {
   private tiptapAdapter: TiptapDataAdapter;
+  private textStyleHandler: TextStyleHandler;
 
   constructor() {
     this.tiptapAdapter = new TiptapDataAdapter();
+    this.textStyleHandler = new TextStyleHandler();
   }
   /**
    * 导入Word文档并转换为Editor.js数据
@@ -473,10 +476,11 @@ export class WordHandler {
     
     if (hasFormattedContent) {
       // 从格式化运行中提取文本
-      combinedText = formattedRuns
-        .filter(run => run.type === 'run')
-        .map(run => run.text || '')
-        .join('');
+      // combinedText = formattedRuns
+      //   .filter(run => run.type === 'run')
+      //   .map(run => run.text || '')
+      //   .join('');
+      combinedText = this.textStyleHandler.convertRunsToEditorFormat(formattedRuns);
     } else {
       // 如果没有格式化运行，使用传统方法提取文本
       const textElements = paragraphElement.querySelectorAll('w\\:t, t');
