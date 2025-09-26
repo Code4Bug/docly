@@ -1,4 +1,5 @@
 import type { EditorPlugin, EditorInstance, PluginConfig } from '../types';
+import { Console } from '../utils/Console';
 
 /**
  * 插件管理器
