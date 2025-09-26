@@ -178,11 +178,13 @@
 }
 
 .dark-theme .ProseMirror:focus {
-  outline: 2px solid #6d6d6d;
-  outline-offset: 2px;
+  outline: none;
+  /* outline: 2px solid #6d6d6d; */
+  /* outline-offset: 2px; */
 }
 
 .ProseMirror:focus {
-  outline: 2px solid #409eff;
-  outline-offset: 2px;
+  outline: none;
+  /* outline: 2px solid #409eff; */
+  /* outline-offset: 2px; */
 }
