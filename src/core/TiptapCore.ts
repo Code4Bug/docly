@@ -18,17 +18,19 @@ import { FontSize } from '../extensions/FontSize'
 import { FontFamily } from '../extensions/FontFamily'
 import { TextAlign } from '../extensions/TextAlign'
 import type { EditorConfig, EditorData, EditorInstance } from '../types'
+import type { TiptapDocument } from '../converters/WordToTiptapConverter'
 import { Console } from '../utils/Console'
 
 /**
  * Tiptap 编辑器核心类
  * 负责初始化和管理 Tiptap 编辑器实例
+ * 支持直接使用 Tiptap JSON 格式，消除不必要的数据转换
  */
 export class TiptapCore implements EditorInstance {
   private editor: Editor | null = null
   private config: EditorConfig
   private eventListeners: Map<string, Function[]> = new Map()
-  private history: EditorData[] = []
+  private history: TiptapDocument[] = []
   private historyIndex: number = -1
   private maxHistorySize: number = 50
   private saveHistoryTimeout: ReturnType<typeof setTimeout> | null = null
@@ -49,7 +51,7 @@ export class TiptapCore implements EditorInstance {
     if (!this.editor) return
     
     try {
-      const initialData = this.convertToEditorData()
+      const initialData = this.convertToTiptapDocument()
       this.history = [initialData]
       this.historyIndex = 0
     } catch (error) {
@@ -58,7 +60,26 @@ export class TiptapCore implements EditorInstance {
   }
 
   /**
-   * 将 Tiptap 内容转换为 EditorData 格式
+   * 将 Tiptap 内容转换为 TiptapDocument 格式
+   */
+  private convertToTiptapDocument(): TiptapDocument {
+    if (!this.editor) {
+      return {
+        type: 'doc',
+        content: [{
+          type: 'paragraph',
+          content: []
+        }]
+      }
+    }
+
+    // 直接获取 Tiptap 的 JSON 格式
+    const json = this.editor.getJSON()
+    return json as TiptapDocument
+  }
+
+  /**
+   * 将 Tiptap 内容转换为 EditorData 格式（保持向后兼容）
    */
   private convertToEditorData(): EditorData {
     if (!this.editor) {
@@ -281,6 +302,7 @@ export class TiptapCore implements EditorInstance {
     // 准备初始内容
     let initialContent = '<p>开始编写您的文档...</p>'
     if (this.config.data && this.config.data.blocks && this.config.data.blocks.length > 0) {
+      // 保持向后兼容，如果传入的是 EditorData 格式，转换为 HTML
       initialContent = this.convertFromEditorData(this.config.data)
     }
 
@@ -322,7 +344,7 @@ export class TiptapCore implements EditorInstance {
    */
   private saveToHistory(): void {
     try {
-      const currentData = this.convertToEditorData()
+      const currentData = this.convertToTiptapDocument()
       
       // 移除当前位置之后的历史记录
       this.history = this.history.slice(0, this.historyIndex + 1)
@@ -353,8 +375,8 @@ export class TiptapCore implements EditorInstance {
       this.isUndoRedoOperation = true
       this.historyIndex--
       const data = this.history[this.historyIndex]
-      const html = this.convertFromEditorData(data)
-      this.editor?.commands.setContent(html)
+      // 直接设置 Tiptap JSON 内容
+      this.editor?.commands.setContent(data)
       this.isUndoRedoOperation = false
       
       Console.debug('撤销成功，当前索引:', this.historyIndex)
@@ -376,8 +398,8 @@ export class TiptapCore implements EditorInstance {
       this.isUndoRedoOperation = true
       this.historyIndex++
       const data = this.history[this.historyIndex]
-      const html = this.convertFromEditorData(data)
-      this.editor?.commands.setContent(html)
+      // 直接设置 Tiptap JSON 内容
+      this.editor?.commands.setContent(data)
       this.isUndoRedoOperation = false
       
       Console.debug('重做成功，当前索引:', this.historyIndex)
@@ -420,7 +442,18 @@ export class TiptapCore implements EditorInstance {
   }
 
   /**
-   * 保存编辑器数据
+   * 保存编辑器数据（返回 Tiptap JSON 格式）
+   */
+  async saveTiptapJson(): Promise<TiptapDocument> {
+    if (!this.editor) {
+      throw new Error('编辑器未初始化')
+    }
+    
+    return this.convertToTiptapDocument()
+  }
+
+  /**
+   * 保存编辑器数据（保持向后兼容，返回 EditorData 格式）
    */
   async save(): Promise<EditorData> {
     if (!this.editor) {
@@ -431,7 +464,23 @@ export class TiptapCore implements EditorInstance {
   }
 
   /**
-   * 渲染编辑器数据
+   * 渲染 Tiptap JSON 数据
+   */
+  async renderTiptapJson(data: TiptapDocument): Promise<void> {
+    if (!this.editor) {
+      throw new Error('编辑器未初始化')
+    }
+    
+    // 直接设置 Tiptap JSON 内容
+    this.editor.commands.setContent(data)
+    
+    // 更新历史记录
+    this.history = [data]
+    this.historyIndex = 0
+  }
+
+  /**
+   * 渲染编辑器数据（保持向后兼容）
    */
   async render(data: EditorData): Promise<void> {
     if (!this.editor) {
@@ -441,8 +490,9 @@ export class TiptapCore implements EditorInstance {
     const html = this.convertFromEditorData(data)
     this.editor.commands.setContent(html)
     
-    // 更新历史记录
-    this.history = [data]
+    // 更新历史记录 - 转换为 Tiptap JSON 格式
+    const tiptapDoc = this.convertToTiptapDocument()
+    this.history = [tiptapDoc]
     this.historyIndex = 0
   }
 

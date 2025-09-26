@@ -1,24 +1,62 @@
 import JSZip from 'jszip';
-import type { EditorData, Comment } from '../types';
+import type { EditorData, Comment as EditorComment } from '../types';
 import { Console } from '../utils/Console';
-import { TiptapDataAdapter } from '../adapters/TiptapDataAdapter';
+import { WordToTiptapConverter, type TiptapDocument, type Comment as TiptapComment } from '../converters/WordToTiptapConverter';
 import { TextStyleHandler } from './TextStyleHandler';
 
 /**
  * Word文档处理器
  * 基于JSZip实现完整的DOCX文件生成
- * 支持 Editor.js 和 Tiptap HTML 格式
+ * 支持直接的 Word XML 到 Tiptap JSON 转换
  */
 export class WordHandler {
-  private tiptapAdapter: TiptapDataAdapter;
+  private wordToTiptapConverter: WordToTiptapConverter;
   private textStyleHandler: TextStyleHandler;
 
   constructor() {
-    this.tiptapAdapter = new TiptapDataAdapter();
+    this.wordToTiptapConverter = new WordToTiptapConverter();
     this.textStyleHandler = new TextStyleHandler();
   }
   /**
-   * 导入Word文档并转换为Editor.js数据
+   * 导入Word文档并转换为 Tiptap JSON 数据
+   * @param file - 要导入的Word文档文件
+   * @returns Promise<TiptapDocument> - 转换后的 Tiptap JSON 数据
+   */
+  async importToTiptap(file: File): Promise<TiptapDocument> {
+    try {
+      Console.debug('开始导入Word文档并转换为 Tiptap JSON:', file.name);
+      
+      // 读取DOCX文件
+      const arrayBuffer = await file.arrayBuffer();
+      const zip = await JSZip.loadAsync(arrayBuffer);
+      
+      // 提取document.xml文件
+      const documentXml = await zip.file('word/document.xml')?.async('text');
+      if (!documentXml) {
+        throw new Error('无法找到Word文档内容');
+      }
+
+      // 提取comments.xml文件（如果存在）
+      const commentXml = await zip.file('word/comments.xml')?.async('text');
+  
+      // 直接转换为 Tiptap JSON 数据
+      const tiptapDoc = this.wordToTiptapConverter.convertWordXmlToTiptapJson(documentXml);
+      
+      // 处理批注数据
+      if (commentXml) {
+        tiptapDoc.comments = this.parseWordXmlToComments(commentXml, documentXml);
+      }
+      
+      Console.debug('Word文档转换为 Tiptap JSON 完成');
+      return tiptapDoc;
+    } catch (error) {
+      Console.error('导入Word文档时发生错误:', error);
+      throw new Error(`导入失败: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * 导入Word文档并转换为Editor.js数据（保持向后兼容）
    * @param file - 要导入的Word文档文件
    * @returns Promise<EditorData> - 转换后的Editor.js数据
    */
@@ -41,7 +79,7 @@ export class WordHandler {
 
       const commentXml = await zip.file('word/comments.xml')?.async('text');
       if (commentXml) {
-        editorData.comments = this.parseWordXmlToComments(commentXml, documentXml);
+        editorData.comments = this.parseWordXmlToEditorComments(commentXml, documentXml);
       }
       
       return editorData;
@@ -173,15 +211,15 @@ export class WordHandler {
   }
 
   /**
-   * 解析Word XML中的注释并转换为Editor.js格式
+   * 解析Word XML中的注释并转换为Tiptap格式
    * @param xmlContent - Word文档的XML内容
    * @param documentXml - 主文档XML内容，用于提取批注对应的原文
-   * @returns Editor.js注释数据
+   * @returns Tiptap注释数据
    */
-  private parseWordXmlToComments(xmlContent: string, documentXml?: string): EditorData['comments'] {
+  private parseWordXmlToComments(xmlContent: string, documentXml?: string): TiptapComment[] {
     const parser = new DOMParser();
     const doc = parser.parseFromString(xmlContent, 'text/xml');
-    const comments: EditorData['comments'] = [];
+    const comments: TiptapComment[] = [];
     
     // 如果有主文档XML，解析批注范围映射
     const commentRangeTextMap = new Map<string, string>();
@@ -224,7 +262,79 @@ export class WordHandler {
       }
       
       // 创建批注对象
-      const commentObj: Comment = {
+      const commentObj: TiptapComment = {
+        id: commentId || `comment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        content: commentContent.trim(),
+        author: commentAuthor || '未知作者',
+        user: commentAuthor || '未知作者',
+        timestamp: timestamp,
+        range: {
+          startOffset: 0,
+          endOffset: originalText.length || commentContent.trim().length,
+          text: originalText || commentContent.trim()
+        }
+      };
+      
+      // 移除回复批注处理逻辑，简化为基本批注结构
+      comments.push(commentObj);
+    });
+    
+    Console.debug(`从Word文档中提取了 ${comments.length} 个批注`);
+    return comments;
+  }
+
+  /**
+   * 解析Word XML中的注释并转换为EditorData格式
+   * @param xmlContent - Word文档的XML内容
+   * @param documentXml - 主文档XML内容，用于提取批注对应的原文
+   * @returns EditorData注释数据
+   */
+  private parseWordXmlToEditorComments(xmlContent: string, documentXml?: string): EditorComment[] {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xmlContent, 'text/xml');
+    const comments: EditorComment[] = [];
+    
+    // 如果有主文档XML，解析批注范围映射
+    const commentRangeTextMap = new Map<string, string>();
+    if (documentXml) {
+      this.extractCommentRangeText(documentXml, commentRangeTextMap);
+    }
+    
+    // 获取所有注释元素
+    const commentElements = doc.querySelectorAll('w\\:comment, comment');
+    
+    commentElements.forEach(comment => {
+      const commentId = comment.getAttribute('w:id') || comment.getAttribute('id');
+      const commentAuthor = comment.getAttribute('w:author') || comment.getAttribute('author');
+      const commentDate = comment.getAttribute('w:date') || comment.getAttribute('date');
+      const commentInitials = comment.getAttribute('w:initials') || comment.getAttribute('initials');
+      
+      // 提取批注内容
+      let commentContent = '';
+      const textElements = comment.querySelectorAll('w\\:t, t');
+      textElements.forEach(textEl => {
+        commentContent += textEl.textContent || '';
+      });
+      
+      // 如果没有找到文本元素，尝试直接获取文本内容
+      if (!commentContent.trim()) {
+        commentContent = comment.textContent || '';
+      }
+      
+      // 获取批注对应的原文
+      const originalText = commentRangeTextMap.get(commentId || '') || '';
+      
+      // 处理时间戳
+      let timestamp = Date.now();
+      if (commentDate) {
+        const parsedDate = new Date(commentDate);
+        if (!isNaN(parsedDate.getTime())) {
+          timestamp = parsedDate.getTime();
+        }
+      }
+      
+      // 创建批注对象
+      const commentObj: EditorComment = {
         id: commentId || `comment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         content: commentContent.trim(),
         user: commentAuthor || '未知作者',
@@ -234,59 +344,11 @@ export class WordHandler {
           endOffset: originalText.length || commentContent.trim().length,
           text: originalText || commentContent.trim()
         },
-        // Word文档特有字段
         author: commentAuthor || '未知作者',
         date: commentDate || new Date(timestamp).toISOString(),
         initials: commentInitials || (commentAuthor ? commentAuthor.substring(0, 2).toUpperCase() : 'UN'),
         resolved: false
       };
-      
-      // 检查是否有回复批注（嵌套的批注）
-      const replyElements = comment.querySelectorAll('w\\:comment, comment');
-      if (replyElements.length > 1) {
-        commentObj.replies = [];
-        // 跳过第一个元素（它是父批注本身）
-        for (let i = 1; i < replyElements.length; i++) {
-          const reply = replyElements[i];
-          const replyId = reply.getAttribute('w:id') || reply.getAttribute('id');
-          const replyAuthor = reply.getAttribute('w:author') || reply.getAttribute('author');
-          const replyDate = reply.getAttribute('w:date') || reply.getAttribute('date');
-          
-          let replyContent = '';
-          const replyTextElements = reply.querySelectorAll('w\\:t, t');
-          replyTextElements.forEach(textEl => {
-            replyContent += textEl.textContent || '';
-          });
-          
-          if (!replyContent.trim()) {
-            replyContent = reply.textContent || '';
-          }
-          
-          let replyTimestamp = Date.now();
-          if (replyDate) {
-            const parsedReplyDate = new Date(replyDate);
-            if (!isNaN(parsedReplyDate.getTime())) {
-              replyTimestamp = parsedReplyDate.getTime();
-            }
-          }
-          
-          commentObj.replies.push({
-            id: replyId || `reply-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            content: replyContent.trim(),
-            user: replyAuthor || '未知作者',
-            timestamp: replyTimestamp,
-            range: {
-              startOffset: 0,
-              endOffset: replyContent.trim().length,
-              text: replyContent.trim()
-            },
-            author: replyAuthor || '未知作者',
-            date: replyDate || new Date(replyTimestamp).toISOString(),
-            parentId: commentObj.id,
-            resolved: false
-          });
-        }
-      }
       
       comments.push(commentObj);
     });
@@ -326,7 +388,37 @@ export class WordHandler {
   }
 
   /**
-   * 导出 Tiptap HTML 为 Word 文档
+   * 从 Tiptap JSON 导出Word文档
+   * @param tiptapDoc - Tiptap JSON 文档数据
+   * @param filename - 导出的文件名
+   */
+  async exportFromTiptapJson(tiptapDoc: TiptapDocument, filename: string = 'document'): Promise<{ blob: Blob; name: string }> {
+    try {
+      Console.debug('开始从 Tiptap JSON 导出Word文档');
+      
+      // 直接从 Tiptap JSON 转换为 Word XML
+      const wordXml = this.wordToTiptapConverter.convertTiptapJsonToWordXml(tiptapDoc);
+      
+      // 创建完整的 DOCX 文件
+      const zip = new JSZip();
+      
+      // 添加基本的 DOCX 结构文件 - 使用现有的 generateDocxFile 逻辑
+      await this.addDocxStructureFiles(zip, wordXml);
+      
+      // 生成 DOCX 文件
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const finalFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
+      
+      Console.debug('从 Tiptap JSON 导出Word文档成功');
+      return { blob, name: finalFilename };
+    } catch (error) {
+      Console.error('从 Tiptap JSON 导出Word文档时发生错误:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 导出 Tiptap HTML 为 Word 文档（保持向后兼容）
    * @param html - Tiptap 编辑器的 HTML 内容
    * @param filename - 导出的文件名
    */
@@ -335,7 +427,7 @@ export class WordHandler {
       Console.debug('开始从 HTML 导出Word文档:', html);
       
       // 将 HTML 转换为 Editor.js 数据格式，然后导出
-      const editorData = this.tiptapAdapter.htmlToEditorData(html);
+      const editorData = this.parseHtmlToEditorData(html);
       return await this.export(editorData, filename);
     } catch (error) {
       Console.error('从 HTML 导出Word文档时发生错误:', error);
@@ -344,7 +436,7 @@ export class WordHandler {
   }
 
   /**
-   * 导入 Word 文档并转换为 Tiptap HTML 格式
+   * 导入 Word 文档并转换为 Tiptap HTML 格式（保持向后兼容）
    * @param file - 要导入的Word文档文件
    * @returns Promise<string> - Tiptap 可用的 HTML 内容
    */
@@ -356,7 +448,7 @@ export class WordHandler {
       const editorData = await this.import(file);
       
       // 转换为 Tiptap HTML 格式
-      const html = this.tiptapAdapter.editorDataToHtml(editorData);
+      const html = this.convertEditorDataToHtml(editorData);
       
       Console.debug('转换为HTML成功:', html);
       return html;
@@ -426,7 +518,7 @@ export class WordHandler {
     });
 
     // 解析批注信息（如果提供了批注XML）
-    let comments: Comment[] = [];
+    let comments: any[] = [];
     if (commentsXml) {
       const parsedComments = this.parseWordXmlToComments(commentsXml, xmlContent);
       comments = parsedComments || [];
@@ -1071,6 +1163,138 @@ export class WordHandler {
     }
     
     return null;
+  }
+
+  /**
+   * 解析 HTML 并转换为 Editor.js 数据（替代 TiptapDataAdapter.htmlToEditorData）
+   * @param html - HTML 字符串
+   * @returns EditorData
+   */
+  private parseHtmlToEditorData(html: string): EditorData {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      const body = doc.body;
+      
+      const blocks: any[] = [];
+      let blockIndex = 0;
+      
+      // 遍历所有子元素
+      Array.from(body.children).forEach(element => {
+        const block = this.htmlElementToBlock(element, blockIndex++);
+        if (block) {
+          blocks.push(block);
+        }
+      });
+      
+      // 如果没有块，添加一个空段落
+      if (blocks.length === 0) {
+        blocks.push({
+          id: 'block_0',
+          type: 'paragraph',
+          data: { text: '' }
+        });
+      }
+      
+      return {
+        time: Date.now(),
+        blocks,
+        version: '2.28.2'
+      };
+    } catch (error) {
+      Console.error('解析 HTML 时发生错误:', error);
+      return {
+        time: Date.now(),
+        blocks: [{
+          id: 'block_0',
+          type: 'paragraph',
+          data: { text: '' }
+        }],
+        version: '2.28.2'
+      };
+    }
+  }
+
+  /**
+   * 将 HTML 元素转换为 Editor.js 块
+   * @param element - HTML 元素
+   * @param index - 块索引
+   * @returns Editor.js 块或 null
+   */
+  private htmlElementToBlock(element: Element, index: number): any | null {
+    const tagName = element.tagName.toLowerCase();
+    const id = `block_${index}`;
+    
+    switch (tagName) {
+      case 'h1':
+      case 'h2':
+      case 'h3':
+      case 'h4':
+      case 'h5':
+      case 'h6':
+        return {
+          id,
+          type: 'header',
+          data: {
+            text: element.textContent || '',
+            level: parseInt(tagName.charAt(1))
+          }
+        };
+      
+      case 'p':
+        return {
+          id,
+          type: 'paragraph',
+          data: {
+            text: element.innerHTML || ''
+          }
+        };
+      
+      case 'ul':
+      case 'ol':
+        const listItems = Array.from(element.querySelectorAll('li')).map(li => li.textContent || '');
+        return {
+          id,
+          type: 'list',
+          data: {
+            style: tagName === 'ul' ? 'unordered' : 'ordered',
+            items: listItems
+          }
+        };
+      
+      case 'blockquote':
+        return {
+          id,
+          type: 'quote',
+          data: {
+            text: element.textContent || '',
+            caption: ''
+          }
+        };
+      
+      case 'pre':
+      case 'code':
+        return {
+          id,
+          type: 'code',
+          data: {
+            code: element.textContent || ''
+          }
+        };
+      
+      default:
+        // 对于其他元素，转换为段落
+        if (element.textContent?.trim()) {
+          return {
+            id,
+            type: 'paragraph',
+            data: {
+              text: element.innerHTML || ''
+            }
+          };
+        }
+        return null;
+    }
   }
 
   /**
@@ -2518,5 +2742,59 @@ export class WordHandler {
     });
     
     return runs;
+  }
+
+  /**
+   * 添加 DOCX 结构文件到 ZIP
+   * @param zip - JSZip 实例
+   * @param wordContent - Word XML 内容
+   */
+  private async addDocxStructureFiles(zip: JSZip, wordContent: string): Promise<void> {
+    // _rels/.rels
+    zip.folder('_rels')!.file('.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`);
+    
+    // [Content_Types].xml
+    zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+    <Default Extension="xml" ContentType="application/xml"/>
+    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+    <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+    <Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>
+    <Override PartName="/word/fontTable.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml"/>
+</Types>`);
+    
+    // word/_rels/document.xml.rels
+    zip.folder('word')!.folder('_rels')!.file('document.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+    <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>
+    <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable" Target="fontTable.xml"/>
+</Relationships>`);
+    
+    // word/document.xml (主文档)
+    zip.folder('word')!.file('document.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+    <w:body>
+        ${wordContent}
+        <w:sectPr>
+            <w:pgSz w:w="11906" w:h="16838"/>
+            <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/>
+            <w:cols w:space="708"/>
+        </w:sectPr>
+    </w:body>
+</w:document>`);
+    
+    // word/styles.xml
+    zip.folder('word')!.file('styles.xml', this.getStylesXml());
+    
+    // word/settings.xml
+    zip.folder('word')!.file('settings.xml', this.getSettingsXml());
+    
+    // word/fontTable.xml
+    zip.folder('word')!.file('fontTable.xml', this.getFontTableXml());
   }
 }

@@ -422,15 +422,16 @@ const handleExport = async (): Promise<void> => {
 
   isExporting.value = true;
   try {
-    const currentEditorData = await editorCore.value.save();
-    Console.debug('准备导出的数据:', currentEditorData);
+    // 使用新的 Tiptap JSON 导出方法
+    const tiptapJson = await editorCore.value.saveTiptapJson();
+    Console.debug('准备导出的 Tiptap JSON 数据:', tiptapJson);
     
-    if (!currentEditorData || !currentEditorData.blocks || currentEditorData.blocks.length === 0) {
+    if (!tiptapJson || !tiptapJson.content || tiptapJson.content.length === 0) {
       showMessage('没有内容可导出，请先添加一些内容', 'warn');
       return;
     }
     
-    const fileResult = await wordHandler.value.export(currentEditorData);
+    const fileResult = await wordHandler.value.exportFromTiptapJson(tiptapJson);
     
     const url = URL.createObjectURL(fileResult.blob); 
     const a = document.createElement('a');
@@ -486,13 +487,15 @@ const handleImport = async (event: Event): Promise<void> => {
   try {
     showMessage('正在导入文档，请稍候...', 'info');
     
-    const editorData = await wordHandler.value.import(file);
+    // 使用新的 Tiptap JSON 转换方法
+    const tiptapJson = await wordHandler.value.importToTiptap(file);
     
     annotations.value = [];
     Console.debug('已清空现有批注');
     
-    if (editorData.comments && editorData.comments.length > 0) {
-      editorData.comments.forEach((comment: any, index: number) => {
+    // 处理批注数据（如果有的话）
+    if (tiptapJson.comments && tiptapJson.comments.length > 0) {
+      tiptapJson.comments.forEach((comment: any, index: number) => {
         annotations.value.push({
           id: comment.id || `imported_${Date.now()}_${index}`,
           content: comment.content,
@@ -507,7 +510,8 @@ const handleImport = async (event: Event): Promise<void> => {
     }
     
     if (editorCore.value) {
-      await editorCore.value.render(editorData);
+      // 直接使用 Tiptap JSON 渲染
+      await editorCore.value.renderTiptapJson(tiptapJson);
       showMessage('文档导入成功', 'success');
     }
     
