@@ -90,8 +90,9 @@ export class TiptapCore implements EditorInstance {
       }
     }
 
-    const html = this.editor.getHTML()
-    const blocks = this.parseHTMLToBlocks(html)
+    // 直接从 Tiptap JSON 转换，保留样式信息
+    const tiptapDoc = this.convertToTiptapDocument()
+    const blocks = this.convertTiptapNodesToBlocks(tiptapDoc.content || [])
     
     return {
       time: Date.now(),
@@ -101,24 +102,187 @@ export class TiptapCore implements EditorInstance {
   }
 
   /**
-   * 解析 HTML 为块格式
+   * 将 Tiptap 节点转换为 EditorData 块格式
    */
-  private parseHTMLToBlocks(html: string): any[] {
-    const parser = new DOMParser()
-    const doc = parser.parseFromString(html, 'text/html')
+  private convertTiptapNodesToBlocks(nodes: any[]): any[] {
     const blocks: any[] = []
     
-    const elements = doc.body.children
-    
-    for (let i = 0; i < elements.length; i++) {
-      const element = elements[i]
-      const block = this.elementToBlock(element, i)
+    nodes.forEach((node, index) => {
+      const block = this.tiptapNodeToBlock(node, index)
       if (block) {
         blocks.push(block)
       }
-    }
+    })
     
     return blocks
+  }
+
+  /**
+   * 将单个 Tiptap 节点转换为块
+   */
+  private tiptapNodeToBlock(node: any, index: number): any | null {
+    const id = `block-${Date.now()}-${index}`
+    
+    // 提取节点的样式信息
+    const styles = this.extractTiptapNodeStyles(node)
+    
+    switch (node.type) {
+      case 'heading':
+        return {
+          id,
+          type: 'header',
+          data: {
+            text: this.extractTextFromTiptapNode(node),
+            level: node.attrs?.level || 1,
+            styles
+          }
+        }
+      
+      case 'paragraph':
+        return {
+          id,
+          type: 'paragraph',
+          data: {
+            text: this.extractTextFromTiptapNode(node),
+            styles
+          }
+        }
+      
+      case 'bulletList':
+      case 'orderedList':
+        const items = node.content?.map((item: any) => 
+          this.extractTextFromTiptapNode(item)
+        ) || []
+        return {
+          id,
+          type: 'list',
+          data: {
+            style: node.type === 'bulletList' ? 'unordered' : 'ordered',
+            items,
+            styles
+          }
+        }
+      
+      case 'blockquote':
+        return {
+          id,
+          type: 'quote',
+          data: {
+            text: this.extractTextFromTiptapNode(node),
+            caption: '',
+            styles
+          }
+        }
+      
+      case 'codeBlock':
+        return {
+          id,
+          type: 'code',
+          data: {
+            code: this.extractTextFromTiptapNode(node),
+            styles
+          }
+        }
+      
+      case 'table':
+        const rows = node.content?.map((row: any) => {
+          return row.content?.map((cell: any) => 
+            this.extractTextFromTiptapNode(cell)
+          ) || []
+        }) || []
+        return {
+          id,
+          type: 'table',
+          data: {
+            content: rows,
+            styles
+          }
+        }
+      
+      default:
+        // 对于其他节点类型，尝试作为段落处理
+        const text = this.extractTextFromTiptapNode(node)
+        if (text.trim()) {
+          return {
+            id,
+            type: 'paragraph',
+            data: {
+              text,
+              styles
+            }
+          }
+        }
+        return null
+    }
+  }
+
+  /**
+   * 从 Tiptap 节点提取样式信息
+   */
+  private extractTiptapNodeStyles(node: any): any {
+    const styles: any = {}
+    
+    // 从节点属性中提取样式
+    if (node.attrs) {
+      if (node.attrs.textAlign) {
+        styles.textAlign = node.attrs.textAlign
+      }
+      if (node.attrs.fontSize) {
+        styles.fontSize = node.attrs.fontSize
+      }
+      if (node.attrs.fontFamily) {
+        styles.fontFamily = node.attrs.fontFamily
+      }
+      if (node.attrs.color) {
+        styles.color = node.attrs.color
+      }
+      if (node.attrs.backgroundColor) {
+        styles.backgroundColor = node.attrs.backgroundColor
+      }
+    }
+    
+    // 从标记中提取样式信息
+    if (node.content) {
+      node.content.forEach((childNode: any) => {
+        if (childNode.marks) {
+          childNode.marks.forEach((mark: any) => {
+            switch (mark.type) {
+              case 'textStyle':
+                if (mark.attrs) {
+                  if (mark.attrs.fontSize) styles.fontSize = mark.attrs.fontSize
+                  if (mark.attrs.fontFamily) styles.fontFamily = mark.attrs.fontFamily
+                  if (mark.attrs.color) styles.color = mark.attrs.color
+                }
+                break
+              case 'textAlign':
+                if (mark.attrs?.textAlign) {
+                  styles.textAlign = mark.attrs.textAlign
+                }
+                break
+            }
+          })
+        }
+      })
+    }
+    
+    return styles
+  }
+
+  /**
+   * 从 Tiptap 节点提取纯文本内容
+   */
+  private extractTextFromTiptapNode(node: any): string {
+    if (node.type === 'text') {
+      return node.text || ''
+    }
+    
+    if (node.content) {
+      return node.content.map((child: any) => 
+        this.extractTextFromTiptapNode(child)
+      ).join('')
+    }
+    
+    return ''
   }
 
   /**
@@ -127,6 +291,9 @@ export class TiptapCore implements EditorInstance {
   private elementToBlock(element: Element, index: number): any | null {
     const tagName = element.tagName.toLowerCase()
     const id = `block-${Date.now()}-${index}`
+    
+    // 提取元素的样式信息
+    const styles = this.extractElementStyles(element)
     
     switch (tagName) {
       case 'h1':
@@ -140,7 +307,8 @@ export class TiptapCore implements EditorInstance {
           type: 'header',
           data: {
             text: element.textContent || '',
-            level: parseInt(tagName.charAt(1))
+            level: parseInt(tagName.charAt(1)),
+            styles
           }
         }
       
@@ -149,7 +317,8 @@ export class TiptapCore implements EditorInstance {
           id,
           type: 'paragraph',
           data: {
-            text: element.innerHTML || ''
+            text: element.innerHTML || '',
+            styles
           }
         }
       
@@ -161,7 +330,8 @@ export class TiptapCore implements EditorInstance {
           type: 'list',
           data: {
             style: tagName === 'ul' ? 'unordered' : 'ordered',
-            items
+            items,
+            styles
           }
         }
       
@@ -171,7 +341,8 @@ export class TiptapCore implements EditorInstance {
           type: 'quote',
           data: {
             text: element.textContent || '',
-            caption: ''
+            caption: '',
+            styles
           }
         }
       
@@ -181,7 +352,8 @@ export class TiptapCore implements EditorInstance {
           id,
           type: 'code',
           data: {
-            code: code ? code.textContent || '' : element.textContent || ''
+            code: code ? code.textContent || '' : element.textContent || '',
+            styles
           }
         }
       
@@ -193,7 +365,8 @@ export class TiptapCore implements EditorInstance {
           id,
           type: 'table',
           data: {
-            content: rows
+            content: rows,
+            styles
           }
         }
       
@@ -204,12 +377,87 @@ export class TiptapCore implements EditorInstance {
             id,
             type: 'paragraph',
             data: {
-              text: element.innerHTML || ''
+              text: element.innerHTML || '',
+              styles
             }
           }
         }
         return null
     }
+  }
+
+  /**
+   * 提取元素的样式信息
+   */
+  private extractElementStyles(element: Element): any {
+    const styles: any = {}
+    const computedStyle = window.getComputedStyle(element)
+    
+    // 提取文本对齐
+    const textAlign = computedStyle.textAlign
+    if (textAlign && textAlign !== 'start') {
+      styles.textAlign = textAlign
+    }
+    
+    // 提取字体大小
+    const fontSize = computedStyle.fontSize
+    if (fontSize) {
+      styles.fontSize = fontSize
+    }
+    
+    // 提取字体族
+    const fontFamily = computedStyle.fontFamily
+    if (fontFamily && fontFamily !== 'initial') {
+      styles.fontFamily = fontFamily
+    }
+    
+    // 提取行高
+    const lineHeight = computedStyle.lineHeight
+    if (lineHeight && lineHeight !== 'normal') {
+      styles.lineHeight = lineHeight
+    }
+    
+    // 提取颜色
+    const color = computedStyle.color
+    if (color && color !== 'rgb(0, 0, 0)') {
+      styles.color = color
+    }
+    
+    // 提取背景色
+    const backgroundColor = computedStyle.backgroundColor
+    if (backgroundColor && backgroundColor !== 'rgba(0, 0, 0, 0)' && backgroundColor !== 'transparent') {
+      styles.backgroundColor = backgroundColor
+    }
+    
+    // 提取边距
+    const marginTop = computedStyle.marginTop
+    const marginBottom = computedStyle.marginBottom
+    const marginLeft = computedStyle.marginLeft
+    const marginRight = computedStyle.marginRight
+    
+    if (marginTop && marginTop !== '0px') styles.marginTop = marginTop
+    if (marginBottom && marginBottom !== '0px') styles.marginBottom = marginBottom
+    if (marginLeft && marginLeft !== '0px') styles.marginLeft = marginLeft
+    if (marginRight && marginRight !== '0px') styles.marginRight = marginRight
+    
+    // 提取内边距
+    const paddingTop = computedStyle.paddingTop
+    const paddingBottom = computedStyle.paddingBottom
+    const paddingLeft = computedStyle.paddingLeft
+    const paddingRight = computedStyle.paddingRight
+    
+    if (paddingTop && paddingTop !== '0px') styles.paddingTop = paddingTop
+    if (paddingBottom && paddingBottom !== '0px') styles.paddingBottom = paddingBottom
+    if (paddingLeft && paddingLeft !== '0px') styles.paddingLeft = paddingLeft
+    if (paddingRight && paddingRight !== '0px') styles.paddingRight = paddingRight
+    
+    // 提取文本缩进
+    const textIndent = computedStyle.textIndent
+    if (textIndent && textIndent !== '0px') {
+      styles.textIndent = textIndent
+    }
+    
+    return styles
   }
 
   /**

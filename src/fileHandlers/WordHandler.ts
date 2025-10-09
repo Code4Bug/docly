@@ -938,7 +938,85 @@ export class WordHandler {
   private extractBlockStyles(block: any): string {
     const styles: string[] = [];
     
-    // 检查块的tunes或其他样式配置
+    // 优先处理 TiptapCore 生成的 styles 对象
+    if (block.data && block.data.styles) {
+      const blockStyles = block.data.styles;
+      
+      // 文本对齐
+      if (blockStyles.textAlign) {
+        styles.push(`text-align: ${blockStyles.textAlign}`);
+      }
+      
+      // 字体大小
+      if (blockStyles.fontSize) {
+        styles.push(`font-size: ${blockStyles.fontSize}`);
+      }
+      
+      // 字体家族
+      if (blockStyles.fontFamily) {
+        styles.push(`font-family: ${blockStyles.fontFamily}`);
+      }
+      
+      // 颜色
+      if (blockStyles.color) {
+        styles.push(`color: ${blockStyles.color}`);
+      }
+      
+      // 背景色
+      if (blockStyles.backgroundColor) {
+        styles.push(`background-color: ${blockStyles.backgroundColor}`);
+      }
+      
+      // 字体粗细
+      if (blockStyles.fontWeight) {
+        styles.push(`font-weight: ${blockStyles.fontWeight}`);
+      }
+      
+      // 字体样式
+      if (blockStyles.fontStyle) {
+        styles.push(`font-style: ${blockStyles.fontStyle}`);
+      }
+      
+      // 行高
+      if (blockStyles.lineHeight) {
+        styles.push(`line-height: ${blockStyles.lineHeight}`);
+      }
+      
+      // 边距
+      if (blockStyles.marginTop) {
+        styles.push(`margin-top: ${blockStyles.marginTop}`);
+      }
+      if (blockStyles.marginBottom) {
+        styles.push(`margin-bottom: ${blockStyles.marginBottom}`);
+      }
+      if (blockStyles.marginLeft) {
+        styles.push(`margin-left: ${blockStyles.marginLeft}`);
+      }
+      if (blockStyles.marginRight) {
+        styles.push(`margin-right: ${blockStyles.marginRight}`);
+      }
+      
+      // 内边距
+      if (blockStyles.paddingTop) {
+        styles.push(`padding-top: ${blockStyles.paddingTop}`);
+      }
+      if (blockStyles.paddingBottom) {
+        styles.push(`padding-bottom: ${blockStyles.paddingBottom}`);
+      }
+      if (blockStyles.paddingLeft) {
+        styles.push(`padding-left: ${blockStyles.paddingLeft}`);
+      }
+      if (blockStyles.paddingRight) {
+        styles.push(`padding-right: ${blockStyles.paddingRight}`);
+      }
+      
+      // 文本缩进
+      if (blockStyles.textIndent) {
+        styles.push(`text-indent: ${blockStyles.textIndent}`);
+      }
+    }
+    
+    // 兼容旧的数据结构
     if (block.tunes) {
       // 文本对齐
       if (block.tunes.textAlign) {
@@ -976,7 +1054,7 @@ export class WordHandler {
       }
     }
     
-    // 检查data中的样式信息
+    // 兼容其他旧的样式配置
     if (block.data) {
       // 处理段落样式
       if (block.data.paragraphStyles) {

@@ -109,6 +109,9 @@ export class WordToTiptapConverter {
     const paragraphStyle = paragraphProps?.querySelector('w\\:pStyle, pStyle');
     const styleVal = paragraphStyle?.getAttribute('w:val') || paragraphStyle?.getAttribute('val');
     
+    // 提取段落级样式属性
+    const paragraphAttrs = this.extractParagraphAttrs(paragraphProps);
+    
     // 提取段落中的所有文本运行
     const runs = paragraph.querySelectorAll('w\\:r, r');
     const content: TiptapNode[] = [];
@@ -129,7 +132,7 @@ export class WordToTiptapConverter {
       
       return {
         type: 'heading',
-        attrs: { level },
+        attrs: { level, ...paragraphAttrs },
         content: content.length > 0 ? content : [{ type: 'text', text: ' ' }]
       };
     }
@@ -141,6 +144,7 @@ export class WordToTiptapConverter {
         type: 'listItem',
         content: [{
           type: 'paragraph',
+          attrs: paragraphAttrs,
           content: content.length > 0 ? content : [{ type: 'text', text: ' ' }]
         }]
       };
@@ -153,6 +157,7 @@ export class WordToTiptapConverter {
     
     return {
       type: 'paragraph',
+      attrs: paragraphAttrs,
       content
     };
   }
@@ -195,6 +200,139 @@ export class WordToTiptapConverter {
    * @param runProps - Word 运行属性元素
    * @returns Tiptap 标记数组
    */
+  /**
+   * 提取段落级样式属性
+   * @param paragraphProps - 段落属性元素
+   * @returns 段落样式属性对象
+   */
+  private extractParagraphAttrs(paragraphProps: Element | null): Record<string, any> {
+    if (!paragraphProps) return {};
+    
+    const attrs: Record<string, any> = {};
+    
+    // 文本对齐
+    const textAlign = paragraphProps.querySelector('w\\:jc, jc');
+    if (textAlign) {
+      const align = textAlign.getAttribute('w:val') || textAlign.getAttribute('val');
+      if (align) {
+        // Word 对齐值映射到 CSS 值
+        const alignMap: Record<string, string> = {
+          'left': 'left',
+          'center': 'center',
+          'right': 'right',
+          'both': 'justify',
+          'distribute': 'justify'
+        };
+        attrs.textAlign = alignMap[align] || align;
+      }
+    }
+    
+    // 字体大小（段落级别的默认字体大小）
+    const fontSize = paragraphProps.querySelector('w\\:sz, sz');
+    if (fontSize) {
+      const size = fontSize.getAttribute('w:val') || fontSize.getAttribute('val');
+      if (size) {
+        // Word 中的字体大小是半点单位，需要除以2
+        attrs.fontSize = `${parseInt(size) / 2}pt`;
+      }
+    }
+    
+    // 字体族（段落级别的默认字体）
+    const fontFamily = paragraphProps.querySelector('w\\:rFonts, rFonts');
+    if (fontFamily) {
+      const font = fontFamily.getAttribute('w:ascii') || fontFamily.getAttribute('ascii');
+      if (font) {
+        attrs.fontFamily = font;
+      }
+    }
+    
+    // 字体颜色（段落级别的默认颜色）
+    const color = paragraphProps.querySelector('w\\:color, color');
+    if (color) {
+      const colorVal = color.getAttribute('w:val') || color.getAttribute('val');
+      if (colorVal && colorVal !== 'auto') {
+        attrs.color = `#${colorVal}`;
+      }
+    }
+    
+    // 背景颜色
+    const backgroundColor = paragraphProps.querySelector('w\\:shd, shd');
+    if (backgroundColor) {
+      const bgColor = backgroundColor.getAttribute('w:fill') || backgroundColor.getAttribute('fill');
+      if (bgColor && bgColor !== 'auto') {
+        attrs.backgroundColor = `#${bgColor}`;
+      }
+    }
+    
+    // 行间距
+    const spacing = paragraphProps.querySelector('w\\:spacing, spacing');
+    if (spacing) {
+      const lineRule = spacing.getAttribute('w:lineRule') || spacing.getAttribute('lineRule');
+      const line = spacing.getAttribute('w:line') || spacing.getAttribute('line');
+      
+      if (line) {
+        if (lineRule === 'exact') {
+          // 固定行距，单位是缇（twips），1缇 = 1/20点
+          attrs.lineHeight = `${parseInt(line) / 20}pt`;
+        } else if (lineRule === 'atLeast') {
+          // 最小行距
+          attrs.lineHeight = `${parseInt(line) / 20}pt`;
+        } else {
+          // 多倍行距，240 = 单倍行距
+          const multiplier = parseInt(line) / 240;
+          attrs.lineHeight = multiplier.toString();
+        }
+      }
+    }
+    
+    // 段前间距
+    const spacingBefore = paragraphProps.querySelector('w\\:spacing, spacing');
+    if (spacingBefore) {
+      const before = spacingBefore.getAttribute('w:before') || spacingBefore.getAttribute('before');
+      if (before) {
+        // 单位是缇（twips），1缇 = 1/20点
+        attrs.marginTop = `${parseInt(before) / 20}pt`;
+      }
+    }
+    
+    // 段后间距
+    const spacingAfter = paragraphProps.querySelector('w\\:spacing, spacing');
+    if (spacingAfter) {
+      const after = spacingAfter.getAttribute('w:after') || spacingAfter.getAttribute('after');
+      if (after) {
+        // 单位是缇（twips），1缇 = 1/20点
+        attrs.marginBottom = `${parseInt(after) / 20}pt`;
+      }
+    }
+    
+    // 首行缩进
+    const indentation = paragraphProps.querySelector('w\\:ind, ind');
+    if (indentation) {
+      const firstLine = indentation.getAttribute('w:firstLine') || indentation.getAttribute('firstLine');
+      const hanging = indentation.getAttribute('w:hanging') || indentation.getAttribute('hanging');
+      const left = indentation.getAttribute('w:left') || indentation.getAttribute('left');
+      const right = indentation.getAttribute('w:right') || indentation.getAttribute('right');
+      
+      if (firstLine) {
+        // 首行缩进，单位是缇（twips）
+        attrs.textIndent = `${parseInt(firstLine) / 20}pt`;
+      } else if (hanging) {
+        // 悬挂缩进
+        attrs.textIndent = `-${parseInt(hanging) / 20}pt`;
+      }
+      
+      if (left) {
+        attrs.marginLeft = `${parseInt(left) / 20}pt`;
+      }
+      
+      if (right) {
+        attrs.marginRight = `${parseInt(right) / 20}pt`;
+      }
+    }
+    
+    return attrs;
+  }
+
   private extractMarksFromRunProps(runProps: Element | null): TiptapMark[] {
     if (!runProps) return [];
     
