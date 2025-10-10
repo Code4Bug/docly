@@ -61,12 +61,61 @@ export class WordToTiptapConverter {
       const paragraphs = doc.querySelectorAll("w\\:p, p");
       const content: TiptapNode[] = [];
 
+      // 用于跟踪列表状态
+      let currentListType: 'bulletList' | 'orderedList' | null = null;
+      let currentListItems: TiptapNode[] = [];
+
       paragraphs.forEach((paragraph) => {
-        const node = this.convertParagraphToTiptapNode(paragraph);
-        if (node) {
-          content.push(node);
+        const paragraphProps = paragraph.querySelector("w\\:pPr, pPr");
+        const numPr = paragraphProps?.querySelector("w\\:numPr, numPr");
+        
+        if (numPr) {
+          // 这是一个列表项
+          const listType = this.determineListType(numPr);
+          const listItem = this.convertParagraphToListItem(paragraph);
+          
+          if (listItem) {
+            if (currentListType === listType) {
+              // 继续当前列表
+              currentListItems.push(listItem);
+            } else {
+              // 结束当前列表，开始新列表
+              if (currentListType && currentListItems.length > 0) {
+                content.push({
+                  type: currentListType,
+                  content: currentListItems
+                });
+              }
+              currentListType = listType;
+              currentListItems = [listItem];
+            }
+          }
+        } else {
+          // 不是列表项，结束当前列表
+          if (currentListType && currentListItems.length > 0) {
+            content.push({
+              type: currentListType,
+              content: currentListItems
+            });
+            currentListType = null;
+            currentListItems = [];
+          }
+          
+          // 处理普通段落
+          const node = this.convertParagraphToTiptapNode(paragraph);
+          if (node) {
+            content.push(node);
+          }
         }
       });
+
+      // 处理最后的列表
+      if (currentListType && currentListItems.length > 0) {
+        content.push({
+          type: currentListType,
+          content: currentListItems
+        });
+      }
 
       // 如果没有内容，添加一个空段落
       if (content.length === 0) {
@@ -653,5 +702,63 @@ export class WordToTiptapConverter {
     }
 
     return fontFamily;
+  }
+
+  /**
+   * 根据 numPr 确定列表类型
+   * @param numPr - w:numPr 元素
+   * @returns 列表类型
+   */
+  private determineListType(numPr: Element): 'bulletList' | 'orderedList' {
+    // 简化处理：根据 numId 判断列表类型
+    // 在实际的 Word 文档中，需要解析 numbering.xml 来确定确切的列表类型
+    // 这里我们使用一个简单的启发式规则：
+    // - numId 为奇数或包含特定模式时，认为是有序列表
+    // - 其他情况认为是无序列表
+    
+    const numId = numPr.querySelector('w\\:numId, numId')?.getAttribute('w:val') || 
+                  numPr.querySelector('w\\:numId, numId')?.getAttribute('val');
+    
+    if (numId) {
+      const numIdValue = parseInt(numId);
+      // 根据 numbering.xml 的分析，numId=1 对应有序列表（decimal格式）
+      // 这里可以根据实际的 numbering.xml 内容进行更精确的判断
+      if (numIdValue === 1) {
+        return 'orderedList';
+      }
+    }
+    
+    // 默认返回无序列表
+    return 'bulletList';
+  }
+
+  /**
+   * 将段落转换为列表项
+   * @param paragraph - Word 段落元素
+   * @returns Tiptap 列表项节点
+   */
+  private convertParagraphToListItem(paragraph: Element): TiptapNode | null {
+    const paragraphProps = paragraph.querySelector("w\\:pPr, pPr");
+    const paragraphAttrs = this.extractParagraphAttrs(paragraphProps);
+
+    // 提取段落中的所有文本运行
+    const runs = paragraph.querySelectorAll("w\\:r, r");
+    const content: TiptapNode[] = [];
+
+    runs.forEach((run) => {
+      const textNodes = this.convertRunToTiptapNodes(run);
+      content.push(...textNodes);
+    });
+
+    return {
+      type: "listItem",
+      content: [
+        {
+          type: "paragraph",
+          attrs: paragraphAttrs,
+          content: content.length > 0 ? content : [{ type: "text", text: " " }],
+        },
+      ],
+    };
   }
 }
