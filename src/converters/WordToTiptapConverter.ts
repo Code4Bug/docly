@@ -1,10 +1,10 @@
-import { Console } from '../utils/Console';
+import { Console } from "../utils/Console";
 
 /**
  * Tiptap 文档格式定义
  */
 export interface TiptapDocument {
-  type: 'doc';
+  type: "doc";
   content: TiptapNode[];
   comments?: Comment[];
 }
@@ -52,47 +52,52 @@ export class WordToTiptapConverter {
    */
   convertWordXmlToTiptapJson(xmlContent: string): TiptapDocument {
     try {
-      Console.debug('开始将 Word XML 转换为 Tiptap JSON');
-      
+      Console.debug("开始将 Word XML 转换为 Tiptap JSON");
+
       const parser = new DOMParser();
-      const doc = parser.parseFromString(xmlContent, 'text/xml');
-      
+      const doc = parser.parseFromString(xmlContent, "text/xml");
+
       // 获取所有段落
-      const paragraphs = doc.querySelectorAll('w\\:p, p');
+      const paragraphs = doc.querySelectorAll("w\\:p, p");
       const content: TiptapNode[] = [];
-      
+
       paragraphs.forEach((paragraph) => {
         const node = this.convertParagraphToTiptapNode(paragraph);
         if (node) {
           content.push(node);
         }
       });
-      
+
       // 如果没有内容，添加一个空段落
       if (content.length === 0) {
         content.push({
-          type: 'paragraph',
-          content: []
+          type: "paragraph",
+          content: [],
         });
       }
-      
+
       const tiptapDoc: TiptapDocument = {
-        type: 'doc',
-        content
+        type: "doc",
+        content,
       };
-      
-      Console.debug('Word XML 转换为 Tiptap JSON 完成，生成了', content.length, '个节点');
+
+      Console.debug(
+        "Word XML 转换为 Tiptap JSON 完成，生成了",
+        content.length,
+        "个节点"
+      );
       return tiptapDoc;
-      
     } catch (error) {
-      Console.error('Word XML 转换为 Tiptap JSON 时发生错误:', error);
+      Console.error("Word XML 转换为 Tiptap JSON 时发生错误:", error);
       // 返回空文档而不是抛出错误
       return {
-        type: 'doc',
-        content: [{
-          type: 'paragraph',
-          content: []
-        }]
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [],
+          },
+        ],
       };
     }
   }
@@ -105,60 +110,65 @@ export class WordToTiptapConverter {
    */
   private convertParagraphToTiptapNode(paragraph: Element): TiptapNode | null {
     // 检查段落样式，判断是否为标题
-    const paragraphProps = paragraph.querySelector('w\\:pPr, pPr');
-    const paragraphStyle = paragraphProps?.querySelector('w\\:pStyle, pStyle');
-    const styleVal = paragraphStyle?.getAttribute('w:val') || paragraphStyle?.getAttribute('val');
-    
+    const paragraphProps = paragraph.querySelector("w\\:pPr, pPr");
+    const paragraphStyle = paragraphProps?.querySelector("w\\:pStyle, pStyle");
+    const styleVal =
+      paragraphStyle?.getAttribute("w:val") ||
+      paragraphStyle?.getAttribute("val");
+
     // 提取段落级样式属性
     const paragraphAttrs = this.extractParagraphAttrs(paragraphProps);
-    
+
     // 提取段落中的所有文本运行
-    const runs = paragraph.querySelectorAll('w\\:r, r');
+    const runs = paragraph.querySelectorAll("w\\:r, r");
     const content: TiptapNode[] = [];
-    
-    runs.forEach(run => {
+
+    runs.forEach((run) => {
       const textNodes = this.convertRunToTiptapNodes(run);
       content.push(...textNodes);
     });
-    
+
     // 如果段落为空，不添加任何内容（Tiptap 会自动处理空段落）
     // Tiptap 不允许空的文本节点
-    
+
     // 根据样式确定节点类型
     if (styleVal && styleVal.match(/heading|title|Heading|Title/i)) {
       // 提取标题级别
       const levelMatch = styleVal.match(/(\d+)/);
       const level = levelMatch ? Math.min(parseInt(levelMatch[1]), 6) : 1;
-      
+
       return {
-        type: 'heading',
+        type: "heading",
         attrs: { level, ...paragraphAttrs },
-        content: content.length > 0 ? content : [{ type: 'text', text: ' ' }]
+        content: content.length > 0 ? content : [{ type: "text", text: " " }],
       };
     }
-    
+
     // 检查是否为列表项
-    const numPr = paragraphProps?.querySelector('w\\:numPr, numPr');
+    const numPr = paragraphProps?.querySelector("w\\:numPr, numPr");
     if (numPr) {
       return {
-        type: 'listItem',
-        content: [{
-          type: 'paragraph',
-          attrs: paragraphAttrs,
-          content: content.length > 0 ? content : [{ type: 'text', text: ' ' }]
-        }]
+        type: "listItem",
+        content: [
+          {
+            type: "paragraph",
+            attrs: paragraphAttrs,
+            content:
+              content.length > 0 ? content : [{ type: "text", text: " " }],
+          },
+        ],
       };
     }
-    
+
     // 默认为段落 - 如果没有内容，返回null让上层处理
     if (content.length === 0) {
       return null;
     }
-    
+
     return {
-      type: 'paragraph',
+      type: "paragraph",
       attrs: paragraphAttrs,
-      content
+      content,
     };
   }
 
@@ -168,30 +178,30 @@ export class WordToTiptapConverter {
    * @returns Tiptap 文本节点数组
    */
   private convertRunToTiptapNodes(run: Element): TiptapNode[] {
-    const textElements = run.querySelectorAll('w\\:t, t');
-    const runProps = run.querySelector('w\\:rPr, rPr');
-    
+    const textElements = run.querySelectorAll("w\\:t, t");
+    const runProps = run.querySelector("w\\:rPr, rPr");
+
     // 提取文本样式
     const marks = this.extractMarksFromRunProps(runProps);
-    
+
     const nodes: TiptapNode[] = [];
-    
-    textElements.forEach(textEl => {
-      const text = textEl.textContent || '';
+
+    textElements.forEach((textEl) => {
+      const text = textEl.textContent || "";
       if (text) {
         const textNode: TiptapNode = {
-          type: 'text',
-          text
+          type: "text",
+          text,
         };
-        
+
         if (marks.length > 0) {
           textNode.marks = marks;
         }
-        
+
         nodes.push(textNode);
       }
     });
-    
+
     return nodes;
   }
 
@@ -205,76 +215,84 @@ export class WordToTiptapConverter {
    * @param paragraphProps - 段落属性元素
    * @returns 段落样式属性对象
    */
-  private extractParagraphAttrs(paragraphProps: Element | null): Record<string, any> {
+  private extractParagraphAttrs(
+    paragraphProps: Element | null
+  ): Record<string, any> {
     if (!paragraphProps) return {};
-    
+
     const attrs: Record<string, any> = {};
-    
+
     // 文本对齐
-    const textAlign = paragraphProps.querySelector('w\\:jc, jc');
+    const textAlign = paragraphProps.querySelector("w\\:jc, jc");
     if (textAlign) {
-      const align = textAlign.getAttribute('w:val') || textAlign.getAttribute('val');
+      const align =
+        textAlign.getAttribute("w:val") || textAlign.getAttribute("val");
       if (align) {
         // Word 对齐值映射到 CSS 值
         const alignMap: Record<string, string> = {
-          'left': 'left',
-          'center': 'center',
-          'right': 'right',
-          'both': 'justify',
-          'distribute': 'justify'
+          left: "left",
+          center: "center",
+          right: "right",
+          both: "justify",
+          distribute: "justify",
         };
         attrs.textAlign = alignMap[align] || align;
       }
     }
-    
+
     // 字体大小（段落级别的默认字体大小）
-    const fontSize = paragraphProps.querySelector('w\\:sz, sz');
+    const fontSize = paragraphProps.querySelector("w\\:sz, sz");
     if (fontSize) {
-      const size = fontSize.getAttribute('w:val') || fontSize.getAttribute('val');
+      const size =
+        fontSize.getAttribute("w:val") || fontSize.getAttribute("val");
       if (size) {
         // Word 中的字体大小是半点单位，需要除以2
         attrs.fontSize = `${parseInt(size) / 2}pt`;
       }
     }
-    
+
     // 字体族（段落级别的默认字体）
-    const fontFamily = paragraphProps.querySelector('w\\:rFonts, rFonts');
+    const fontFamily = paragraphProps.querySelector("w\\:rFonts, rFonts");
     if (fontFamily) {
-      const font = fontFamily.getAttribute('w:ascii') || fontFamily.getAttribute('ascii');
+      const font = this.extractFontFamilyByHint(fontFamily);
       if (font) {
         attrs.fontFamily = font;
       }
     }
-    
+
     // 字体颜色（段落级别的默认颜色）
-    const color = paragraphProps.querySelector('w\\:color, color');
+    const color = paragraphProps.querySelector("w\\:color, color");
     if (color) {
-      const colorVal = color.getAttribute('w:val') || color.getAttribute('val');
-      if (colorVal && colorVal !== 'auto') {
+      const colorVal = color.getAttribute("w:val") || color.getAttribute("val");
+      if (colorVal && colorVal !== "auto") {
         attrs.color = `#${colorVal}`;
       }
     }
-    
+
     // 背景颜色
-    const backgroundColor = paragraphProps.querySelector('w\\:shd, shd');
+    const backgroundColor = paragraphProps.querySelector("w\\:shd, shd");
     if (backgroundColor) {
-      const bgColor = backgroundColor.getAttribute('w:fill') || backgroundColor.getAttribute('fill');
-      if (bgColor && bgColor !== 'auto') {
+      const bgColor =
+        backgroundColor.getAttribute("w:fill") ||
+        backgroundColor.getAttribute("fill");
+      if (bgColor && bgColor !== "auto") {
         attrs.backgroundColor = `#${bgColor}`;
       }
     }
-    
+
     // 行间距
-    const spacing = paragraphProps.querySelector('w\\:spacing, spacing');
+    const spacing = paragraphProps.querySelector("w\\:spacing, spacing");
     if (spacing) {
-      const lineRule = spacing.getAttribute('w:lineRule') || spacing.getAttribute('lineRule');
-      const line = spacing.getAttribute('w:line') || spacing.getAttribute('line');
-      
+      const lineRule =
+        spacing.getAttribute("w:lineRule") || spacing.getAttribute("lineRule");
+      const line =
+        spacing.getAttribute("w:line") || spacing.getAttribute("line");
+
       if (line) {
-        if (lineRule === 'exact') {
+        if (lineRule === "exact") {
           // 固定行距，单位是缇（twips），1缇 = 1/20点
           attrs.lineHeight = `${parseInt(line) / 20}pt`;
-        } else if (lineRule === 'atLeast') {
+        } else if (lineRule === "atLeast") {
           // 最小行距
           attrs.lineHeight = `${parseInt(line) / 20}pt`;
         } else {
@@ -284,35 +302,46 @@ export class WordToTiptapConverter {
         }
       }
     }
-    
+
     // 段前间距
-    const spacingBefore = paragraphProps.querySelector('w\\:spacing, spacing');
+    const spacingBefore = paragraphProps.querySelector("w\\:spacing, spacing");
     if (spacingBefore) {
-      const before = spacingBefore.getAttribute('w:before') || spacingBefore.getAttribute('before');
+      const before =
+        spacingBefore.getAttribute("w:before") ||
+        spacingBefore.getAttribute("before");
       if (before) {
         // 单位是缇（twips），1缇 = 1/20点
         attrs.marginTop = `${parseInt(before) / 20}pt`;
       }
     }
-    
+
     // 段后间距
-    const spacingAfter = paragraphProps.querySelector('w\\:spacing, spacing');
+    const spacingAfter = paragraphProps.querySelector("w\\:spacing, spacing");
     if (spacingAfter) {
-      const after = spacingAfter.getAttribute('w:after') || spacingAfter.getAttribute('after');
+      const after =
+        spacingAfter.getAttribute("w:after") ||
+        spacingAfter.getAttribute("after");
       if (after) {
         // 单位是缇（twips），1缇 = 1/20点
         attrs.marginBottom = `${parseInt(after) / 20}pt`;
       }
     }
-    
+
     // 首行缩进
-    const indentation = paragraphProps.querySelector('w\\:ind, ind');
+    const indentation = paragraphProps.querySelector("w\\:ind, ind");
     if (indentation) {
-      const firstLine = indentation.getAttribute('w:firstLine') || indentation.getAttribute('firstLine');
-      const hanging = indentation.getAttribute('w:hanging') || indentation.getAttribute('hanging');
-      const left = indentation.getAttribute('w:left') || indentation.getAttribute('left');
-      const right = indentation.getAttribute('w:right') || indentation.getAttribute('right');
-      
+      const firstLine =
+        indentation.getAttribute("w:firstLine") ||
+        indentation.getAttribute("firstLine");
+      const hanging =
+        indentation.getAttribute("w:hanging") ||
+        indentation.getAttribute("hanging");
+      const left =
+        indentation.getAttribute("w:left") || indentation.getAttribute("left");
+      const right =
+        indentation.getAttribute("w:right") ||
+        indentation.getAttribute("right");
+
       if (firstLine) {
         // 首行缩进，单位是缇（twips）
         attrs.textIndent = `${parseInt(firstLine) / 20}pt`;
@@ -320,82 +349,83 @@ export class WordToTiptapConverter {
         // 悬挂缩进
         attrs.textIndent = `-${parseInt(hanging) / 20}pt`;
       }
-      
+
       if (left) {
         attrs.marginLeft = `${parseInt(left) / 20}pt`;
       }
-      
+
       if (right) {
         attrs.marginRight = `${parseInt(right) / 20}pt`;
       }
     }
-    
+
     return attrs;
   }
 
   private extractMarksFromRunProps(runProps: Element | null): TiptapMark[] {
     if (!runProps) return [];
-    
+
     const marks: TiptapMark[] = [];
-    
+
     // 粗体
-    if (runProps.querySelector('w\\:b, b')) {
-      marks.push({ type: 'bold' });
+    if (runProps.querySelector("w\\:b, b")) {
+      marks.push({ type: "bold" });
     }
-    
+
     // 斜体
-    if (runProps.querySelector('w\\:i, i')) {
-      marks.push({ type: 'italic' });
+    if (runProps.querySelector("w\\:i, i")) {
+      marks.push({ type: "italic" });
     }
-    
+
     // 下划线
-    if (runProps.querySelector('w\\:u, u')) {
-      marks.push({ type: 'underline' });
+    if (runProps.querySelector("w\\:u, u")) {
+      marks.push({ type: "underline" });
     }
-    
+
     // 删除线
-    if (runProps.querySelector('w\\:strike, strike')) {
-      marks.push({ type: 'strike' });
+    if (runProps.querySelector("w\\:strike, strike")) {
+      marks.push({ type: "strike" });
     }
-    
+
     // 字体颜色
-    const colorEl = runProps.querySelector('w\\:color, color');
+    const colorEl = runProps.querySelector("w\\:color, color");
     if (colorEl) {
-      const color = colorEl.getAttribute('w:val') || colorEl.getAttribute('val');
-      if (color && color !== 'auto') {
+      const color =
+        colorEl.getAttribute("w:val") || colorEl.getAttribute("val");
+      if (color && color !== "auto") {
         marks.push({
-          type: 'textStyle',
-          attrs: { color: `#${color}` }
+          type: "textStyle",
+          attrs: { color: `#${color}` },
         });
       }
     }
-    
+
     // 字体大小
-    const sizeEl = runProps.querySelector('w\\:sz, sz');
+    const sizeEl = runProps.querySelector("w\\:sz, sz");
     if (sizeEl) {
-      const size = sizeEl.getAttribute('w:val') || sizeEl.getAttribute('val');
+      const size = sizeEl.getAttribute("w:val") || sizeEl.getAttribute("val");
       if (size) {
         // Word 中的字体大小是半点单位，需要除以2
         const fontSize = `${parseInt(size) / 2}pt`;
         marks.push({
-          type: 'textStyle',
-          attrs: { fontSize }
+          type: "textStyle",
+          attrs: { fontSize },
         });
       }
     }
-    
+
     // 字体族
-    const fontEl = runProps.querySelector('w\\:rFonts, rFonts');
+    const fontEl = runProps.querySelector("w\\:rFonts, rFonts");
     if (fontEl) {
-      const fontFamily = fontEl.getAttribute('w:ascii') || fontEl.getAttribute('ascii');
+      const fontFamily = this.extractFontFamilyByHint(fontEl);
       if (fontFamily) {
         marks.push({
-          type: 'textStyle',
-          attrs: { fontFamily }
+          type: "textStyle",
+          attrs: { fontFamily },
         });
       }
     }
-    
+
     return marks;
   }
 
@@ -406,24 +436,23 @@ export class WordToTiptapConverter {
    */
   convertTiptapJsonToWordXml(tiptapDoc: TiptapDocument): string {
     try {
-      Console.debug('开始将 Tiptap JSON 转换为 Word XML');
-      
-      const paragraphs = tiptapDoc.content.map(node => 
-        this.convertTiptapNodeToWordXml(node)
-      ).filter(Boolean);
-      
+      Console.debug("开始将 Tiptap JSON 转换为 Word XML");
+
+      const paragraphs = tiptapDoc.content
+        .map((node) => this.convertTiptapNodeToWordXml(node))
+        .filter(Boolean);
+
       const wordXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:body>
-    ${paragraphs.join('\n    ')}
+    ${paragraphs.join("\n    ")}
   </w:body>
 </w:document>`;
-      
-      Console.debug('Tiptap JSON 转换为 Word XML 完成');
+
+      Console.debug("Tiptap JSON 转换为 Word XML 完成");
       return wordXml;
-      
     } catch (error) {
-      Console.error('Tiptap JSON 转换为 Word XML 时发生错误:', error);
+      Console.error("Tiptap JSON 转换为 Word XML 时发生错误:", error);
       throw error;
     }
   }
@@ -435,11 +464,11 @@ export class WordToTiptapConverter {
    */
   private convertTiptapNodeToWordXml(node: TiptapNode): string {
     switch (node.type) {
-      case 'paragraph':
+      case "paragraph":
         return this.convertParagraphNodeToWordXml(node);
-      case 'heading':
+      case "heading":
         return this.convertHeadingNodeToWordXml(node);
-      case 'listItem':
+      case "listItem":
         return this.convertListItemNodeToWordXml(node);
       default:
         // 未知节点类型，转换为段落
@@ -451,13 +480,13 @@ export class WordToTiptapConverter {
    * 将段落节点转换为 Word XML
    */
   private convertParagraphNodeToWordXml(node: TiptapNode): string {
-    const runs = (node.content || []).map(child => 
-      this.convertTextNodeToWordRun(child)
-    ).filter(Boolean);
-    
+    const runs = (node.content || [])
+      .map((child) => this.convertTextNodeToWordRun(child))
+      .filter(Boolean);
+
     return `<w:p>
       <w:pPr></w:pPr>
-      ${runs.join('\n      ')}
+      ${runs.join("\n      ")}
     </w:p>`;
   }
 
@@ -466,15 +495,15 @@ export class WordToTiptapConverter {
    */
   private convertHeadingNodeToWordXml(node: TiptapNode): string {
     const level = node.attrs?.level || 1;
-    const runs = (node.content || []).map(child => 
-      this.convertTextNodeToWordRun(child)
-    ).filter(Boolean);
-    
+    const runs = (node.content || [])
+      .map((child) => this.convertTextNodeToWordRun(child))
+      .filter(Boolean);
+
     return `<w:p>
       <w:pPr>
         <w:pStyle w:val="Heading${level}"/>
       </w:pPr>
-      ${runs.join('\n      ')}
+      ${runs.join("\n      ")}
     </w:p>`;
   }
 
@@ -484,11 +513,11 @@ export class WordToTiptapConverter {
   private convertListItemNodeToWordXml(node: TiptapNode): string {
     // 简化处理，将列表项转换为段落
     const paragraphContent = node.content?.[0];
-    if (paragraphContent && paragraphContent.type === 'paragraph') {
-      const runs = (paragraphContent.content || []).map(child => 
-        this.convertTextNodeToWordRun(child)
-      ).filter(Boolean);
-      
+    if (paragraphContent && paragraphContent.type === "paragraph") {
+      const runs = (paragraphContent.content || [])
+        .map((child) => this.convertTextNodeToWordRun(child))
+        .filter(Boolean);
+
       return `<w:p>
         <w:pPr>
           <w:numPr>
@@ -496,24 +525,24 @@ export class WordToTiptapConverter {
             <w:numId w:val="1"/>
           </w:numPr>
         </w:pPr>
-        ${runs.join('\n        ')}
+        ${runs.join("\n        ")}
       </w:p>`;
     }
-    
-    return '';
+
+    return "";
   }
 
   /**
    * 将文本节点转换为 Word 运行
    */
   private convertTextNodeToWordRun(node: TiptapNode): string {
-    if (node.type !== 'text' || !node.text) {
-      return '';
+    if (node.type !== "text" || !node.text) {
+      return "";
     }
-    
+
     const runProps = this.convertMarksToWordRunProps(node.marks || []);
     const escapedText = this.escapeXmlText(node.text);
-    
+
     return `<w:r>
       ${runProps}
       <w:t>${escapedText}</w:t>
@@ -525,28 +554,28 @@ export class WordToTiptapConverter {
    */
   private convertMarksToWordRunProps(marks: TiptapMark[]): string {
     if (marks.length === 0) {
-      return '<w:rPr></w:rPr>';
+      return "<w:rPr></w:rPr>";
     }
-    
+
     const props: string[] = [];
-    
-    marks.forEach(mark => {
+
+    marks.forEach((mark) => {
       switch (mark.type) {
-        case 'bold':
-          props.push('<w:b/>');
+        case "bold":
+          props.push("<w:b/>");
           break;
-        case 'italic':
-          props.push('<w:i/>');
+        case "italic":
+          props.push("<w:i/>");
           break;
-        case 'underline':
+        case "underline":
           props.push('<w:u w:val="single"/>');
           break;
-        case 'strike':
-          props.push('<w:strike/>');
+        case "strike":
+          props.push("<w:strike/>");
           break;
-        case 'textStyle':
+        case "textStyle":
           if (mark.attrs?.color) {
-            const color = mark.attrs.color.replace('#', '');
+            const color = mark.attrs.color.replace("#", "");
             props.push(`<w:color w:val="${color}"/>`);
           }
           if (mark.attrs?.fontSize) {
@@ -559,8 +588,8 @@ export class WordToTiptapConverter {
           break;
       }
     });
-    
-    return `<w:rPr>${props.join('')}</w:rPr>`;
+
+    return `<w:rPr>${props.join("")}</w:rPr>`;
   }
 
   /**
@@ -568,10 +597,61 @@ export class WordToTiptapConverter {
    */
   private escapeXmlText(text: string): string {
     return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;');
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;");
+  }
+
+  /**
+   * 根据 w:hint 属性提取正确的字体族
+   * @param fontElement w:rFonts 元素
+   * @returns 字体族名称
+   */
+  private extractFontFamilyByHint(fontElement: Element): string | null {
+    const hint =
+      fontElement.getAttribute("w:hint") || fontElement.getAttribute("hint");
+
+    // 根据 hint 值选择对应的字体属性
+    let fontFamily: string | null = null;
+
+    switch (hint) {
+      case "eastAsia":
+        // 东亚字体（中文、日文、韩文）
+        fontFamily =
+          fontElement.getAttribute("w:eastAsia") ||
+          fontElement.getAttribute("eastAsia");
+        break;
+      case "cs":
+        // 复杂脚本字体（阿拉伯文、希伯来文等）
+        fontFamily =
+          fontElement.getAttribute("w:cs") || fontElement.getAttribute("cs");
+        break;
+      case "default":
+      default:
+        // 默认使用 eastAsia 字体，然后是 ascii
+        fontFamily =
+          fontElement.getAttribute("w:eastAsia") ||
+          fontElement.getAttribute("ascii") ||
+          fontElement.getAttribute("w:hAnsi") ||
+          fontElement.getAttribute("w:cs");
+        break;
+    }
+
+    // 如果根据 hint 没有找到字体，则按优先级顺序查找
+    if (!fontFamily) {
+      fontFamily =
+        fontElement.getAttribute("w:eastAsia") ||
+        fontElement.getAttribute("eastAsia") ||
+        fontElement.getAttribute("w:ascii") ||
+        fontElement.getAttribute("ascii") ||
+        fontElement.getAttribute("w:hAnsi") ||
+        fontElement.getAttribute("hAnsi") ||
+        fontElement.getAttribute("w:cs") ||
+        fontElement.getAttribute("cs");
+    }
+
+    return fontFamily;
   }
 }
