@@ -1693,6 +1693,7 @@ export class WordHandler {
     <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
     <Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>
     <Override PartName="/word/fontTable.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml"/>
+    <Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>
 </Types>`);
     
     // word/_rels/document.xml.rels
@@ -1701,6 +1702,7 @@ export class WordHandler {
     <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
     <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>
     <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable" Target="fontTable.xml"/>
+    <Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>
 </Relationships>`);
     
     // word/document.xml (主文档)
@@ -1904,6 +1906,60 @@ export class WordHandler {
         <w:sig w:usb0="800002BF" w:usb1="38CF7CFA" w:usb2="00000016" w:usb3="00000000" w:csb0="0004001F" w:csb1="00000000"/>
     </w:font>
 </w:fonts>`;
+  }
+
+  /**
+   * 生成 numbering.xml 内容
+   */
+  private getNumberingXml(): string {
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+    <!-- 抽象编号定义 -->
+    <w:abstractNum w:abstractNumId="0">
+        <w:nsid w:val="FDFF2C79"/>
+        <w:multiLevelType w:val="singleLevel"/>
+        <w:tmpl w:val="FDFF2C79"/>
+        <w:lvl w:ilvl="0" w:tentative="0">
+            <w:start w:val="1"/>
+            <w:numFmt w:val="decimal"/>
+            <w:lvlText w:val="%1."/>
+            <w:lvlJc w:val="left"/>
+            <w:pPr>
+                <w:ind w:left="425" w:hanging="425"/>
+            </w:pPr>
+            <w:rPr>
+                <w:rFonts w:hint="default"/>
+            </w:rPr>
+        </w:lvl>
+    </w:abstractNum>
+    
+    <w:abstractNum w:abstractNumId="1">
+        <w:nsid w:val="2DD860C1"/>
+        <w:multiLevelType w:val="hybridMultilevel"/>
+        <w:tmpl w:val="10643FE7"/>
+        <w:lvl w:ilvl="0">
+            <w:start w:val="1"/>
+            <w:numFmt w:val="bullet"/>
+            <w:lvlText w:val="●"/>
+            <w:lvlJc w:val="left"/>
+            <w:pPr>
+                <w:ind w:left="720" w:hanging="360"/>
+            </w:pPr>
+            <w:rPr>
+                <w:rFonts w:ascii="Symbol" w:hAnsi="Symbol" w:hint="default"/>
+            </w:rPr>
+        </w:lvl>
+    </w:abstractNum>
+    
+    <!-- 编号实例 -->
+    <w:num w:numId="1">
+        <w:abstractNumId w:val="0"/>
+    </w:num>
+    
+    <w:num w:numId="2">
+        <w:abstractNumId w:val="1"/>
+    </w:num>
+</w:numbering>`;
   }
 
   /**
@@ -2874,5 +2930,8 @@ export class WordHandler {
     
     // word/fontTable.xml
     zip.folder('word')!.file('fontTable.xml', this.getFontTableXml());
+    
+    // word/numbering.xml
+    zip.folder('word')!.file('numbering.xml', this.getNumberingXml());
   }
 }
