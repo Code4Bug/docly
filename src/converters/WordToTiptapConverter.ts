@@ -57,41 +57,22 @@ export class WordToTiptapConverter {
       const parser = new DOMParser();
       const doc = parser.parseFromString(xmlContent, "text/xml");
 
-      // 获取所有段落
-      const paragraphs = doc.querySelectorAll("w\\:p, p");
+      // 获取文档体中的所有直接子元素（段落和表格）
+      const bodyElements = doc.querySelectorAll("w\\:body > *, body > *");
       const content: TiptapNode[] = [];
 
       // 用于跟踪列表状态
       let currentListType: "bulletList" | "orderedList" | null = null;
       let currentListItems: TiptapNode[] = [];
 
-      paragraphs.forEach((paragraph) => {
-        const paragraphProps = paragraph.querySelector("w\\:pPr, pPr");
-        const numPr = paragraphProps?.querySelector("w\\:numPr, numPr");
-
-        if (numPr) {
-          // 这是一个列表项
-          const listType = this.determineListType(numPr);
-          const listItem = this.convertParagraphToListItem(paragraph);
-
-          if (listItem) {
-            if (currentListType === listType) {
-              // 继续当前列表
-              currentListItems.push(listItem);
-            } else {
-              // 结束当前列表，开始新列表
-              if (currentListType && currentListItems.length > 0) {
-                content.push({
-                  type: currentListType,
-                  content: currentListItems,
-                });
-              }
-              currentListType = listType;
-              currentListItems = [listItem];
-            }
-          }
-        } else {
-          // 不是列表项，结束当前列表
+      bodyElements.forEach((element) => {
+        const tagName = element.tagName.toLowerCase();
+        
+        if (tagName === "w:tbl" || tagName === "tbl") {
+          // 处理表格
+          Console.debug("发现表格元素，开始转换");
+          
+          // 结束当前列表（如果有）
           if (currentListType && currentListItems.length > 0) {
             content.push({
               type: currentListType,
@@ -100,11 +81,53 @@ export class WordToTiptapConverter {
             currentListType = null;
             currentListItems = [];
           }
+          
+          const tableNode = this.convertWordTableToTiptapNode(element);
+          if (tableNode) {
+            content.push(tableNode);
+          }
+        } else if (tagName === "w:p" || tagName === "p") {
+          // 处理段落（保持原有逻辑）
+          const paragraphProps = element.querySelector("w\\:pPr, pPr");
+          const numPr = paragraphProps?.querySelector("w\\:numPr, numPr");
 
-          // 处理普通段落
-          const node = this.convertParagraphToTiptapNode(paragraph);
-          if (node) {
-            content.push(node);
+          if (numPr) {
+            // 这是一个列表项
+            const listType = this.determineListType(numPr);
+            const listItem = this.convertParagraphToListItem(element);
+
+            if (listItem) {
+              if (currentListType === listType) {
+                // 继续当前列表
+                currentListItems.push(listItem);
+              } else {
+                // 结束当前列表，开始新列表
+                if (currentListType && currentListItems.length > 0) {
+                  content.push({
+                    type: currentListType,
+                    content: currentListItems,
+                  });
+                }
+                currentListType = listType;
+                currentListItems = [listItem];
+              }
+            }
+          } else {
+            // 不是列表项，结束当前列表
+            if (currentListType && currentListItems.length > 0) {
+              content.push({
+                type: currentListType,
+                content: currentListItems,
+              });
+              currentListType = null;
+              currentListItems = [];
+            }
+
+            // 处理普通段落
+            const node = this.convertParagraphToTiptapNode(element);
+            if (node) {
+              content.push(node);
+            }
           }
         }
       });
@@ -509,10 +532,10 @@ export class WordToTiptapConverter {
 
       Console.debug("Tiptap JSON 转换为 Word XML 完成");
       Console.debug("生成的Word XML内容:", wordXml.substring(0, 500) + "...");
-      
+
       // 保存完整的Word XML到文件用于调试
       this.saveWordXmlToFile(wordXml);
-      
+
       return wordXml;
     } catch (error) {
       Console.error("Tiptap JSON 转换为 Word XML 时发生错误:", error);
@@ -539,6 +562,12 @@ export class WordToTiptapConverter {
         return this.convertBulletListNodeToWordXml(node);
       case "orderedList":
         return this.convertOrderedListNodeToWordXml(node);
+      case "table":
+        return this.convertTableNodeToWordXml(node);
+      case "tableRow":
+        return this.convertTableRowNodeToWordXml(node);
+      case "tableCell":
+        return this.convertTableCellNodeToWordXml(node);
       default:
         Console.debug(`未知节点类型: ${node.type}, 转换为段落`);
         // 未知节点类型，转换为段落
@@ -585,7 +614,10 @@ export class WordToTiptapConverter {
   /**
    * 将列表项节点转换为 Word XML
    */
-  private convertListItemNodeToWordXml(node: TiptapNode, listType: 'bullet' | 'ordered' = 'bullet'): string {
+  private convertListItemNodeToWordXml(
+    node: TiptapNode,
+    listType: "bullet" | "ordered" = "bullet"
+  ): string {
     // 简化处理，将列表项转换为段落
     const paragraphContent = node.content?.[0];
     if (paragraphContent && paragraphContent.type === "paragraph") {
@@ -596,7 +628,7 @@ export class WordToTiptapConverter {
       // 根据列表类型选择不同的numId
       // numId=1: 有序列表（数字编号）
       // numId=2: 无序列表（项目符号）
-      const numId = listType === 'ordered' ? '1' : '2';
+      const numId = listType === "ordered" ? "1" : "2";
 
       return `<w:p>
         <w:pPr>
@@ -656,7 +688,7 @@ export class WordToTiptapConverter {
    */
   private convertMarksToWordRunProps(marks: TiptapMark[]): string {
     const props: string[] = [];
-    
+
     // 默认字体设置，确保中文字体正确显示
     let hasCustomFont = false;
 
@@ -685,7 +717,9 @@ export class WordToTiptapConverter {
           }
           if (mark.attrs?.fontFamily) {
             hasCustomFont = true;
-            props.push(`<w:rFonts w:ascii="${mark.attrs.fontFamily}" w:eastAsia="${mark.attrs.fontFamily}" w:hAnsi="${mark.attrs.fontFamily}" w:cs="${mark.attrs.fontFamily}"/>`);
+            props.push(
+              `<w:rFonts w:ascii="${mark.attrs.fontFamily}" w:eastAsia="${mark.attrs.fontFamily}" w:hAnsi="${mark.attrs.fontFamily}" w:cs="${mark.attrs.fontFamily}"/>`
+            );
           }
           break;
       }
@@ -693,7 +727,9 @@ export class WordToTiptapConverter {
 
     // 如果没有自定义字体，添加默认字体设置
     if (!hasCustomFont) {
-      props.push(`<w:rFonts w:ascii="Times New Roman" w:eastAsia="宋体" w:hAnsi="Times New Roman" w:cs="Times New Roman"/>`);
+      props.push(
+        `<w:rFonts w:ascii="Times New Roman" w:eastAsia="宋体" w:hAnsi="Times New Roman" w:cs="Times New Roman"/>`
+      );
     }
 
     return `<w:rPr>${props.join("")}</w:rPr>`;
@@ -725,7 +761,7 @@ export class WordToTiptapConverter {
     const listItems = node.content
       .map((listItem) => {
         if (listItem.type === "listItem") {
-          return this.convertListItemNodeToWordXml(listItem, 'bullet');
+          return this.convertListItemNodeToWordXml(listItem, "bullet");
         }
         return "";
       })
@@ -791,7 +827,7 @@ export class WordToTiptapConverter {
     const listItems = node.content
       .map((listItem) => {
         if (listItem.type === "listItem") {
-          return this.convertListItemNodeToWordXml(listItem, 'ordered');
+          return this.convertListItemNodeToWordXml(listItem, "ordered");
         }
         return "";
       })
@@ -878,6 +914,63 @@ export class WordToTiptapConverter {
     return "orderedList";
   }
 
+  
+  /**
+   * 将Word表格转换为Tiptap表格节点
+   */
+  private convertWordTableToTiptapNode(tableElement: Element): TiptapNode | null {
+    Console.debug("转换Word表格到Tiptap节点");
+    
+    const rows = tableElement.querySelectorAll("w\\:tr, tr");
+    const tableRows: TiptapNode[] = [];
+    
+    rows.forEach((row) => {
+      const cells = row.querySelectorAll("w\\:tc, tc");
+      const tableCells: TiptapNode[] = [];
+      
+      cells.forEach((cell) => {
+        const paragraphs = cell.querySelectorAll("w\\:p, p");
+        const cellContent: TiptapNode[] = [];
+        
+        paragraphs.forEach((paragraph) => {
+          const paragraphNode = this.convertParagraphToTiptapNode(paragraph);
+          if (paragraphNode) {
+            cellContent.push(paragraphNode);
+          }
+        });
+        
+        // 如果单元格没有内容，添加一个空段落
+        if (cellContent.length === 0) {
+          cellContent.push({
+            type: "paragraph",
+            content: []
+          });
+        }
+        
+        tableCells.push({
+          type: "tableCell",
+          content: cellContent
+        });
+      });
+      
+      if (tableCells.length > 0) {
+        tableRows.push({
+          type: "tableRow",
+          content: tableCells
+        });
+      }
+    });
+    
+    if (tableRows.length === 0) {
+      return null;
+    }
+    
+    return {
+      type: "table",
+      content: tableRows
+    };
+  }
+
   /**
    * 将段落转换为列表项
    * @param paragraph - Word 段落元素
@@ -908,35 +1001,130 @@ export class WordToTiptapConverter {
     };
   }
 
+  
+  /**
+   * 将表格节点转换为 Word XML
+   */
+  private convertTableNodeToWordXml(node: TiptapNode): string {
+    Console.debug("转换表格节点");
+    
+    const rows = (node.content || [])
+      .map((child) => this.convertTableRowNodeToWordXml(child))
+      .filter(Boolean);
+
+          // 计算列数（从第一行获取）
+    const firstRow = node.content?.[0];
+    const columnCount = firstRow?.content?.length || 1;
+    
+    // 计算每列宽度（总宽度5000，平均分配）
+    const columnWidth = Math.floor(5000 / columnCount);
+
+
+    return `<w:tbl>
+      <w:tblPr>
+        <w:tblStyle w:val="TableGrid"/>
+        <w:tblW w:w="5000" w:type="pct"/>
+        <w:tblBorders>
+          <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+        </w:tblBorders>
+        <w:tblCellMar>
+          <w:top w:w="108" w:type="dxa"/>
+          <w:left w:w="108" w:type="dxa"/>
+          <w:bottom w:w="108" w:type="dxa"/>
+          <w:right w:w="108" w:type="dxa"/>
+        </w:tblCellMar>
+      </w:tblPr>
+      <w:tblGrid>
+        ${Array(columnCount).fill(0).map(() => `<w:gridCol w:w="${columnWidth}"/>`).join('\n        ')}
+      </w:tblGrid>
+      ${rows.join("\n      ")}
+    </w:tbl>`;
+  }
+
+  /**
+   * 将表格行节点转换为 Word XML
+   */
+  private convertTableRowNodeToWordXml(node: TiptapNode): string {
+    Console.debug("转换表格行节点");
+    
+    const cells = (node.content || [])
+      .map((child) => this.convertTableCellNodeToWordXml(child))
+      .filter(Boolean);
+
+    return `<w:tr>
+      ${cells.join("\n      ")}
+    </w:tr>`;
+  }
+
+  /**
+   * 将表格单元格节点转换为 Word XML
+   */
+  private convertTableCellNodeToWordXml(node: TiptapNode): string {
+    Console.debug("转换表格单元格节点");
+    
+    const paragraphs = (node.content || [])
+      .map((child) => {
+        if (child.type === "paragraph") {
+          return this.convertParagraphNodeToWordXml(child);
+        }
+        // 如果不是段落，包装成段落
+        return this.convertParagraphNodeToWordXml({
+          type: "paragraph",
+          content: [child]
+        });
+      })
+      .filter(Boolean);
+
+    // 如果没有内容，创建一个空段落
+    const cellContent = paragraphs.length > 0 ? paragraphs.join("\n      ") : 
+      `<w:p>
+      <w:pPr><w:jc w:val="left"/></w:pPr>
+      
+    </w:p>`;
+
+    return `<w:tc>
+      <w:tcPr>
+        <w:tcW w:w="1000" w:type="pct"/>
+        <w:vAlign w:val="top"/>
+      </w:tcPr>
+      ${cellContent}
+    </w:tc>`;
+  }
+
   /**
    * 保存Word XML内容到文件用于调试
    */
   private saveWordXmlToFile(wordXml: string): void {
     try {
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
       const filename = `debug-word-xml-${timestamp}.xml`;
-      
+
       // 创建一个可下载的文件
-      const blob = new Blob([wordXml], { type: 'application/xml' });
+      const blob = new Blob([wordXml], { type: "application/xml" });
       const url = URL.createObjectURL(blob);
-      
+
       // 创建下载链接
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
       link.download = filename;
-      link.style.display = 'none';
-      
+      link.style.display = "none";
+
       // 触发下载
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       // 清理URL对象
       URL.revokeObjectURL(url);
-      
+
       Console.debug(`Word XML已保存到文件: ${filename}`);
     } catch (error) {
-      Console.error('保存Word XML文件时出错:', error);
+      Console.error("保存Word XML文件时出错:", error);
     }
   }
 }
