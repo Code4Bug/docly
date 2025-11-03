@@ -1775,7 +1775,7 @@ export class WordHandler {
             <w:rFonts w:asciiTheme="majorHAnsi" w:eastAsiaTheme="majorEastAsia" w:hAnsiTheme="majorHAnsi" w:cstheme="majorBidi"/>
             <w:b/>
             <w:bCs/>
-            <w:color w:val="2F5496" w:themeColor="accent1" w:themeShade="BF"/>
+            <w:color w:val="000000" w:themeColor="text1" w:themeShade="BF"/>
             <w:sz w:val="32"/>
             <w:szCs w:val="32"/>
         </w:rPr>
@@ -1798,7 +1798,7 @@ export class WordHandler {
             <w:rFonts w:asciiTheme="majorHAnsi" w:eastAsiaTheme="majorEastAsia" w:hAnsiTheme="majorHAnsi" w:cstheme="majorBidi"/>
             <w:b/>
             <w:bCs/>
-            <w:color w:val="2F5496" w:themeColor="accent1" w:themeShade="BF"/>
+            <w:color w:val="000000" w:themeColor="text1" w:themeShade="BF"/>
             <w:sz w:val="26"/>
             <w:szCs w:val="26"/>
         </w:rPr>
@@ -1821,7 +1821,7 @@ export class WordHandler {
             <w:rFonts w:asciiTheme="majorHAnsi" w:eastAsiaTheme="majorEastAsia" w:hAnsiTheme="majorHAnsi" w:cstheme="majorBidi"/>
             <w:b/>
             <w:bCs/>
-            <w:color w:val="1F4E79" w:themeColor="accent1" w:themeShade="BF"/>
+            <w:color w:val="000000" w:themeColor="text1" w:themeShade="BF"/>
             <w:sz w:val="24"/>
             <w:szCs w:val="24"/>
         </w:rPr>
