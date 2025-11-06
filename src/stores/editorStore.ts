@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import type { EditorData, Comment, EditorInstance } from '../types';
+import type { Comment, EditorInstance } from '../types';
+import type { TiptapDocument } from '../converters/WordToTiptapConverter';
 import { Console } from '../utils/Console';
 
 /**
@@ -9,7 +10,7 @@ import { Console } from '../utils/Console';
 export const useEditorStore = defineStore('editor', () => {
   // 状态
   const editorInstance = ref<EditorInstance | null>(null);
-  const editorData = ref<EditorData | null>(null);
+  const editorData = ref<TiptapDocument | null>(null);
   const isLoading = ref(false);
   const isSaving = ref(false);
   const hasUnsavedChanges = ref(false);
@@ -17,23 +18,17 @@ export const useEditorStore = defineStore('editor', () => {
   const currentUser = ref<string>('');
   const isReadOnly = ref(false);
 
-  // 计算属性
-  const blockCount = computed(() => {
-    return editorData.value?.blocks.length || 0;
-  });
-
+  // 计算属性 - 简化版本，基于Tiptap内容
   const wordCount = computed(() => {
-    if (!editorData.value) return 0;
+    if (!editorInstance.value) return 0;
     
-    let count = 0;
-    editorData.value.blocks.forEach(block => {
-      if (block.data.text) {
-        // 简单的单词计数，去除HTML标签
-        const text = block.data.text.replace(/<[^>]*>/g, '');
-        count += text.trim().split(/\s+/).filter((word: string) => word.length > 0).length;
-      }
-    });
-    return count;
+    try {
+      // 从编辑器实例获取纯文本进行计数
+      const text = editorInstance.value.getText?.() || '';
+      return text.trim().split(/\s+/).filter(word => word.length > 0).length;
+    } catch {
+      return 0;
+    }
   });
 
   const commentCount = computed(() => {
@@ -66,7 +61,7 @@ export const useEditorStore = defineStore('editor', () => {
   /**
    * 更新编辑器数据
    */
-  const updateEditorData = (data: EditorData) => {
+  const updateEditorData = (data: TiptapDocument) => {
     Console.debug('updateEditorData 被调用，传入数据:', data);
     Console.debug('更新前 editorData.value:', editorData.value);
     editorData.value = data;
@@ -98,7 +93,7 @@ export const useEditorStore = defineStore('editor', () => {
   /**
    * 加载文档
    */
-  const loadDocument = async (data: EditorData): Promise<void> => {
+  const loadDocument = async (data: TiptapDocument): Promise<void> => {
     Console.debug('editorStore.loadDocument 开始加载文档，数据:', data);
     Console.debug('检查编辑器实例状态:', {
       hasInstance: !!editorInstance.value,
@@ -201,10 +196,9 @@ export const useEditorStore = defineStore('editor', () => {
    */
   const getDocumentStats = () => {
     return {
-      blockCount: blockCount.value,
       wordCount: wordCount.value,
       commentCount: commentCount.value,
-      lastModified: editorData.value?.time || 0
+      hasContent: !!editorData.value
     };
   };
 
@@ -220,7 +214,6 @@ export const useEditorStore = defineStore('editor', () => {
     isReadOnly,
     
     // 计算属性
-    blockCount,
     wordCount,
     commentCount,
     

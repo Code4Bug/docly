@@ -40,9 +40,18 @@ export interface TiptapMark {
  * 消除中间适配层，实现单向数据流：Word XML → Tiptap JSON
  */
 export class WordToTiptapConverter {
+  private numberingTypeMap: Record<number, "bulletList" | "orderedList"> = {};
+
   constructor() {
     // TextStyleHandler 暂时保留，未来可能用于处理复杂的文本样式
     // this.textStyleHandler = new TextStyleHandler();
+  }
+
+  /**
+   * 设置从 numbering.xml 解析得到的 numId → 列表类型 映射
+   */
+  setNumberingTypeMap(map: Record<number, "bulletList" | "orderedList">) {
+    this.numberingTypeMap = map || {};
   }
 
   /**
@@ -90,8 +99,14 @@ export class WordToTiptapConverter {
           // 处理段落（保持原有逻辑）
           const paragraphProps = element.querySelector("w\\:pPr, pPr");
           const numPr = paragraphProps?.querySelector("w\\:numPr, numPr");
+          // 获取 numId，用于判断是否真的为列表。Word 中部分段落可能带有 <w:numPr> 但 numId=0，表示并非列表（常见于表格附近或样式切换后残留属性）。
+          const numIdStr = numPr?.querySelector("w\\:numId, numId")?.getAttribute("w:val")
+            || numPr?.querySelector("w\\:numId, numId")?.getAttribute("val")
+            || null;
+          const numId = numIdStr ? parseInt(numIdStr, 10) : 0;
 
-          if (numPr) {
+          // 仅当 numId > 0 时才视为列表项
+          if (numPr && numId > 0) {
             // 这是一个列表项
             const listType = this.determineListType(numPr);
             const listItem = this.convertParagraphToListItem(element);
@@ -216,9 +231,13 @@ export class WordToTiptapConverter {
       };
     }
 
-    // 检查是否为列表项
+    // 检查是否为列表项（仅当 numId>0 时）
     const numPr = paragraphProps?.querySelector("w\\:numPr, numPr");
-    if (numPr) {
+    const numIdStr = numPr?.querySelector("w\\:numId, numId")?.getAttribute("w:val")
+      || numPr?.querySelector("w\\:numId, numId")?.getAttribute("val")
+      || null;
+    const numId = numIdStr ? parseInt(numIdStr, 10) : 0;
+    if (numPr && numId > 0) {
       return {
         type: "listItem",
         content: [
@@ -534,7 +553,7 @@ export class WordToTiptapConverter {
       Console.debug("生成的Word XML内容:", wordXml.substring(0, 500) + "...");
 
       // 保存完整的Word XML到文件用于调试
-      this.saveWordXmlToFile(wordXml);
+      // this.saveWordXmlToFile(wordXml);
 
       return wordXml;
     } catch (error) {
@@ -851,23 +870,42 @@ export class WordToTiptapConverter {
     switch (hint) {
       case "eastAsia":
         // 东亚字体（中文、日文、韩文）
+        // 在很多文档中仅设置了 w:cs（复杂脚本），而没有显式的 w:eastAsia。
+        // 当 hint 指向 eastAsia 时，应优先尝试 eastAsia，其次回退到 cs，最后再到 hAnsi/ascii。
         fontFamily =
           fontElement.getAttribute("w:eastAsia") ||
-          fontElement.getAttribute("eastAsia");
+          fontElement.getAttribute("eastAsia") ||
+          fontElement.getAttribute("w:cs") ||
+          fontElement.getAttribute("cs") ||
+          fontElement.getAttribute("w:hAnsi") ||
+          fontElement.getAttribute("hAnsi") ||
+          fontElement.getAttribute("w:ascii") ||
+          fontElement.getAttribute("ascii");
         break;
       case "cs":
         // 复杂脚本字体（阿拉伯文、希伯来文等）
         fontFamily =
-          fontElement.getAttribute("w:cs") || fontElement.getAttribute("cs");
+          fontElement.getAttribute("w:cs") ||
+          fontElement.getAttribute("cs") ||
+          fontElement.getAttribute("w:eastAsia") ||
+          fontElement.getAttribute("eastAsia") ||
+          fontElement.getAttribute("w:hAnsi") ||
+          fontElement.getAttribute("hAnsi") ||
+          fontElement.getAttribute("w:ascii") ||
+          fontElement.getAttribute("ascii");
         break;
       case "default":
       default:
-        // 默认使用 eastAsia 字体，然后是 ascii
+        // 默认情况下，为了更好地支持中文等东亚文字，优先 eastAsia，其次 cs，再到 hAnsi/ascii
         fontFamily =
           fontElement.getAttribute("w:eastAsia") ||
-          fontElement.getAttribute("ascii") ||
+          fontElement.getAttribute("eastAsia") ||
+          fontElement.getAttribute("w:cs") ||
+          fontElement.getAttribute("cs") ||
           fontElement.getAttribute("w:hAnsi") ||
-          fontElement.getAttribute("w:cs");
+          fontElement.getAttribute("hAnsi") ||
+          fontElement.getAttribute("w:ascii") ||
+          fontElement.getAttribute("ascii");
         break;
     }
 
@@ -876,12 +914,12 @@ export class WordToTiptapConverter {
       fontFamily =
         fontElement.getAttribute("w:eastAsia") ||
         fontElement.getAttribute("eastAsia") ||
-        fontElement.getAttribute("w:ascii") ||
-        fontElement.getAttribute("ascii") ||
+        fontElement.getAttribute("w:cs") ||
+        fontElement.getAttribute("cs") ||
         fontElement.getAttribute("w:hAnsi") ||
         fontElement.getAttribute("hAnsi") ||
-        fontElement.getAttribute("w:cs") ||
-        fontElement.getAttribute("cs");
+        fontElement.getAttribute("w:ascii") ||
+        fontElement.getAttribute("ascii");
     }
 
     return fontFamily;
@@ -893,24 +931,22 @@ export class WordToTiptapConverter {
    * @returns 列表类型
    */
   private determineListType(numPr: Element): "bulletList" | "orderedList" {
-    // 根据我们的 numbering.xml 定义：
-    // numId=1: 有序列表（数字编号）- 匹配原始文档
-    // numId=2: 无序列表（项目符号）
-
-    const numId =
+    // 优先根据解析得到的映射判断列表类型
+    const numIdStr =
       numPr.querySelector("w\\:numId, numId")?.getAttribute("w:val") ||
       numPr.querySelector("w\\:numId, numId")?.getAttribute("val");
 
-    if (numId) {
-      const numIdValue = parseInt(numId);
-      if (numIdValue === 1) {
-        return "orderedList";
-      } else if (numIdValue === 2) {
-        return "bulletList";
-      }
+    if (numIdStr) {
+      const numIdValue = parseInt(numIdStr, 10);
+      const mapped = this.numberingTypeMap[numIdValue];
+      if (mapped) return mapped;
+
+      // 回退逻辑：常见的硬编码约定
+      if (numIdValue === 1) return "orderedList";
+      if (numIdValue === 2) return "bulletList";
     }
 
-    // 默认返回有序列表（因为原始文档主要使用numId=1）
+    // 最终回退：按有序列表处理
     return "orderedList";
   }
 

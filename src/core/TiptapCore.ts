@@ -17,14 +17,14 @@ import { createLowlight } from 'lowlight'
 import { FontSize } from '../extensions/FontSize'
 import { FontFamily } from '../extensions/FontFamily'
 import { TextAlign } from '../extensions/TextAlign'
-import type { EditorConfig, EditorData, EditorInstance } from '../types'
+import type { EditorConfig, EditorInstance } from '../types'
 import type { TiptapDocument } from '../converters/WordToTiptapConverter'
 import { Console } from '../utils/Console'
 
 /**
  * Tiptap 编辑器核心类
  * 负责初始化和管理 Tiptap 编辑器实例
- * 支持直接使用 Tiptap JSON 格式，消除不必要的数据转换
+ * 直接使用 TiptapDocument 格式，无数据转换
  */
 export class TiptapCore implements EditorInstance {
   private editor: Editor | null = null
@@ -51,7 +51,7 @@ export class TiptapCore implements EditorInstance {
     if (!this.editor) return
     
     try {
-      const initialData = this.convertToTiptapDocument()
+      const initialData = this.getTiptapDocument()
       this.history = [initialData]
       this.historyIndex = 0
     } catch (error) {
@@ -60,9 +60,9 @@ export class TiptapCore implements EditorInstance {
   }
 
   /**
-   * 将 Tiptap 内容转换为 TiptapDocument 格式
+   * 获取当前 TiptapDocument
    */
-  private convertToTiptapDocument(): TiptapDocument {
+  private getTiptapDocument(): TiptapDocument {
     if (!this.editor) {
       return {
         type: 'doc',
@@ -78,428 +78,6 @@ export class TiptapCore implements EditorInstance {
     return json as TiptapDocument
   }
 
-  /**
-   * 将 Tiptap 内容转换为 EditorData 格式（保持向后兼容）
-   */
-  private convertToEditorData(): EditorData {
-    if (!this.editor) {
-      return {
-        time: Date.now(),
-        blocks: [],
-        version: '2.0.0'
-      }
-    }
-
-    // 直接从 Tiptap JSON 转换，保留样式信息
-    const tiptapDoc = this.convertToTiptapDocument()
-    const blocks = this.convertTiptapNodesToBlocks(tiptapDoc.content || [])
-    
-    return {
-      time: Date.now(),
-      blocks,
-      version: '2.0.0'
-    }
-  }
-
-  /**
-   * 将 Tiptap 节点转换为 EditorData 块格式
-   */
-  private convertTiptapNodesToBlocks(nodes: any[]): any[] {
-    const blocks: any[] = []
-    
-    nodes.forEach((node, index) => {
-      const block = this.tiptapNodeToBlock(node, index)
-      if (block) {
-        blocks.push(block)
-      }
-    })
-    
-    return blocks
-  }
-
-  /**
-   * 将单个 Tiptap 节点转换为块
-   */
-  private tiptapNodeToBlock(node: any, index: number): any | null {
-    const id = `block-${Date.now()}-${index}`
-    
-    // 提取节点的样式信息
-    const styles = this.extractTiptapNodeStyles(node)
-    
-    switch (node.type) {
-      case 'heading':
-        return {
-          id,
-          type: 'header',
-          data: {
-            text: this.extractTextFromTiptapNode(node),
-            level: node.attrs?.level || 1,
-            styles
-          }
-        }
-      
-      case 'paragraph':
-        return {
-          id,
-          type: 'paragraph',
-          data: {
-            text: this.extractTextFromTiptapNode(node),
-            styles
-          }
-        }
-      
-      case 'bulletList':
-      case 'orderedList':
-        const items = node.content?.map((item: any) => 
-          this.extractTextFromTiptapNode(item)
-        ) || []
-        return {
-          id,
-          type: 'list',
-          data: {
-            style: node.type === 'bulletList' ? 'unordered' : 'ordered',
-            items,
-            styles
-          }
-        }
-      
-      case 'blockquote':
-        return {
-          id,
-          type: 'quote',
-          data: {
-            text: this.extractTextFromTiptapNode(node),
-            caption: '',
-            styles
-          }
-        }
-      
-      case 'codeBlock':
-        return {
-          id,
-          type: 'code',
-          data: {
-            code: this.extractTextFromTiptapNode(node),
-            styles
-          }
-        }
-      
-      case 'table':
-        const rows = node.content?.map((row: any) => {
-          return row.content?.map((cell: any) => 
-            this.extractTextFromTiptapNode(cell)
-          ) || []
-        }) || []
-        return {
-          id,
-          type: 'table',
-          data: {
-            content: rows,
-            styles
-          }
-        }
-      
-      default:
-        // 对于其他节点类型，尝试作为段落处理
-        const text = this.extractTextFromTiptapNode(node)
-        if (text.trim()) {
-          return {
-            id,
-            type: 'paragraph',
-            data: {
-              text,
-              styles
-            }
-          }
-        }
-        return null
-    }
-  }
-
-  /**
-   * 从 Tiptap 节点提取样式信息
-   */
-  private extractTiptapNodeStyles(node: any): any {
-    const styles: any = {}
-    
-    // 从节点属性中提取样式
-    if (node.attrs) {
-      if (node.attrs.textAlign) {
-        styles.textAlign = node.attrs.textAlign
-      }
-      if (node.attrs.fontSize) {
-        styles.fontSize = node.attrs.fontSize
-      }
-      if (node.attrs.fontFamily) {
-        styles.fontFamily = node.attrs.fontFamily
-      }
-      if (node.attrs.color) {
-        styles.color = node.attrs.color
-      }
-      if (node.attrs.backgroundColor) {
-        styles.backgroundColor = node.attrs.backgroundColor
-      }
-    }
-    
-    // 从标记中提取样式信息
-    if (node.content) {
-      node.content.forEach((childNode: any) => {
-        if (childNode.marks) {
-          childNode.marks.forEach((mark: any) => {
-            switch (mark.type) {
-              case 'textStyle':
-                if (mark.attrs) {
-                  if (mark.attrs.fontSize) styles.fontSize = mark.attrs.fontSize
-                  if (mark.attrs.fontFamily) styles.fontFamily = mark.attrs.fontFamily
-                  if (mark.attrs.color) styles.color = mark.attrs.color
-                }
-                break
-              case 'textAlign':
-                if (mark.attrs?.textAlign) {
-                  styles.textAlign = mark.attrs.textAlign
-                }
-                break
-            }
-          })
-        }
-      })
-    }
-    
-    return styles
-  }
-
-  /**
-   * 从 Tiptap 节点提取纯文本内容
-   */
-  private extractTextFromTiptapNode(node: any): string {
-    if (node.type === 'text') {
-      return node.text || ''
-    }
-    
-    if (node.content) {
-      return node.content.map((child: any) => 
-        this.extractTextFromTiptapNode(child)
-      ).join('')
-    }
-    
-    return ''
-  }
-
-  /**
-   * 将 DOM 元素转换为块数据
-   */
-  private elementToBlock(element: Element, index: number): any | null {
-    const tagName = element.tagName.toLowerCase()
-    const id = `block-${Date.now()}-${index}`
-    
-    // 提取元素的样式信息
-    const styles = this.extractElementStyles(element)
-    
-    switch (tagName) {
-      case 'h1':
-      case 'h2':
-      case 'h3':
-      case 'h4':
-      case 'h5':
-      case 'h6':
-        return {
-          id,
-          type: 'header',
-          data: {
-            text: element.textContent || '',
-            level: parseInt(tagName.charAt(1)),
-            styles
-          }
-        }
-      
-      case 'p':
-        return {
-          id,
-          type: 'paragraph',
-          data: {
-            text: element.innerHTML || '',
-            styles
-          }
-        }
-      
-      case 'ul':
-      case 'ol':
-        const items = Array.from(element.querySelectorAll('li')).map(li => li.textContent || '')
-        return {
-          id,
-          type: 'list',
-          data: {
-            style: tagName === 'ul' ? 'unordered' : 'ordered',
-            items,
-            styles
-          }
-        }
-      
-      case 'blockquote':
-        return {
-          id,
-          type: 'quote',
-          data: {
-            text: element.textContent || '',
-            caption: '',
-            styles
-          }
-        }
-      
-      case 'pre':
-        const code = element.querySelector('code')
-        return {
-          id,
-          type: 'code',
-          data: {
-            code: code ? code.textContent || '' : element.textContent || '',
-            styles
-          }
-        }
-      
-      case 'table':
-        const rows = Array.from(element.querySelectorAll('tr')).map(tr => {
-          return Array.from(tr.querySelectorAll('td, th')).map(cell => cell.textContent || '')
-        })
-        return {
-          id,
-          type: 'table',
-          data: {
-            content: rows,
-            styles
-          }
-        }
-      
-      default:
-        // 对于其他元素，作为段落处理
-        if (element.textContent?.trim()) {
-          return {
-            id,
-            type: 'paragraph',
-            data: {
-              text: element.innerHTML || '',
-              styles
-            }
-          }
-        }
-        return null
-    }
-  }
-
-  /**
-   * 提取元素的样式信息
-   */
-  private extractElementStyles(element: Element): any {
-    const styles: any = {}
-    const computedStyle = window.getComputedStyle(element)
-    
-    // 提取文本对齐
-    const textAlign = computedStyle.textAlign
-    if (textAlign && textAlign !== 'start') {
-      styles.textAlign = textAlign
-    }
-    
-    // 提取字体大小
-    const fontSize = computedStyle.fontSize
-    if (fontSize) {
-      styles.fontSize = fontSize
-    }
-    
-    // 提取字体族
-    const fontFamily = computedStyle.fontFamily
-    if (fontFamily && fontFamily !== 'initial') {
-      styles.fontFamily = fontFamily
-    }
-    
-    // 提取行高
-    const lineHeight = computedStyle.lineHeight
-    if (lineHeight && lineHeight !== 'normal') {
-      styles.lineHeight = lineHeight
-    }
-    
-    // 提取颜色
-    const color = computedStyle.color
-    if (color && color !== 'rgb(0, 0, 0)') {
-      styles.color = color
-    }
-    
-    // 提取背景色
-    const backgroundColor = computedStyle.backgroundColor
-    if (backgroundColor && backgroundColor !== 'rgba(0, 0, 0, 0)' && backgroundColor !== 'transparent') {
-      styles.backgroundColor = backgroundColor
-    }
-    
-    // 提取边距
-    const marginTop = computedStyle.marginTop
-    const marginBottom = computedStyle.marginBottom
-    const marginLeft = computedStyle.marginLeft
-    const marginRight = computedStyle.marginRight
-    
-    if (marginTop && marginTop !== '0px') styles.marginTop = marginTop
-    if (marginBottom && marginBottom !== '0px') styles.marginBottom = marginBottom
-    if (marginLeft && marginLeft !== '0px') styles.marginLeft = marginLeft
-    if (marginRight && marginRight !== '0px') styles.marginRight = marginRight
-    
-    // 提取内边距
-    const paddingTop = computedStyle.paddingTop
-    const paddingBottom = computedStyle.paddingBottom
-    const paddingLeft = computedStyle.paddingLeft
-    const paddingRight = computedStyle.paddingRight
-    
-    if (paddingTop && paddingTop !== '0px') styles.paddingTop = paddingTop
-    if (paddingBottom && paddingBottom !== '0px') styles.paddingBottom = paddingBottom
-    if (paddingLeft && paddingLeft !== '0px') styles.paddingLeft = paddingLeft
-    if (paddingRight && paddingRight !== '0px') styles.paddingRight = paddingRight
-    
-    // 提取文本缩进
-    const textIndent = computedStyle.textIndent
-    if (textIndent && textIndent !== '0px') {
-      styles.textIndent = textIndent
-    }
-    
-    return styles
-  }
-
-  /**
-   * 将 EditorData 转换为 HTML
-   */
-  private convertFromEditorData(data: EditorData): string {
-    if (!data.blocks || data.blocks.length === 0) {
-      return '<p>开始编写您的文档...</p>'
-    }
-
-    return data.blocks.map(block => {
-      switch (block.type) {
-        case 'header':
-          const level = block.data?.level || 2
-          return `<h${level}>${block.data?.text || ''}</h${level}>`
-        
-        case 'paragraph':
-          return `<p>${block.data?.text || ''}</p>`
-        
-        case 'list':
-          const tag = block.data?.style === 'ordered' ? 'ol' : 'ul'
-          const items = (block.data?.items || []).map((item: string) => `<li>${item}</li>`).join('')
-          return `<${tag}>${items}</${tag}>`
-        
-        case 'quote':
-          return `<blockquote>${block.data?.text || ''}</blockquote>`
-        
-        case 'code':
-          return `<pre><code>${block.data?.code || ''}</code></pre>`
-        
-        case 'table':
-          const rows = (block.data?.content || []).map((row: string[]) => {
-            const cells = row.map(cell => `<td>${cell}</td>`).join('')
-            return `<tr>${cells}</tr>`
-          }).join('')
-          return `<table><tbody>${rows}</tbody></table>`
-        
-        default:
-          return `<p>${block.data?.text || ''}</p>`
-      }
-    }).join('')
-  }
 
   /**
    * 初始化编辑器
@@ -548,10 +126,10 @@ export class TiptapCore implements EditorInstance {
     ]
 
     // 准备初始内容
-    let initialContent = '<p>开始编写您的文档...</p>'
-    if (this.config.data && this.config.data.blocks && this.config.data.blocks.length > 0) {
-      // 保持向后兼容，如果传入的是 EditorData 格式，转换为 HTML
-      initialContent = this.convertFromEditorData(this.config.data)
+    let initialContent: string | TiptapDocument = '<p>开始编写您的文档...</p>'
+    if (this.config.data) {
+      // 如果传入的是 TiptapDocument 格式，直接使用 JSON 对象
+      initialContent = this.config.data
     }
 
     this.editor = new Editor({
@@ -592,7 +170,7 @@ export class TiptapCore implements EditorInstance {
    */
   private saveToHistory(): void {
     try {
-      const currentData = this.convertToTiptapDocument()
+      const currentData = this.getTiptapDocument()
       
       // 移除当前位置之后的历史记录
       this.history = this.history.slice(0, this.historyIndex + 1)
@@ -692,29 +270,18 @@ export class TiptapCore implements EditorInstance {
   /**
    * 保存编辑器数据（返回 Tiptap JSON 格式）
    */
-  async saveTiptapJson(): Promise<TiptapDocument> {
+  async save(): Promise<TiptapDocument> {
     if (!this.editor) {
       throw new Error('编辑器未初始化')
     }
     
-    return this.convertToTiptapDocument()
+    return this.getTiptapDocument()
   }
 
   /**
-   * 保存编辑器数据（保持向后兼容，返回 EditorData 格式）
+   * 渲染编辑器数据
    */
-  async save(): Promise<EditorData> {
-    if (!this.editor) {
-      throw new Error('编辑器未初始化')
-    }
-    
-    return this.convertToEditorData()
-  }
-
-  /**
-   * 渲染 Tiptap JSON 数据
-   */
-  async renderTiptapJson(data: TiptapDocument): Promise<void> {
+  async render(data: TiptapDocument): Promise<void> {
     if (!this.editor) {
       throw new Error('编辑器未初始化')
     }
@@ -728,20 +295,17 @@ export class TiptapCore implements EditorInstance {
   }
 
   /**
-   * 渲染编辑器数据（保持向后兼容）
+   * 渲染 Tiptap JSON 数据（别名方法）
    */
-  async render(data: EditorData): Promise<void> {
-    if (!this.editor) {
-      throw new Error('编辑器未初始化')
-    }
-    
-    const html = this.convertFromEditorData(data)
-    this.editor.commands.setContent(html)
-    
-    // 更新历史记录 - 转换为 Tiptap JSON 格式
-    const tiptapDoc = this.convertToTiptapDocument()
-    this.history = [tiptapDoc]
-    this.historyIndex = 0
+  async renderTiptapJson(data: TiptapDocument): Promise<void> {
+    return this.render(data);
+  }
+
+  /**
+   * 保存为 Tiptap JSON 格式（别名方法）
+   */
+  async saveTiptapJson(): Promise<TiptapDocument> {
+    return this.save();
   }
 
   /**

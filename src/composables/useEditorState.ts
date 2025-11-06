@@ -1,5 +1,5 @@
 import { ref, computed, watch } from 'vue';
-import type { EditorData } from '../types';
+import type { TiptapDocument } from '../converters/WordToTiptapConverter';
 
 /**
  * 编辑器状态管理组合式函数
@@ -7,11 +7,9 @@ import type { EditorData } from '../types';
  */
 export function useEditorState() {
   // 编辑器数据
-  const editorData = ref<EditorData>({
-    time: Date.now(),
-    blocks: [],
-    version: '1.0.0',
-    comments: []
+  const editorData = ref<TiptapDocument>({
+    type: 'doc',
+    content: []
   });
   
   // 编辑器内容（HTML字符串）
@@ -72,9 +70,9 @@ export function useEditorState() {
   
   /**
    * 更新编辑器数据
-   * @param {EditorData} data - 新的编辑器数据
+   * @param {TiptapDocument} data - 新的编辑器数据
    */
-  const updateEditorData = (data: EditorData): void => {
+  const updateEditorData = (data: TiptapDocument): void => {
     editorData.value = data;
   };
   
@@ -131,10 +129,8 @@ export function useEditorState() {
    */
   const resetState = (): void => {
     editorData.value = {
-      time: Date.now(),
-      blocks: [],
-      version: '1.0.0',
-      comments: []
+      type: 'doc',
+      content: []
     };
     editorContent.value = '';
     selectedText.value = '';

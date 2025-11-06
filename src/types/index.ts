@@ -1,3 +1,5 @@
+import type { TiptapDocument } from '../converters/WordToTiptapConverter'
+
 /**
  * 编辑器插件接口定义
  */
@@ -24,32 +26,23 @@ export interface CommentPlugin extends EditorPlugin {
  * 文件处理接口定义
  */
 export interface FileHandler {
-  import(file: File): Promise<EditorData>;
-  export(data: EditorData): Promise<File>;
-  preview?(data: EditorData): HTMLElement;
+  import(file: File): Promise<TiptapDocument>;
+  export(data: TiptapDocument): Promise<File>;
+  preview?(data: TiptapDocument): HTMLElement;
 }
 
 /**
  * 编辑器实例接口
  */
 export interface EditorInstance {
-  save(): Promise<EditorData>;
-  render(data: EditorData): Promise<void>;
+  save(): Promise<TiptapDocument>;
+  render(data: TiptapDocument): Promise<void>;
   destroy(): void;
   on(event: string, callback: Function): void;
   off(event: string, callback: Function): void;
   setReadOnly(readOnly: boolean): Promise<void>;
   isReadOnly(): boolean;
-}
-
-/**
- * 编辑器数据结构
- */
-export interface EditorData {
-  time: number;
-  blocks: Block[];
-  version: string;
-  comments?: Comment[];
+  getText(): string;
 }
 
 /**
@@ -110,12 +103,12 @@ export interface PluginConfig {
 }
 
 /**
- * 编辑器配置接口
+ * 编辑器配置
  */
 export interface EditorConfig {
   holder: string | HTMLElement;
   plugins: PluginConfig[];
-  data?: EditorData;
+  data?: TiptapDocument;
   readOnly?: boolean;
   placeholder?: string;
 }

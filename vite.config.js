@@ -24,14 +24,19 @@ export default defineConfig({
           'ui-vendor': ['naive-ui'],
           // 将编辑器相关库分离
           'editor-vendor': [
-            '@editorjs/editorjs',
-            '@editorjs/header',
-            '@editorjs/paragraph',
-            '@editorjs/list',
-            '@editorjs/quote',
-            '@editorjs/table',
-            '@editorjs/code',
-            '@editorjs/image'
+            '@tiptap/vue-3',
+            '@tiptap/starter-kit',
+            '@tiptap/extension-table',
+            '@tiptap/extension-table-row',
+            '@tiptap/extension-table-cell',
+            '@tiptap/extension-table-header',
+            '@tiptap/extension-underline',
+            '@tiptap/extension-text-style',
+            '@tiptap/extension-color',
+            '@tiptap/extension-highlight',
+            '@tiptap/extension-code-block-lowlight',
+            '@tiptap/extension-superscript',
+            '@tiptap/extension-subscript'
           ],
           // 将文档处理库分离
           'docx-vendor': ['docx-preview', 'docxtemplater']

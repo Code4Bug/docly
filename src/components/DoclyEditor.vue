@@ -294,18 +294,20 @@ const initEditor = async (): Promise<void> => {
       plugins: [],
       readOnly: props.readOnly,
       placeholder: '开始编写您的文档...',
+      // 传入符合 TiptapDocument 类型的初始内容
       data: {
-        time: Date.now(),
-        blocks: [
+        type: 'doc',
+        content: [
           {
-            id: 'initial-block',
             type: 'paragraph',
-            data: {
-              text: '欢迎使用 Docly 编辑器！开始编写您的文档...'
-            }
+            content: [
+              {
+                type: 'text',
+                text: '欢迎使用 Docly 编辑器！开始编写您的文档...'
+              }
+            ]
           }
-        ],
-        version: '2.0.0'
+        ]
       },
       ...props.config
     });
@@ -322,26 +324,11 @@ const initEditor = async (): Promise<void> => {
         const data = await editorCore.value!.save();
         Console.debug('获取到编辑器数据:', data);
         
-        // 将编辑器数据转换为HTML内容用于统计
+        // 将 TiptapDocument 转换为HTML内容用于统计
         let htmlContent = '';
-        data.blocks.forEach(block => {
-          Console.debug('处理块:', block);
-          if (block.type === 'paragraph' && block.data?.text) {
-            htmlContent += `<p>${block.data.text}</p>`;
-          } else if (block.type === 'header' && block.data?.text) {
-            const level = block.data.level || 1;
-            htmlContent += `<h${level}>${block.data.text}</h${level}>`;
-          } else if (block.type === 'list' && block.data?.items) {
-            const tag = block.data.style === 'ordered' ? 'ol' : 'ul';
-            htmlContent += `<${tag}>`;
-            block.data.items.forEach((item: string) => {
-              htmlContent += `<li>${item}</li>`;
-            });
-            htmlContent += `</${tag}>`;
-          } else if (block.data?.text) {
-            htmlContent += `<div>${block.data.text}</div>`;
-          }
-        });
+        if (data.content && Array.isArray(data.content)) {
+          htmlContent = convertTiptapNodesToHtml(data.content);
+        }
         
         Console.debug('生成的HTML内容:', htmlContent);
         editorContent.value = htmlContent;
@@ -404,6 +391,64 @@ const initEditor = async (): Promise<void> => {
     Console.error('错误堆栈:', (error as Error).stack);
     showMessage('编辑器初始化失败', 'error');
   }
+};
+
+/**
+ * 将 TiptapNode 数组转换为 HTML 字符串用于统计
+ */
+const convertTiptapNodesToHtml = (nodes: any[]): string => {
+  let html = '';
+  
+  for (const node of nodes) {
+    if (node.type === 'paragraph') {
+      html += '<p>';
+      if (node.content) {
+        html += convertTiptapNodesToHtml(node.content);
+      }
+      html += '</p>';
+    } else if (node.type === 'text') {
+      html += node.text || '';
+    } else if (node.type === 'heading') {
+      const level = node.attrs?.level || 1;
+      html += `<h${level}>`;
+      if (node.content) {
+        html += convertTiptapNodesToHtml(node.content);
+      }
+      html += `</h${level}>`;
+    } else if (node.type === 'bulletList' || node.type === 'orderedList') {
+      const tag = node.type === 'bulletList' ? 'ul' : 'ol';
+      html += `<${tag}>`;
+      if (node.content) {
+        html += convertTiptapNodesToHtml(node.content);
+      }
+      html += `</${tag}>`;
+    } else if (node.type === 'listItem') {
+      html += '<li>';
+      if (node.content) {
+        html += convertTiptapNodesToHtml(node.content);
+      }
+      html += '</li>';
+    } else if (node.type === 'blockquote') {
+      html += '<blockquote>';
+      if (node.content) {
+        html += convertTiptapNodesToHtml(node.content);
+      }
+      html += '</blockquote>';
+    } else if (node.type === 'codeBlock') {
+      html += '<pre><code>';
+      if (node.content) {
+        html += convertTiptapNodesToHtml(node.content);
+      }
+      html += '</code></pre>';
+    } else if (node.type === 'hardBreak') {
+      html += '<br>';
+    } else if (node.content) {
+      // 对于其他有内容的节点，递归处理内容
+      html += convertTiptapNodesToHtml(node.content);
+    }
+  }
+  
+  return html;
 };
 
 /**
