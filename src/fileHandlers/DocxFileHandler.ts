@@ -196,6 +196,40 @@ export class DocxFileHandler {
       <w:szCs w:val="32"/>
     </w:rPr>
   </w:style>
+  <w:style w:type="paragraph" w:styleId="CommentText">
+    <w:name w:val="comment text"/>
+    <w:basedOn w:val="Normal"/>
+    <w:link w:val="CommentTextChar"/>
+    <w:semiHidden/>
+    <w:rsid w:val="00000000"/>
+    <w:pPr>
+      <w:spacing w:after="0" w:line="240" w:lineRule="auto"/>
+    </w:pPr>
+    <w:rPr>
+      <w:sz w:val="20"/>
+      <w:szCs w:val="20"/>
+    </w:rPr>
+  </w:style>
+  <w:style w:type="character" w:styleId="CommentReference">
+    <w:name w:val="comment reference"/>
+    <w:semiHidden/>
+    <w:rsid w:val="00000000"/>
+    <w:rPr>
+      <w:sz w:val="16"/>
+      <w:szCs w:val="16"/>
+    </w:rPr>
+  </w:style>
+  <w:style w:type="character" w:styleId="CommentTextChar">
+    <w:name w:val="批注文本 字符"/>
+    <w:basedOn w:val="DefaultParagraphFont"/>
+    <w:link w:val="CommentText"/>
+    <w:semiHidden/>
+    <w:rsid w:val="00000000"/>
+    <w:rPr>
+      <w:sz w:val="20"/>
+      <w:szCs w:val="20"/>
+    </w:rPr>
+  </w:style>
 </w:styles>`;
   }
 

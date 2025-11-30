@@ -35,17 +35,27 @@ export class WordXmlGenerator {
     
     let modifiedXml = bodyXml;
     let successfulMatches = 0;
+    let fallbackInsertions = 0;
     
-    // 按批注ID排序，确保处理顺序一致
-    const sortedComments = [...comments].sort((a, b) => a.id.localeCompare(b.id));
+    // 按批注在文档中的位置排序，确保从后往前插入，避免位置偏移
+    const sortedComments = [...comments].sort((a, b) => {
+      // 如果有range信息，按startOffset排序
+      if (a.range?.startOffset !== undefined && b.range?.startOffset !== undefined) {
+        return b.range.startOffset - a.range.startOffset; // 从后往前
+      }
+      // 否则按ID排序
+      return b.id.localeCompare(a.id);
+    });
     
     // 为每个批注添加范围标记
-    sortedComments.forEach((comment) => {
+    sortedComments.forEach((comment, index) => {
       const commentId = comment.id;
       const rangeText = comment.range?.text;
       
-      if (rangeText && rangeText.trim() && rangeText.length > 2) {
-        console.log(`处理批注 ${commentId}，范围文本: "${rangeText}"`);
+      console.log(`处理批注 ${index + 1}/${comments.length}: ${commentId}`);
+      
+      if (rangeText && rangeText.trim() && rangeText.length > 1) {
+        console.log(`批注 ${commentId} 范围文本: "${rangeText.substring(0, 50)}${rangeText.length > 50 ? '...' : ''}"`);
         
         // 使用更精确的批注定位方法
         const insertResult = this.insertCommentAtPreciseLocation(modifiedXml, commentId, rangeText.trim());
@@ -53,16 +63,38 @@ export class WordXmlGenerator {
         if (insertResult.success) {
           modifiedXml = insertResult.xml;
           successfulMatches++;
-          console.log(`批注 ${commentId} 成功定位并插入`);
+          console.log(`✓ 批注 ${commentId} 成功定位并插入`);
         } else {
-          console.warn(`批注 ${commentId} 定位失败: ${insertResult.reason}`);
+          console.warn(`✗ 批注 ${commentId} 精确定位失败: ${insertResult.reason}`);
+          
+          // 尝试回退策略：在文档末尾插入批注引用
+          const fallbackResult = this.insertCommentAsFallback(modifiedXml, commentId, comment);
+          if (fallbackResult.success) {
+            modifiedXml = fallbackResult.xml;
+            fallbackInsertions++;
+            console.log(`⚠ 批注 ${commentId} 使用回退策略插入`);
+          } else {
+            console.error(`✗ 批注 ${commentId} 回退策略也失败`);
+          }
         }
       } else {
-        console.warn(`批注 ${commentId} 缺少有效范围文本，跳过插入`);
+        console.warn(`⚠ 批注 ${commentId} 缺少有效范围文本，使用回退策略`);
+        
+        // 对于没有范围文本的批注，也使用回退策略
+        const fallbackResult = this.insertCommentAsFallback(modifiedXml, commentId, comment);
+        if (fallbackResult.success) {
+          modifiedXml = fallbackResult.xml;
+          fallbackInsertions++;
+          console.log(`⚠ 批注 ${commentId} 使用回退策略插入（无范围文本）`);
+        }
       }
     });
     
-    console.log(`批注范围标记插入完成，成功: ${successfulMatches}/${comments.length}`);
+    console.log(`批注范围标记插入完成:`);
+    console.log(`  - 精确匹配: ${successfulMatches}/${comments.length}`);
+    console.log(`  - 回退插入: ${fallbackInsertions}/${comments.length}`);
+    console.log(`  - 总成功率: ${Math.round(((successfulMatches + fallbackInsertions) / comments.length) * 100)}%`);
+    
     return modifiedXml;
   }
 
@@ -196,7 +228,7 @@ export class WordXmlGenerator {
       // 如果找不到运行元素，直接在文本位置插入
       const commentStart = `<w:commentRangeStart w:id="${commentId}"/>`;
       const commentEnd = `<w:commentRangeEnd w:id="${commentId}"/>`;
-      const commentRef = `<w:r><w:commentReference w:id="${commentId}"/></w:r>`;
+      const commentRef = `<w:r><w:rPr></w:rPr><w:commentReference w:id="${commentId}"/></w:r>`;
       
       return xml.substring(0, position.start) + 
              commentStart + 
@@ -208,13 +240,92 @@ export class WordXmlGenerator {
     // 在运行元素前后插入批注标记
     const commentStart = `<w:commentRangeStart w:id="${commentId}"/>`;
     const commentEnd = `<w:commentRangeEnd w:id="${commentId}"/>`;
-    const commentRef = `<w:r><w:commentReference w:id="${commentId}"/></w:r>`;
+    const commentRef = `<w:r><w:rPr></w:rPr><w:commentReference w:id="${commentId}"/></w:r>`;
     
     return xml.substring(0, runStart) + 
            commentStart + 
            xml.substring(runStart, runEnd) + 
            commentEnd + commentRef +
            xml.substring(runEnd);
+  }
+
+  /**
+   * 回退策略：在文档适当位置插入批注引用
+   */
+  private insertCommentAsFallback(xml: string, commentId: string, comment: Comment): { success: boolean; xml: string; reason?: string } {
+    try {
+      // 策略1: 如果有范围文本，尝试模糊匹配
+      if (comment.range?.text && comment.range.text.trim().length > 3) {
+        const fuzzyResult = this.insertCommentWithFuzzyMatch(xml, commentId, comment.range.text.trim());
+        if (fuzzyResult.success) {
+          return fuzzyResult;
+        }
+      }
+      
+      // 策略2: 在第一个段落末尾插入批注引用
+      const firstParagraphEnd = xml.indexOf('</w:p>');
+      if (firstParagraphEnd !== -1) {
+        const commentRef = `<w:r><w:rPr></w:rPr><w:commentReference w:id="${commentId}"/></w:r>`;
+        const modifiedXml = xml.substring(0, firstParagraphEnd) + 
+                           commentRef + 
+                           xml.substring(firstParagraphEnd);
+        
+        return { success: true, xml: modifiedXml };
+      }
+      
+      // 策略3: 在文档body末尾插入一个新段落包含批注引用
+      const bodyEndIndex = xml.lastIndexOf('</w:body>');
+      if (bodyEndIndex !== -1) {
+        const commentParagraph = `<w:p><w:r><w:rPr></w:rPr><w:commentReference w:id="${commentId}"/></w:r></w:p>`;
+        const modifiedXml = xml.substring(0, bodyEndIndex) + 
+                           commentParagraph + 
+                           xml.substring(bodyEndIndex);
+        
+        return { success: true, xml: modifiedXml };
+      }
+      
+      return { success: false, xml, reason: '无法找到合适的插入位置' };
+      
+    } catch (error) {
+      console.error(`批注 ${commentId} 回退策略执行失败:`, error);
+      return { success: false, xml, reason: `回退策略错误: ${error instanceof Error ? error.message : '未知错误'}` };
+    }
+  }
+
+  /**
+   * 使用模糊匹配插入批注
+   */
+  private insertCommentWithFuzzyMatch(xml: string, commentId: string, searchText: string): { success: boolean; xml: string; reason?: string } {
+    // 尝试匹配部分文本（取前一半或后一半）
+    const halfLength = Math.floor(searchText.length / 2);
+    const firstHalf = searchText.substring(0, halfLength);
+    const secondHalf = searchText.substring(halfLength);
+    
+    // 尝试匹配前半部分
+    if (firstHalf.length > 3) {
+      const candidates = this.findTextCandidates(xml, firstHalf);
+      if (candidates.length > 0) {
+        const bestCandidate = this.selectBestCandidate(xml, candidates);
+        if (bestCandidate) {
+          const modifiedXml = this.insertCommentMarkersAtPosition(xml, commentId, bestCandidate);
+          return { success: true, xml: modifiedXml };
+        }
+      }
+    }
+    
+    // 尝试匹配后半部分
+    if (secondHalf.length > 3) {
+      const candidates = this.findTextCandidates(xml, secondHalf);
+      if (candidates.length > 0) {
+        const bestCandidate = this.selectBestCandidate(xml, candidates);
+        if (bestCandidate) {
+          const modifiedXml = this.insertCommentMarkersAtPosition(xml, commentId, bestCandidate);
+          return { success: true, xml: modifiedXml };
+        }
+      }
+    }
+    
+    return { success: false, xml, reason: '模糊匹配失败' };
   }
 
 
@@ -225,18 +336,90 @@ export class WordXmlGenerator {
   generateCommentsXml(comments: Comment[]): string {
     console.log('开始生成批注XML...');
     
-    const commentsElements = comments.map(comment => {
-      const date = new Date(comment.timestamp).toISOString();
-      const escapedContent = this.escapeXml(comment.content);
-      const escapedAuthor = this.escapeXml(comment.author);
+    const commentsElements = comments.map((comment, index) => {
+      // 确保时间戳有效
+      let timestamp = comment.timestamp;
+      if (!timestamp || isNaN(timestamp) || timestamp <= 0) {
+        timestamp = Date.now();
+        console.warn(`批注 ${comment.id} 时间戳无效，使用当前时间`);
+      }
       
-      return `<w:comment w:id="${comment.id}" w:author="${escapedAuthor}" w:date="${date}">
+      const date = new Date(timestamp).toISOString();
+      const escapedContent = this.escapeXml(comment.content || '批注内容为空');
+      const escapedAuthor = this.escapeXml(comment.author || comment.user || '匿名用户');
+      
+      // 生成用户缩写
+      const initials = comment.initials || this.generateInitials(escapedAuthor);
+      
+      console.log(`生成批注 ${index + 1}/${comments.length}: ID=${comment.id}, 作者=${escapedAuthor}, 内容长度=${comment.content?.length || 0}`);
+      
+      // 构建批注XML，包含更完整的格式信息
+      let commentXml = `<w:comment w:id="${comment.id}" w:author="${escapedAuthor}" w:date="${date}" w:initials="${initials}">`;
+      
+      // 主批注内容
+      commentXml += `
         <w:p>
+          <w:pPr>
+            <w:pStyle w:val="CommentText"/>
+          </w:pPr>
           <w:r>
-            <w:t>${escapedContent}</w:t>
+            <w:rPr>
+              <w:rStyle w:val="CommentReference"/>
+            </w:rPr>
+            <w:annotationRef/>
+          </w:r>
+          <w:r>
+            <w:t xml:space="preserve"> ${escapedContent}</w:t>
+          </w:r>
+        </w:p>`;
+      
+      // 如果有回复，添加回复内容
+      if (comment.replies && comment.replies.length > 0) {
+        console.log(`批注 ${comment.id} 包含 ${comment.replies.length} 条回复`);
+        
+        comment.replies.forEach((reply, replyIndex) => {
+          const replyTimestamp = reply.timestamp && !isNaN(reply.timestamp) && reply.timestamp > 0 ? reply.timestamp : Date.now();
+          const replyDate = new Date(replyTimestamp).toISOString();
+          const replyAuthor = this.escapeXml(reply.author || reply.user || '匿名用户');
+          const replyContent = this.escapeXml(reply.content || '回复内容为空');
+          const replyInitials = reply.initials || this.generateInitials(replyAuthor);
+          
+          commentXml += `
+        <w:p>
+          <w:pPr>
+            <w:pStyle w:val="CommentText"/>
+          </w:pPr>
+          <w:r>
+            <w:rPr>
+              <w:b/>
+              <w:sz w:val="18"/>
+            </w:rPr>
+            <w:t>${replyAuthor} (${replyInitials})</w:t>
+          </w:r>
+          <w:r>
+            <w:rPr>
+              <w:sz w:val="16"/>
+              <w:color w:val="666666"/>
+            </w:rPr>
+            <w:t xml:space="preserve"> - ${new Date(replyTimestamp).toLocaleString('zh-CN')}</w:t>
           </w:r>
         </w:p>
+        <w:p>
+          <w:pPr>
+            <w:pStyle w:val="CommentText"/>
+            <w:ind w:left="360"/>
+          </w:pPr>
+          <w:r>
+            <w:t>${replyContent}</w:t>
+          </w:r>
+        </w:p>`;
+        });
+      }
+      
+      commentXml += `
       </w:comment>`;
+      
+      return commentXml;
     }).join('\n');
     
     const commentsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -244,8 +427,37 @@ export class WordXmlGenerator {
   ${commentsElements}
 </w:comments>`;
     
-    console.log('批注XML生成完成，内容长度:', commentsXml.length);
+    console.log('批注XML生成完成:');
+    console.log(`  - 批注数量: ${comments.length}`);
+    console.log(`  - 总回复数: ${comments.reduce((sum, c) => sum + (c.replies?.length || 0), 0)}`);
+    console.log(`  - XML长度: ${commentsXml.length} 字符`);
+    
     return commentsXml;
+  }
+
+  /**
+   * 生成用户缩写
+   */
+  private generateInitials(author: string): string {
+    if (!author || author.trim().length === 0) {
+      return 'U';
+    }
+    
+    const cleanAuthor = author.trim();
+    
+    // 如果是中文名，取前两个字符
+    if (/[\u4e00-\u9fff]/.test(cleanAuthor)) {
+      return cleanAuthor.substring(0, 2);
+    }
+    
+    // 如果是英文名，取每个单词的首字母
+    const words = cleanAuthor.split(/\s+/);
+    if (words.length >= 2) {
+      return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase();
+    }
+    
+    // 单个单词，取前两个字母
+    return cleanAuthor.substring(0, 2).toUpperCase();
   }
 
   /**
