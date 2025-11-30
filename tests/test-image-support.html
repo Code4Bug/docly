@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片支持测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .test-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .test-title {
+            color: #333;
+            border-bottom: 2px solid #409eff;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .file-input {
+            margin: 10px 0;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .btn {
+            background: #409eff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        .btn:hover {
+            background: #337ecc;
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            background: #f8f9fa;
+            border-left: 4px solid #409eff;
+        }
+        
+        .error {
+            background: #fff5f5;
+            border-left-color: #f56565;
+            color: #c53030;
+        }
+        
+        .success {
+            background: #f0fff4;
+            border-left-color: #48bb78;
+            color: #2f855a;
+        }
+        
+        .image-preview {
+            max-width: 100%;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .log {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>图片支持功能测试</h1>
+    
+    <div class="test-container">
+        <h2 class="test-title">1. 导入包含图片的 DOCX 文件</h2>
+        <input type="file" id="docxFile" accept=".docx" class="file-input">
+        <button onclick="testImageImport()" class="btn">测试图片导入</button>
+        <div id="importResult" class="result" style="display: none;"></div>
+        <div id="imagePreview"></div>
+    </div>
+    
+    <div class="test-container">
+        <h2 class="test-title">2. 导出包含图片的 DOCX 文件</h2>
+        <button onclick="testImageExport()" class="btn" id="exportBtn" disabled>测试图片导出</button>
+        <div id="exportResult" class="result" style="display: none;"></div>
+    </div>
+    
+    <div class="test-container">
+        <h2 class="test-title">3. 调试日志</h2>
+        <button onclick="clearLog()" class="btn">清空日志</button>
+        <div id="debugLog" class="log"></div>
+    </div>
+
+    <script type="module">
+        import { WordHandler } from '../src/fileHandlers/WordHandler.js';
+        
+        let currentTiptapDoc = null;
+        const wordHandler = new WordHandler();
+        
+        // 日志函数
+        function log(message, type = 'info') {
+            const logElement = document.getElementById('debugLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${type.toUpperCase()}: ${message}\n`;
+            logElement.textContent += logEntry;
+            logElement.scrollTop = logElement.scrollHeight;
+            
+            if (type === 'error') {
+                console.error(message);
+            } else {
+                console.log(message);
+            }
+        }
+        
+        // 测试图片导入
+        window.testImageImport = async function() {
+            const fileInput = document.getElementById('docxFile');
+            const resultDiv = document.getElementById('importResult');
+            const previewDiv = document.getElementById('imagePreview');
+            const exportBtn = document.getElementById('exportBtn');
+            
+            if (!fileInput.files[0]) {
+                showResult(resultDiv, '请选择一个 DOCX 文件', 'error');
+                return;
+            }
+            
+            try {
+                log('开始导入 DOCX 文件...');
+                showResult(resultDiv, '正在导入文件，请稍候...', 'info');
+                
+                const file = fileInput.files[0];
+                log(`文件名: ${file.name}, 大小: ${Math.round(file.size / 1024)} KB`);
+                
+                // 导入文档
+                currentTiptapDoc = await wordHandler.importToTiptap(file);
+                
+                log('文档导入完成');
+                log(`内容节点数: ${currentTiptapDoc.content?.length || 0}`);
+                log(`图片数量: ${currentTiptapDoc.images?.length || 0}`);
+                log(`批注数量: ${currentTiptapDoc.comments?.length || 0}`);
+                
+                // 显示结果
+                let resultText = `导入成功！\n`;
+                resultText += `- 内容节点: ${currentTiptapDoc.content?.length || 0}\n`;
+                resultText += `- 图片数量: ${currentTiptapDoc.images?.length || 0}\n`;
+                resultText += `- 批注数量: ${currentTiptapDoc.comments?.length || 0}`;
+                
+                if (currentTiptapDoc.importWarnings?.length > 0) {
+                    resultText += `\n\n警告:\n${currentTiptapDoc.importWarnings.join('\n')}`;
+                }
+                
+                showResult(resultDiv, resultText, 'success');
+                
+                // 显示图片预览
+                if (currentTiptapDoc.images && currentTiptapDoc.images.length > 0) {
+                    previewDiv.innerHTML = '<h3>图片预览:</h3>';
+                    currentTiptapDoc.images.forEach((img, index) => {
+                        const imgElement = document.createElement('img');
+                        imgElement.src = img.data;
+                        imgElement.alt = `图片 ${index + 1}`;
+                        imgElement.className = 'image-preview';
+                        imgElement.style.maxWidth = '300px';
+                        
+                        const caption = document.createElement('p');
+                        caption.textContent = `图片 ${index + 1}: ${img.filename} (${img.mimeType})`;
+                        
+                        previewDiv.appendChild(imgElement);
+                        previewDiv.appendChild(caption);
+                        
+                        log(`图片 ${index + 1}: ${img.filename}, 类型: ${img.mimeType}, 数据长度: ${img.data.length}`);
+                    });
+                } else {
+                    previewDiv.innerHTML = '<p>文档中没有找到图片</p>';
+                }
+                
+                // 启用导出按钮
+                exportBtn.disabled = false;
+                
+            } catch (error) {
+                log(`导入失败: ${error.message}`, 'error');
+                showResult(resultDiv, `导入失败: ${error.message}`, 'error');
+                previewDiv.innerHTML = '';
+                exportBtn.disabled = true;
+            }
+        };
+        
+        // 测试图片导出
+        window.testImageExport = async function() {
+            const resultDiv = document.getElementById('exportResult');
+            
+            if (!currentTiptapDoc) {
+                showResult(resultDiv, '请先导入一个包含图片的文档', 'error');
+                return;
+            }
+            
+            try {
+                log('开始导出 DOCX 文件...');
+                showResult(resultDiv, '正在导出文件，请稍候...', 'info');
+                
+                // 记录导出前的文档状态
+                log('导出前的文档状态:');
+                log(`- 内容节点数: ${currentTiptapDoc.content?.length || 0}`);
+                log(`- 图片数量: ${currentTiptapDoc.images?.length || 0}`);
+                if (currentTiptapDoc.images) {
+                    currentTiptapDoc.images.forEach((img, index) => {
+                        log(`  图片 ${index + 1}: ${img.filename}, 关系ID: ${img.relationshipId}, 数据长度: ${img.data.length}`);
+                    });
+                }
+                
+                // 导出文档
+                const result = await wordHandler.exportFromTiptapJson(currentTiptapDoc, 'test-image-export');
+                
+                log('文档导出完成');
+                log(`导出文件大小: ${Math.round(result.blob.size / 1024)} KB`);
+                
+                // 创建下载链接
+                const url = URL.createObjectURL(result.blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = result.name;
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                showResult(resultDiv, `导出成功！文件大小: ${Math.round(result.blob.size / 1024)} KB`, 'success');
+                
+            } catch (error) {
+                log(`导出失败: ${error.message}`, 'error');
+                showResult(resultDiv, `导出失败: ${error.message}`, 'error');
+            }
+        };
+        
+        // 显示结果
+        function showResult(element, message, type) {
+            element.textContent = message;
+            element.className = `result ${type}`;
+            element.style.display = 'block';
+        }
+        
+        // 清空日志
+        window.clearLog = function() {
+            document.getElementById('debugLog').textContent = '';
+        };
+        
+        // 初始化日志
+        log('图片支持测试页面已加载');
+        log('请选择一个包含图片的 DOCX 文件进行测试');
+    </script>
+</body>
+</html>

@@ -109,6 +109,62 @@ export class DocxFileHandler {
   }
 
   /**
+   * 生成包含图片和批注的完整.docx文件
+   */
+  async generateDocxFileWithImagesAndComments(
+    wordContent: string, 
+    commentsXml?: string, 
+    images?: { [relationshipId: string]: { data: string; mimeType: string; filename: string } }
+  ): Promise<Blob> {
+    const zip = new JSZip();
+    
+    // 添加基本结构文件（不包含图片关系，稍后单独处理）
+    await this.addDocxStructureFiles(zip, wordContent, !!commentsXml, !!images);
+    
+    // 如果有图片数据，需要重新生成包含图片关系的 document.xml.rels
+    if (images && Object.keys(images).length > 0) {
+      console.log('添加图片文件到Word文档...');
+      const mediaFolder = zip.folder('word')!.folder('media')!;
+      
+      // 添加图片文件
+      Object.entries(images).forEach(([relationshipId, imageInfo]) => {
+        // 从 base64 数据中提取实际的图片数据
+        console.log(`处理图片数据: ${imageInfo.filename}`);
+        console.log(`原始数据长度: ${imageInfo.data.length}`);
+        console.log(`数据前缀: ${imageInfo.data.substring(0, 50)}`);
+        
+        const base64Data = imageInfo.data.split(',')[1] || imageInfo.data;
+        console.log(`提取的base64数据长度: ${base64Data.length}`);
+        console.log(`base64数据前缀: ${base64Data.substring(0, 50)}`);
+        
+        mediaFolder.file(imageInfo.filename, base64Data, { base64: true });
+        console.log(`添加图片: ${imageInfo.filename}, 关系ID: ${relationshipId}`);
+      });
+      
+      // 重新生成包含图片关系的 document.xml.rels
+      const documentRelsXml = this.generateDocumentRelsWithImages(!!commentsXml, images);
+      zip.folder('word')!.folder('_rels')!.file('document.xml.rels', documentRelsXml);
+      
+      console.log('生成的 document.xml.rels 内容:');
+      console.log(documentRelsXml);
+      console.log('图片文件添加完成');
+    }
+    
+    // 如果有批注数据，添加批注文件
+    if (commentsXml) {
+      console.log('添加批注文件到Word文档...');
+      zip.folder('word')!.file('comments.xml', commentsXml);
+      console.log('批注文件添加完成');
+    }
+    
+    // 生成ZIP文件
+    return await zip.generateAsync({
+      type: 'blob',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    });
+  }
+
+  /**
    * 生成包含批注的.docx文件
    */
   async generateDocxFileWithComments(wordContent: string, commentsXml?: string): Promise<Blob> {
@@ -133,15 +189,15 @@ export class DocxFileHandler {
 
   // === 私有方法 ===
 
-  private async addDocxStructureFiles(zip: any, wordContent: string, hasComments: boolean = false): Promise<void> {
-    // [Content_Types].xml - 根据是否有批注调整内容类型
-    zip.file('[Content_Types].xml', this.getContentTypesXml(hasComments));
+  private async addDocxStructureFiles(zip: any, wordContent: string, hasComments: boolean = false, hasImages: boolean = false): Promise<void> {
+    // [Content_Types].xml - 根据是否有批注和图片调整内容类型
+    zip.file('[Content_Types].xml', this.getContentTypesXml(hasComments, hasImages));
     
     // _rels/.rels
     zip.folder('_rels')!.file('.rels', this.getRelsXml());
     
-    // word/_rels/document.xml.rels - 根据是否有批注调整关系文件
-    zip.folder('word')!.folder('_rels')!.file('document.xml.rels', this.getDocumentRelsXml(hasComments));
+    // word/_rels/document.xml.rels - 根据是否有批注和图片调整关系文件
+    zip.folder('word')!.folder('_rels')!.file('document.xml.rels', this.getDocumentRelsXml(hasComments, hasImages, wordContent));
     
     // word/document.xml
     zip.folder('word')!.file('document.xml', wordContent);
@@ -159,7 +215,7 @@ export class DocxFileHandler {
     zip.folder('word')!.file('numbering.xml', this.getNumberingXmlForContent(wordContent));
   }
 
-  private getContentTypesXml(hasComments: boolean = false): string {
+  private getContentTypesXml(hasComments: boolean = false, hasImages: boolean = false): string {
     let contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
@@ -176,6 +232,16 @@ export class DocxFileHandler {
   <Override PartName="/word/comments.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml"/>`;
     }
     
+    // 如果有图片，添加图片内容类型
+    if (hasImages) {
+      contentTypes += `
+  <Default Extension="png" ContentType="image/png"/>
+  <Default Extension="jpg" ContentType="image/jpeg"/>
+  <Default Extension="jpeg" ContentType="image/jpeg"/>
+  <Default Extension="gif" ContentType="image/gif"/>
+  <Default Extension="bmp" ContentType="image/bmp"/>`;
+    }
+    
     contentTypes += `
 </Types>`;
     
@@ -189,7 +255,7 @@ export class DocxFileHandler {
 </Relationships>`;
   }
 
-  private getDocumentRelsXml(hasComments: boolean = false): string {
+  private getDocumentRelsXml(hasComments: boolean = false, hasImages: boolean = false, wordContent?: string): string {
     let relationships = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
@@ -197,10 +263,20 @@ export class DocxFileHandler {
   <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable" Target="fontTable.xml"/>
   <Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>`;
     
+    let nextRId = 5;
+    
     // 如果有批注，添加批注关系
     if (hasComments) {
       relationships += `
-  <Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments" Target="comments.xml"/>`;
+  <Relationship Id="rId${nextRId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments" Target="comments.xml"/>`;
+      nextRId++;
+    }
+    
+    // 如果有图片，添加图片关系
+    if (hasImages && wordContent) {
+      const imageRelationships = this.extractImageRelationshipsFromContent(wordContent);
+      // 这里需要从外部传入实际的图片关系映射
+      // 暂时跳过，将在 generateDocxFileWithImagesAndComments 中处理
     }
     
     relationships += `
@@ -374,5 +450,61 @@ export class DocxFileHandler {
 
     // 若正文没有列表，返回一个空的 numbering 文件以保持结构完整
     return header + parts.join("\n") + footer;
+  }
+
+  /**
+   * 生成包含图片关系的 document.xml.rels 文件
+   */
+  private generateDocumentRelsWithImages(
+    hasComments: boolean, 
+    images: { [relationshipId: string]: { data: string; mimeType: string; filename: string } }
+  ): string {
+    let relationships = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable" Target="fontTable.xml"/>
+  <Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>`;
+    
+    let nextRId = 5;
+    
+    // 如果有批注，添加批注关系
+    if (hasComments) {
+      relationships += `
+  <Relationship Id="rId${nextRId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments" Target="comments.xml"/>`;
+      nextRId++;
+    }
+    
+    // 添加图片关系
+    Object.entries(images).forEach(([relationshipId, imageInfo]) => {
+      console.log(`生成图片关系: Id="${relationshipId}", Target="media/${imageInfo.filename}"`);
+      relationships += `
+  <Relationship Id="${relationshipId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${imageInfo.filename}"/>`;
+    });
+    
+    relationships += `
+</Relationships>`;
+    
+    return relationships;
+  }
+
+  /**
+   * 从 Word 内容中提取图片关系映射
+   * 需要与实际的图片数据匹配
+   */
+  private extractImageRelationshipsFromContent(wordContent: string): Map<string, string> {
+    const relationships = new Map<string, string>();
+    
+    // 使用正则表达式查找所有的图片引用
+    const imagePattern = /<a:blip[^>]*r:embed="([^"]+)"/g;
+    let match;
+    
+    while ((match = imagePattern.exec(wordContent)) !== null) {
+      const relationshipId = match[1];
+      // 这里暂时设置为空，将在调用时根据实际图片数据设置正确的文件名
+      relationships.set(relationshipId, '');
+    }
+    
+    return relationships;
   }
 }

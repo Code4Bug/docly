@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片导出测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .test-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .btn {
+            background: #409eff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        .btn:hover {
+            background: #337ecc;
+        }
+        
+        .log {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>图片导出测试</h1>
+    
+    <div class="test-container">
+        <h2>创建包含图片的测试文档</h2>
+        <button onclick="createTestDocument()" class="btn">创建测试文档并导出</button>
+        <div id="debugLog" class="log"></div>
+    </div>
+
+    <script type="module">
+        import { WordHandler } from '../src/fileHandlers/WordHandler.ts';
+        
+        const wordHandler = new WordHandler();
+        
+        // 日志函数
+        function log(message, type = 'info') {
+            const logElement = document.getElementById('debugLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${type.toUpperCase()}: ${message}\n`;
+            logElement.textContent += logEntry;
+            logElement.scrollTop = logElement.scrollHeight;
+            
+            if (type === 'error') {
+                console.error(message);
+            } else {
+                console.log(message);
+            }
+        }
+        
+        // 创建一个简单的base64图片数据（1x1像素的红色PNG）
+        function createTestImageData() {
+            return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
+        }
+        
+        // 创建测试文档
+        window.createTestDocument = async function() {
+            try {
+                log('开始创建包含图片的测试文档...');
+                
+                // 创建一个包含图片的Tiptap文档
+                const testImageData = createTestImageData();
+                
+                const tiptapDoc = {
+                    type: 'doc',
+                    content: [
+                        {
+                            type: 'paragraph',
+                            content: [
+                                {
+                                    type: 'text',
+                                    text: '这是一个包含图片的测试文档：'
+                                }
+                            ]
+                        },
+                        {
+                            type: 'image',
+                            attrs: {
+                                src: testImageData,
+                                relationshipId: 'rId7',
+                                width: 100,
+                                height: 100,
+                                alt: '测试图片'
+                            }
+                        },
+                        {
+                            type: 'paragraph',
+                            content: [
+                                {
+                                    type: 'text',
+                                    text: '图片应该显示在上方。'
+                                }
+                            ]
+                        }
+                    ],
+                    images: [
+                        {
+                            id: 'img_1',
+                            relationshipId: 'rId7',
+                            filename: 'test-image.png',
+                            data: testImageData,
+                            mimeType: 'image/png',
+                            width: 100,
+                            height: 100
+                        }
+                    ]
+                };
+                
+                log('测试文档创建完成');
+                log(`文档内容节点数: ${tiptapDoc.content.length}`);
+                log(`图片数量: ${tiptapDoc.images.length}`);
+                log(`图片关系ID: ${tiptapDoc.images[0].relationshipId}`);
+                
+                // 导出文档
+                log('开始导出Word文档...');
+                const result = await wordHandler.exportFromTiptapJson(tiptapDoc, 'test-image-debug');
+                
+                log(`导出成功！文件大小: ${Math.round(result.blob.size / 1024)} KB`);
+                
+                // 下载文件
+                const url = URL.createObjectURL(result.blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = result.name;
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                log('文件下载完成，请检查Word文档中是否显示图片');
+                
+            } catch (error) {
+                log(`测试失败: ${error.message}`, 'error');
+                console.error('详细错��:', error);
+            }
+        };
+        
+        // 初始化
+        log('图片导出测试页面已加载');
+        log('点击按钮创建包含图片的测试文档');
+    </script>
+</body>
+</html>

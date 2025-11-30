@@ -144,6 +144,9 @@ export class WordXmlParser {
             parseResult.warnings.push(`批注 ${index + 1} (ID: ${id}) 缺少关联的原文文本`);
           }
           
+          // 计算批注范围的偏移量
+          const rangeOffsets = this.calculateCommentRangeOffsets(documentXml, id, rangeText);
+          
           const parsedComment: TiptapComment = {
             id,
             author,
@@ -151,8 +154,8 @@ export class WordXmlParser {
             user: author,
             timestamp,
             range: {
-              startOffset: 0,
-              endOffset: 0,
+              startOffset: rangeOffsets.startOffset,
+              endOffset: rangeOffsets.endOffset,
               text: rangeText
             }
           };
@@ -295,6 +298,112 @@ export class WordXmlParser {
     }
     
     return { isValid: true };
+  }
+
+  /**
+   * 计算批注范围的偏移量
+   */
+  private calculateCommentRangeOffsets(documentXml: string | undefined, commentId: string, rangeText: string): { startOffset: number; endOffset: number } {
+    if (!documentXml || !rangeText || rangeText.trim().length === 0) {
+      return { startOffset: 0, endOffset: 0 };
+    }
+    
+    try {
+      console.debug(`计算批注 ${commentId} 的范围偏移量，范围文本: "${rangeText}"`);
+      
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(documentXml, 'text/xml');
+      
+      // 查找批注范围开始和结束标记
+      const commentStart = this.findCommentRangeStarts(doc).find(start => 
+        this.extractCommentRangeId(start, 0) === commentId
+      );
+      
+      if (!commentStart) {
+        console.warn(`未找到批注 ${commentId} 的开始标记`);
+        return { startOffset: 0, endOffset: 0 };
+      }
+      
+      const commentEnd = this.findCommentRangeEnd(doc, commentId);
+      if (!commentEnd) {
+        console.warn(`未找到批注 ${commentId} 的结束标记`);
+        return { startOffset: 0, endOffset: 0 };
+      }
+      
+      // 计算文档中到批注开始位置的文本偏移量
+      const startOffset = this.calculateTextOffsetToNode(doc, commentStart);
+      
+      // 计算批注范围的长度
+      const rangeLength = this.normalizeText(rangeText).length;
+      const endOffset = startOffset + rangeLength;
+      
+      console.debug(`批注 ${commentId} 偏移量计算结果: start=${startOffset}, end=${endOffset}, length=${rangeLength}`);
+      
+      return { startOffset, endOffset };
+    } catch (error) {
+      console.error(`计算批注 ${commentId} 偏移量时发生错误:`, error);
+      return { startOffset: 0, endOffset: 0 };
+    }
+  }
+  
+  /**
+   * 计算到指定节点的文本偏移量
+   */
+  private calculateTextOffsetToNode(doc: Document, targetNode: Element): number {
+    let offset = 0;
+    
+    try {
+      // 创建一个树遍历器，只遍历文本节点
+      const walker = document.createTreeWalker(
+        doc.documentElement,
+        NodeFilter.SHOW_TEXT,
+        null
+      );
+      
+      let currentNode = walker.nextNode();
+      
+      while (currentNode) {
+        // 检查当前文本节点是否在目标节点之前
+        if (this.isNodeBefore(currentNode, targetNode)) {
+          const textContent = currentNode.textContent || '';
+          offset += textContent.length;
+        } else {
+          break;
+        }
+        
+        currentNode = walker.nextNode();
+      }
+      
+      return offset;
+    } catch (error) {
+      console.error('计算文本偏移量时发生错误:', error);
+      return 0;
+    }
+  }
+  
+  /**
+   * 检查节点A是否在节点B之前
+   */
+  private isNodeBefore(nodeA: Node, nodeB: Node): boolean {
+    try {
+      const position = nodeA.compareDocumentPosition(nodeB);
+      return (position & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    } catch (error) {
+      console.error('比较节点位置时发生错误:', error);
+      return false;
+    }
+  }
+  
+  /**
+   * 标准化文本（用于偏移量计算）
+   */
+  private normalizeText(text: string): string {
+    return text
+      .trim()
+      .replace(/\s+/g, ' ')
+      .replace(/[\r\n\t]/g, ' ')
+      .replace(/\u00A0/g, ' ')
+      .trim();
   }
 
   /**
@@ -1106,12 +1215,15 @@ export class WordXmlParser {
 
   /**
    * 清理提取的文本
+   * 改进版本：更智能地处理分割的文本片段和样式标记
    */
   private cleanExtractedText(text: string): string {
     try {
       if (!text || typeof text !== 'string') {
         return '';
       }
+      
+      console.debug(`清理文本前: "${text}"`);
       
       let cleaned = text
         .trim()
@@ -1120,35 +1232,84 @@ export class WordXmlParser {
         .replace(/^\s+|\s+$/gm, '')  // 移除行首行尾空白
         .replace(/[\u200B-\u200D\uFEFF]/g, '');  // 移除零宽字符
       
-      // 如果文本过长，截取合理长度
+      // 改进的字符间空格检测和修复
+      if (cleaned.includes(' ') && cleaned.length > 3) {
+        // 策略1: 检测单字符+空格的模式（如 "T i t l e" -> "Title"）
+        const singleCharSpacePattern = /\b\w\s+(?=\w)/g;
+        const matches = cleaned.match(singleCharSpacePattern);
+        
+        if (matches && matches.length >= 2) {
+          const withoutExtraSpaces = cleaned.replace(/(\w)\s+(?=\w)/g, '$1');
+          
+          // 验证修复后的文本是否更合理
+          if (withoutExtraSpaces.length < cleaned.length * 0.8 && withoutExtraSpaces.length > 2) {
+            console.debug(`修复字符间空格: "${cleaned}" -> "${withoutExtraSpaces}"`);
+            cleaned = withoutExtraSpaces;
+          }
+        }
+        
+        // 策略2: 检测中文字符间的异常空格
+        const chineseCharSpacePattern = /[\u4e00-\u9fff]\s+(?=[\u4e00-\u9fff])/g;
+        if (chineseCharSpacePattern.test(cleaned)) {
+          const withoutChineseSpaces = cleaned.replace(chineseCharSpacePattern, (match) => {
+            return match.replace(/\s+/g, '');
+          });
+          console.debug(`修复中文字符间空格: "${cleaned}" -> "${withoutChineseSpaces}"`);
+          cleaned = withoutChineseSpaces;
+        }
+        
+        // 策略3: 检测标点符号前的异常空格
+        const punctuationSpacePattern = /\s+([。，！？；：""''（）【】《》])/g;
+        if (punctuationSpacePattern.test(cleaned)) {
+          const withoutPunctuationSpaces = cleaned.replace(punctuationSpacePattern, '$1');
+          console.debug(`修复标点符号前空格: "${cleaned}" -> "${withoutPunctuationSpaces}"`);
+          cleaned = withoutPunctuationSpaces;
+        }
+      }
+      
+      // 如果文本过长，智能截取
       if (cleaned.length > 200) {
-        // 尝试在句号、逗号或空格处截断
         const truncateAt = Math.min(200, cleaned.length);
         let cutPoint = truncateAt;
         
-        for (let i = truncateAt - 1; i >= Math.max(0, truncateAt - 50); i--) {
-          const char = cleaned[i];
-          if (char === '。' || char === '，' || char === '.' || char === ',' || char === ' ') {
+        // 优先在句子边界截断
+        const sentenceEnders = ['。', '！', '？', '.', '!', '?'];
+        for (let i = truncateAt - 1; i >= Math.max(0, truncateAt - 100); i--) {
+          if (sentenceEnders.includes(cleaned[i])) {
             cutPoint = i + 1;
             break;
           }
         }
         
+        // 其次在词语边界截断
+        if (cutPoint === truncateAt) {
+          const wordEnders = ['，', ',', ' ', '、'];
+          for (let i = truncateAt - 1; i >= Math.max(0, truncateAt - 50); i--) {
+            if (wordEnders.includes(cleaned[i])) {
+              cutPoint = i + 1;
+              break;
+            }
+          }
+        }
+        
         cleaned = cleaned.substring(0, cutPoint).trim();
+        console.debug(`文本过长，截取到 ${cutPoint} 字符`);
       }
       
       // 验证文本质量
       if (cleaned.length < 2) {
+        console.debug('文本太短，返回空字符串');
         return '';
       }
       
       // 检查是否包含过多的特殊字符或数字（可能是格式标记）
       const specialCharRatio = (cleaned.match(/[^\w\s\u4e00-\u9fff]/g) || []).length / cleaned.length;
       if (specialCharRatio > 0.5) {
-        console.warn('提取的文本包含过多特殊字符，可能不是有效的批注原文:', cleaned.substring(0, 50));
+        console.warn(`文本包含过多特殊字符 (${Math.round(specialCharRatio * 100)}%)，可能不是有效的批注原文:`, cleaned.substring(0, 50));
         return '';
       }
       
+      console.debug(`清理文本后: "${cleaned}"`);
       return cleaned;
     } catch (error) {
       console.error('清理文本时发生错误:', error);
@@ -1295,21 +1456,25 @@ export class WordXmlParser {
     try {
       console.debug(`开始提取节点间文本，从 ${startNode.tagName} 到 ${endNode.tagName}`);
       
+      // 首先尝试直接查找包含的文本运行元素（推荐方法）
+      const textRuns = this.findTextRunsBetweenNodes(startNode, endNode);
+      if (textRuns.length > 0) {
+        // 智能合并文本片段
+        const mergedText = this.smartMergeTextFragments(textRuns);
+        if (mergedText && mergedText.length > 0) {
+          console.debug(`通过文本运行提取到批注原文: "${mergedText.substring(0, 50)}..."`);
+          return this.cleanExtractedText(mergedText);
+        }
+      }
+      
+      // 如果文本运行方法失败，使用传统的节点遍历方法
+      console.debug('文本运行方法未获得结果，使用节点遍历方法');
+      
       let text = '';
       let currentNode: Node | null = startNode.nextSibling;
       let nodeCount = 0;
-      const maxNodes = 1000; // 减少最大节点数，避免提取过多无关内容
-      const processedNodes = new Set<Node>(); // 防止重复处理
-      
-      // 首先尝试直接查找包含的文本运行元素
-      const textRuns = this.findTextRunsBetweenNodes(startNode, endNode);
-      if (textRuns.length > 0) {
-        const extractedText = textRuns.join(' ').trim();
-        if (extractedText && extractedText.length > 0) {
-          console.debug(`通过文本运行提取到批注原文: "${extractedText.substring(0, 50)}..."`);
-          return this.cleanExtractedText(extractedText);
-        }
-      }
+      const maxNodes = 1000;
+      const processedNodes = new Set<Node>();
       
       while (currentNode && currentNode !== endNode && nodeCount < maxNodes) {
         try {
@@ -1399,36 +1564,297 @@ export class WordXmlParser {
 
   /**
    * 查找两个节点之间的文本运行元素
+   * 改进版本：更准确地识别批注范围内的所有文本片段
    */
   private findTextRunsBetweenNodes(startNode: Element, endNode: Element): string[] {
     const textRuns: string[] = [];
     
     try {
+      console.debug(`查找批注范围内的文本运行，从 ${startNode.tagName} 到 ${endNode.tagName}`);
+      
       // 获取共同的父元素
       const commonParent = this.findCommonParent(startNode, endNode);
       if (!commonParent) {
+        console.warn('未找到共同父元素');
         return textRuns;
       }
       
       // 在共同父元素中查找所有文本运行
       const allRuns = commonParent.querySelectorAll('w\\:r, r');
       let collecting = false;
+      let foundStart = false;
+      let foundEnd = false;
       
-      for (const run of Array.from(allRuns)) {
+      console.debug(`共找到 ${allRuns.length} 个文本运行元素`);
+      
+      for (let i = 0; i < allRuns.length; i++) {
+        const run = allRuns[i] as Element;
+        
         // 检查是否到达开始节点
-        if (run.contains(startNode) || run === startNode || this.isAfterNode(run, startNode)) {
+        if (!foundStart && (run.contains(startNode) || run === startNode || this.isAfterNode(run, startNode))) {
           collecting = true;
+          foundStart = true;
+          console.debug(`找到开始位置，运行 ${i + 1}`);
+        }
+        
+        // 检查是否到达结束节点
+        if (foundStart && (run.contains(endNode) || run === endNode || this.isAfterNode(endNode, run))) {
+          foundEnd = true;
+          console.debug(`找到结束位置，运行 ${i + 1}`);
+          
+          // 如果当前运行包含结束节点，仍需要提取其文本
+          if (run.contains(endNode) || run === endNode) {
+            const runText = this.extractTextFromTextRun(run);
+            if (runText.trim()) {
+              textRuns.push(runText.trim());
+              console.debug(`提取结束运行文本: "${runText.trim()}"`);
+            }
+          }
+          break;
         }
         
         // 如果正在收集，提取文本
         if (collecting) {
-          const runText = this.extractTextFromTextRun(run as Element);
+          const runText = this.extractTextFromTextRun(run);
+          if (runText.trim()) {
+            textRuns.push(runText.trim());
+            console.debug(`提取运行 ${i + 1} 文本: "${runText.trim()}"`);
+          }
+        }
+      }
+      
+      console.debug(`文本运行提取完成，共提取 ${textRuns.length} 个片段`);
+      console.debug(`提取的文本片段:`, textRuns);
+      
+      // 如果没有找到开始或结束节点，尝试备用方法
+      if (!foundStart || !foundEnd) {
+        console.warn(`未完整找到批注范围 (开始: ${foundStart}, 结束: ${foundEnd})，尝试备用方法`);
+        return this.findTextRunsBetweenNodesFallback(startNode, endNode);
+      }
+      
+      return textRuns;
+    } catch (error) {
+      console.error('查找文本运行时发生错误:', error);
+      return textRuns;
+    }
+  }
+
+  /**
+   * 智能合并文本片段
+   * 处理由于样式分割导致的文本片段化问题
+   */
+  private smartMergeTextFragments(textFragments: string[]): string {
+    if (!textFragments || textFragments.length === 0) {
+      return '';
+    }
+    
+    if (textFragments.length === 1) {
+      return textFragments[0];
+    }
+    
+    console.debug(`智能合并 ${textFragments.length} 个文本片段:`, textFragments);
+    
+    // 策略1: 直接连接（适用于大多数情况）
+    let merged = textFragments.join('');
+    console.debug(`直接连接结果: "${merged}"`);
+    
+    // 策略2: 用空格连接（适用于词语被分割的情况）
+    const spaceJoined = textFragments.join(' ');
+    console.debug(`空格连接结果: "${spaceJoined}"`);
+    
+    // 策略3: 智能连接（根据片段特征决定是否需要空格）
+    const smartJoined = this.intelligentJoinFragments(textFragments);
+    console.debug(`智能连接结果: "${smartJoined}"`);
+    
+    // 选择最佳结果
+    const candidates = [merged, spaceJoined, smartJoined].filter(text => text.trim().length > 0);
+    
+    // 优先选择长度适中且看起来最自然的文本
+    let bestCandidate = candidates[0];
+    let bestScore = this.calculateTextNaturalness(bestCandidate);
+    
+    for (let i = 1; i < candidates.length; i++) {
+      const score = this.calculateTextNaturalness(candidates[i]);
+      if (score > bestScore) {
+        bestCandidate = candidates[i];
+        bestScore = score;
+      }
+    }
+    
+    console.debug(`选择最佳合并结果: "${bestCandidate}" (得分: ${bestScore.toFixed(2)})`);
+    return bestCandidate;
+  }
+  
+  /**
+   * 智能连接文本片段
+   */
+  private intelligentJoinFragments(fragments: string[]): string {
+    if (fragments.length <= 1) {
+      return fragments.join('');
+    }
+    
+    let result = fragments[0];
+    
+    for (let i = 1; i < fragments.length; i++) {
+      const prev = fragments[i - 1];
+      const current = fragments[i];
+      
+      // 判断是否需要在片段间添加空格
+      const needsSpace = this.shouldAddSpaceBetweenFragments(prev, current);
+      
+      if (needsSpace) {
+        result += ' ' + current;
+      } else {
+        result += current;
+      }
+    }
+    
+    return result;
+  }
+  
+  /**
+   * 判断两个文本片段之间是否需要空格
+   */
+  private shouldAddSpaceBetweenFragments(prev: string, current: string): boolean {
+    if (!prev || !current) {
+      return false;
+    }
+    
+    const prevTrimmed = prev.trim();
+    const currentTrimmed = current.trim();
+    
+    if (!prevTrimmed || !currentTrimmed) {
+      return false;
+    }
+    
+    const prevLast = prevTrimmed[prevTrimmed.length - 1];
+    const currentFirst = currentTrimmed[0];
+    
+    // 中文字符之间通常不需要空格
+    const isChinese = (char: string) => /[\u4e00-\u9fff]/.test(char);
+    if (isChinese(prevLast) && isChinese(currentFirst)) {
+      return false;
+    }
+    
+    // 标点符号前后的处理
+    const isPunctuation = (char: string) => /[。，！？；：""''（）【】《》,.!?;:()[\]{}]/.test(char);
+    if (isPunctuation(prevLast) || isPunctuation(currentFirst)) {
+      return false;
+    }
+    
+    // 数字和字母之间可能需要空格
+    const isAlphaNumeric = (char: string) => /[a-zA-Z0-9]/.test(char);
+    if (isAlphaNumeric(prevLast) && isAlphaNumeric(currentFirst)) {
+      return true;
+    }
+    
+    // 英文单词之间需要空格
+    if (/[a-zA-Z]/.test(prevLast) && /[a-zA-Z]/.test(currentFirst)) {
+      return true;
+    }
+    
+    // 默认不添加空格
+    return false;
+  }
+  
+  /**
+   * 计算文本的自然度得分
+   */
+  private calculateTextNaturalness(text: string): number {
+    if (!text || text.trim().length === 0) {
+      return 0;
+    }
+    
+    let score = 0;
+    const trimmed = text.trim();
+    
+    // 基础分数：文本长度
+    score += Math.min(trimmed.length / 50, 1) * 10;
+    
+    // 减分：过多的空格
+    const spaceRatio = (trimmed.match(/\s/g) || []).length / trimmed.length;
+    if (spaceRatio > 0.3) {
+      score -= (spaceRatio - 0.3) * 20;
+    }
+    
+    // 加分：包含完整的词语
+    const wordCount = trimmed.split(/\s+/).filter(word => word.length > 1).length;
+    score += wordCount * 2;
+    
+    // 减分：过多的单字符
+    const singleCharCount = trimmed.split(/\s+/).filter(word => word.length === 1).length;
+    score -= singleCharCount * 1;
+    
+    // 加分：自然的标点符号使用
+    const punctuationMatches = trimmed.match(/[。，！？；：""''（）【】《》]/g);
+    if (punctuationMatches) {
+      score += Math.min(punctuationMatches.length, 3) * 1;
+    }
+    
+    // 减分：异常的字符模式
+    if (/\w\s+\w\s+\w/.test(trimmed)) {
+      score -= 5; // 检测到字符间有异常空格的模式
+    }
+    
+    return Math.max(score, 0);
+  }
+
+  /**
+   * 备用方法：查找两个节点之间的文本运行
+   */
+  private findTextRunsBetweenNodesFallback(startNode: Element, endNode: Element): string[] {
+    const textRuns: string[] = [];
+    
+    try {
+      console.debug('使用备用方法查找文本运行');
+      
+      // 方法1：基于DOM遍历顺序
+      const walker = document.createTreeWalker(
+        startNode.ownerDocument!.documentElement,
+        NodeFilter.SHOW_ELEMENT,
+        {
+          acceptNode: (node: Node) => {
+            const element = node as Element;
+            const tagName = element.tagName.toLowerCase();
+            return (tagName === 'w:r' || tagName === 'r') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+          }
+        }
+      );
+      
+      // 定位到开始节点
+      walker.currentNode = startNode;
+      let collecting = false;
+      let currentRun = walker.nextNode() as Element;
+      
+      while (currentRun) {
+        if (currentRun.contains(startNode) || currentRun === startNode) {
+          collecting = true;
+        }
+        
+        if (collecting) {
+          const runText = this.extractTextFromTextRun(currentRun);
           if (runText.trim()) {
             textRuns.push(runText.trim());
           }
         }
         
-        // 检查是否到达结束节点
+        if (currentRun.contains(endNode) || currentRun === endNode) {
+          break;
+        }
+        
+        currentRun = walker.nextNode() as Element;
+      }
+      
+      console.debug(`备用方法提取了 ${textRuns.length} 个文本片段`);
+      return textRuns;
+    } catch (error) {
+      console.error('备用文本运行查找失败:', error);
+      return textRuns;
+    }
+  }
+
+  /**
+   * 检查节点A是否在节点B之后
         if (run.contains(endNode) || run === endNode) {
           break;
         }

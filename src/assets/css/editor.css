@@ -188,3 +188,41 @@
   /* outline: 2px solid #409eff; */
   /* outline-offset: 2px; */
 }
+
+/* 图片样式 */
+.ProseMirror img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin: 8px 0;
+  display: block;
+}
+
+.ProseMirror img.editor-image {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ProseMirror img.editor-image:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.ProseMirror img.ProseMirror-selectednode {
+  outline: 2px solid #409eff;
+  outline-offset: 2px;
+}
+
+/* 深色主题下的图片样式 */
+.dark-theme .ProseMirror img {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.dark-theme .ProseMirror img.editor-image:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.dark-theme .ProseMirror img.ProseMirror-selectednode {
+  outline-color: #6d6d6d;
+}

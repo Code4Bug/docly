@@ -478,12 +478,12 @@ const handleExport = async (): Promise<void> => {
       return;
     }
     
-    // 将当前的批注数据合并到TiptapDocument中
+    // 将当前的批注数据更新到编辑器核心中
     if (annotations.value && annotations.value.length > 0) {
-      Console.debug('合并批注数据到导出文档中，批注数量:', annotations.value.length);
+      Console.debug('更新批注数据到编辑器核心中，批注数量:', annotations.value.length);
       
       // 转换批注格式以匹配TiptapDocument.comments的类型
-      tiptapJson.comments = annotations.value.map(annotation => ({
+      const commentsData = annotations.value.map(annotation => ({
         id: annotation.id,
         content: annotation.content,
         author: annotation.author,
@@ -492,12 +492,22 @@ const handleExport = async (): Promise<void> => {
         range: annotation.range
       }));
       
-      Console.debug('批注数据合并完成，最终文档包含批注数量:', tiptapJson.comments.length);
+      editorCore.value.setDocumentComments(commentsData);
+      Console.debug('批注数据更新完成');
     } else {
       Console.debug('没有批注数据需要导出');
+      editorCore.value.setDocumentComments([]);
     }
     
-    const fileResult = await wordHandler.value.exportFromTiptapJson(tiptapJson);
+    // 重新获取包含所有信息的 TiptapDocument
+    const completeTiptapJson = await editorCore.value.saveTiptapJson();
+    Console.debug('完整的导出数据:', {
+      contentNodes: completeTiptapJson.content?.length || 0,
+      images: completeTiptapJson.images?.length || 0,
+      comments: completeTiptapJson.comments?.length || 0
+    });
+    
+    const fileResult = await wordHandler.value.exportFromTiptapJson(completeTiptapJson);
     
     const url = URL.createObjectURL(fileResult.blob); 
     const a = document.createElement('a');

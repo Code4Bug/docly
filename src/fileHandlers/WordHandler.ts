@@ -57,9 +57,16 @@ export class WordHandler {
         
         // 处理图片数据
         let processedImages: ImageInfo[] = [];
+        console.log('检查图片处理条件:');
+        console.log('- images 存在:', !!images);
+        console.log('- images 键数量:', images ? Object.keys(images).length : 0);
+        console.log('- relationshipsXml 存在:', !!relationshipsXml);
+        
         if (images && Object.keys(images).length > 0 && relationshipsXml) {
           try {
             console.log('开始处理图片数据...');
+            console.log('可用的图片文件:', Object.keys(images));
+            
             const imageRelationships = ImageProcessor.parseImageRelationships(relationshipsXml);
             console.log('解析到的图片关系:', imageRelationships);
             
@@ -68,11 +75,18 @@ export class WordHandler {
             
             if (processedImages.length > 0) {
               importResult.warnings.push(`成功处理 ${processedImages.length} 个图片`);
+            } else {
+              console.warn('图片处理完成但没有处理任何图片');
             }
           } catch (imageError) {
             console.error('处理图片数据失败:', imageError);
             importResult.warnings.push('图片处理失败，文档中的图片可能无法正确显示');
           }
+        } else {
+          console.log('跳过图片处理，原因:');
+          if (!images) console.log('- 没有图片数据');
+          else if (Object.keys(images).length === 0) console.log('- 图片数据为空');
+          if (!relationshipsXml) console.log('- 没有关系XML');
         }
         
         // 将处理后的图片信息添加到文档中
@@ -195,11 +209,11 @@ export class WordHandler {
 
   /**
    * 从TiptapDocument导出Word文档 (推荐)
-   * 现在支持批注数据导出
+   * 现在支持批注和图片数据导出
    */
   async exportFromTiptapJson(tiptapDoc: TiptapDocument, filename: string = 'document'): Promise<{ blob: Blob; name: string }> {
     try {
-      console.log('开始导出Word文档，包含批注数量:', tiptapDoc.comments?.length || 0);
+      console.log('开始导出Word文档，包含批注数量:', tiptapDoc.comments?.length || 0, '，包含图片数量:', tiptapDoc.images?.length || 0);
       
       // 生成主文档XML
       const wordXml = this.generator.generateFromTiptap(tiptapDoc);
@@ -212,8 +226,46 @@ export class WordHandler {
         console.log('批注XML生成完成');
       }
       
-      // 生成包含批注的完整Word文档
-      const blob = await this.fileHandler.generateDocxFileWithComments(wordXml, commentsXml);
+      // 准备图片数据（如果存在图片数据）
+      let imagesForExport: { [relationshipId: string]: { data: string; mimeType: string; filename: string } } | undefined;
+      if (tiptapDoc.images && tiptapDoc.images.length > 0) {
+        console.log('准备图片数据用于导出...');
+        console.log('原始图片数据:', tiptapDoc.images.map(img => ({
+          id: img.id,
+          relationshipId: img.relationshipId,
+          filename: img.filename,
+          mimeType: img.mimeType,
+          dataLength: img.data.length
+        })));
+        
+        imagesForExport = {};
+        
+        // 同时更新文档中图片节点的关系ID，确保一致性
+        this.updateImageRelationshipIds(tiptapDoc);
+        
+        tiptapDoc.images.forEach((imageInfo, index) => {
+          const relationshipId = imageInfo.relationshipId || `rId${7 + index}`; // 从 rId7 开始分配图片关系ID
+          const filename = imageInfo.filename || `image${index + 1}.png`;
+          
+          imagesForExport![relationshipId] = {
+            data: imageInfo.data,
+            mimeType: imageInfo.mimeType,
+            filename: filename
+          };
+          
+          console.log(`准备图片 ${index + 1}: relationshipId=${relationshipId}, filename=${filename}, mimeType=${imageInfo.mimeType}`);
+        });
+        
+        console.log('图片数据准备完成，共', Object.keys(imagesForExport).length, '个图片');
+        console.log('导出图片映射:', Object.keys(imagesForExport).map(rid => ({
+          relationshipId: rid,
+          filename: imagesForExport![rid].filename,
+          mimeType: imagesForExport![rid].mimeType
+        })));
+      }
+      
+      // 生成包含批注和图片的完整Word文档
+      const blob = await this.fileHandler.generateDocxFileWithImagesAndComments(wordXml, commentsXml, imagesForExport);
       
       console.log('Word文档导出完成，文件大小:', Math.round(blob.size / 1024), 'KB');
       return { blob, name: `${filename}.docx` };
@@ -532,6 +584,63 @@ export class WordHandler {
   private convertTiptapToHtml(tiptapDoc: TiptapDocument): string {
     const htmlConverter = new TiptapToHtmlConverter();
     return htmlConverter.convertToHtml(tiptapDoc);
+  }
+
+  /**
+   * 更新文档中图片节点的关系ID，确保与导出的图片数据一致
+   */
+  private updateImageRelationshipIds(tiptapDoc: TiptapDocument): void {
+    if (!tiptapDoc.images || tiptapDoc.images.length === 0) return;
+    
+    console.log('开始更新图片关系ID...');
+    
+    // 创建关系ID映射
+    const relationshipIdMap = new Map<string, string>();
+    tiptapDoc.images.forEach((imageInfo, index) => {
+      const newRelationshipId = `rId${7 + index}`;
+      const oldRelationshipId = imageInfo.relationshipId;
+      
+      if (oldRelationshipId && oldRelationshipId !== newRelationshipId) {
+        relationshipIdMap.set(oldRelationshipId, newRelationshipId);
+        console.log(`映射关系ID: ${oldRelationshipId} -> ${newRelationshipId}`);
+      }
+      
+      imageInfo.relationshipId = newRelationshipId;
+    });
+    
+    // 递归更新文档内容中的图片节点
+    const updateNode = (node: any) => {
+      if (node.type === 'image' && node.attrs?.relationshipId) {
+        const oldId = node.attrs.relationshipId;
+        
+        // 如果有映射，使用映射的新ID
+        if (relationshipIdMap.has(oldId)) {
+          const newId = relationshipIdMap.get(oldId)!;
+          node.attrs.relationshipId = newId;
+          console.log(`更新图片节点关系ID: ${oldId} -> ${newId}`);
+        } else {
+          // 如果没有映射，检查是否需要更新为标准格式
+          const imageIndex = tiptapDoc.images!.findIndex(img => img.relationshipId === oldId);
+          if (imageIndex >= 0) {
+            const newId = `rId${7 + imageIndex}`;
+            if (oldId !== newId) {
+              node.attrs.relationshipId = newId;
+              console.log(`标准化图片节点关系ID: ${oldId} -> ${newId}`);
+            }
+          }
+        }
+      }
+      
+      if (node.content && Array.isArray(node.content)) {
+        node.content.forEach(updateNode);
+      }
+    };
+    
+    if (tiptapDoc.content && Array.isArray(tiptapDoc.content)) {
+      tiptapDoc.content.forEach(updateNode);
+    }
+    
+    console.log('图片关系ID更新完成');
   }
 
 

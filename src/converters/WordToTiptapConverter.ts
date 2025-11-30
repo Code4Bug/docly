@@ -26,11 +26,21 @@ export interface Comment {
   author: string;
   user: string;
   timestamp: number;
+  initials?: string;
+  replies?: CommentReply[];
   range?: {
     startOffset: number;
     endOffset: number;
     text: string;
   };
+}
+
+export interface CommentReply {
+  content: string;
+  author: string;
+  user: string;
+  timestamp: number;
+  initials?: string;
 }
 
 export interface TiptapNode {
@@ -597,6 +607,7 @@ export class WordToTiptapConverter {
    */
   private convertTiptapNodeToWordXml(node: TiptapNode): string {
     Console.debug(`转换节点类型: ${node.type}`);
+    console.log(`转换节点类型: ${node.type}, 节点内容:`, JSON.stringify(node, null, 2));
 
     switch (node.type) {
       case "paragraph":
@@ -615,6 +626,18 @@ export class WordToTiptapConverter {
         return this.convertTableRowNodeToWordXml(node);
       case "tableCell":
         return this.convertTableCellNodeToWordXml(node);
+      case "image":
+        // 处理顶级图片节点，包装在段落中
+        Console.debug("处理顶级图片节点");
+        console.log("处理顶级图片节点:", JSON.stringify(node, null, 2));
+        const imageXml = this.convertImageNodeToWordXml(node);
+        console.log("生成的图片XML:", imageXml);
+        const paragraphXml = `<w:p>
+          <w:pPr></w:pPr>
+          ${imageXml}
+        </w:p>`;
+        console.log("包装后的段落XML:", paragraphXml);
+        return paragraphXml;
       default:
         Console.debug(`未知节点类型: ${node.type}, 转换为段落`);
         // 未知节点类型，转换为段落
@@ -718,6 +741,7 @@ export class WordToTiptapConverter {
    */
   private convertTextNodeToWordRun(node: TiptapNode): string {
     if (node.type === "image") {
+      console.log('在convertTextNodeToWordRun中处理图片节点:', JSON.stringify(node, null, 2));
       // 处理图片节点，转换为Word图片XML
       return this.convertImageNodeToWordXml(node);
     }
@@ -1177,12 +1201,20 @@ export class WordToTiptapConverter {
     const height = attrs.height || 300;
     const alt = attrs.alt || '图片';
     
+    console.log(`转换图片节点到Word XML: relationshipId=${relationshipId}, width=${width}, height=${height}, alt=${alt}`);
+    console.log('图片节点属性:', JSON.stringify(attrs, null, 2));
+    
+    // 验证关系ID格式
+    if (!relationshipId.startsWith('rId')) {
+      console.warn(`图片关系ID格式可能不正确: ${relationshipId}，应该以 'rId' 开头`);
+    }
+    
     // 转换像素到EMU (English Metric Units)
     // 1 像素 = 9525 EMU
     const widthEmu = width * 9525;
     const heightEmu = height * 9525;
     
-    return `<w:r>
+    const xmlResult = `<w:r>
       <w:drawing>
         <wp:inline distT="0" distB="0" distL="114300" distR="114300">
           <wp:extent cx="${widthEmu}" cy="${heightEmu}"/>
@@ -1221,6 +1253,11 @@ export class WordToTiptapConverter {
         </wp:inline>
       </w:drawing>
     </w:r>`;
+    
+    console.log(`生成的图片XML片段 (前200字符): ${xmlResult.substring(0, 200)}...`);
+    console.log(`图片XML中使用的关系ID: ${relationshipId}`);
+    
+    return xmlResult;
   }
 
   /**

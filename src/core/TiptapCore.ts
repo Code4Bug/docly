@@ -36,6 +36,8 @@ export class TiptapCore implements EditorInstance {
   private maxHistorySize: number = 50
   private saveHistoryTimeout: ReturnType<typeof setTimeout> | null = null
   private isUndoRedoOperation: boolean = false
+  private documentImages: any[] = [] // 存储文档的图片信息
+  private documentComments: any[] = [] // 存储文档的批注信息
 
   /**
    * 构造函数
@@ -75,8 +77,18 @@ export class TiptapCore implements EditorInstance {
     }
 
     // 直接获取 Tiptap 的 JSON 格式
-    const json = this.editor.getJSON()
-    return json as TiptapDocument
+    const json = this.editor.getJSON() as TiptapDocument
+    
+    // 添加存储的图片和批注信息
+    if (this.documentImages.length > 0) {
+      json.images = this.documentImages
+    }
+    
+    if (this.documentComments.length > 0) {
+      json.comments = this.documentComments
+    }
+    
+    return json
   }
 
 
@@ -293,6 +305,12 @@ export class TiptapCore implements EditorInstance {
     if (!this.editor) {
       throw new Error('编辑器未初始化')
     }
+    
+    // 保存图片和批注信息
+    this.documentImages = data.images || []
+    this.documentComments = data.comments || []
+    
+    console.log('TiptapCore 渲染文档，图片数量:', this.documentImages.length, '批注数量:', this.documentComments.length)
     
     // 直接设置 Tiptap JSON 内容
     this.editor.commands.setContent(data)
@@ -588,6 +606,38 @@ export class TiptapCore implements EditorInstance {
   updateImage(attrs: { src?: string; alt?: string; width?: number; height?: number }): void {
     if (!this.editor) return
     this.editor.chain().focus().updateAttributes('image', attrs).run()
+  }
+
+  /**
+   * 设置文档图片信息
+   * @param images - 图片信息数组
+   */
+  setDocumentImages(images: any[]): void {
+    this.documentImages = images || []
+    console.log('TiptapCore 设置图片信息，数量:', this.documentImages.length)
+  }
+
+  /**
+   * 获取文档图片信息
+   */
+  getDocumentImages(): any[] {
+    return this.documentImages
+  }
+
+  /**
+   * 设置文档批注信息
+   * @param comments - 批注信息数组
+   */
+  setDocumentComments(comments: any[]): void {
+    this.documentComments = comments || []
+    console.log('TiptapCore 设置批注信息，数量:', this.documentComments.length)
+  }
+
+  /**
+   * 获取文档批注信息
+   */
+  getDocumentComments(): any[] {
+    return this.documentComments
   }
 
   /**
