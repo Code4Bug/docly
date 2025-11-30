@@ -26,3 +26,5 @@ dist-ssr
 .vscode
 
 docx_proto_files
+
+.kiro

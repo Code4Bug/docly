@@ -530,6 +530,7 @@ export class WordToTiptapConverter {
       Console.debug("开始将 Tiptap JSON 转换为 Word XML");
       Console.debug("Tiptap 文档结构:", tiptapDoc);
       Console.debug("内容节点数量:", tiptapDoc.content?.length);
+      Console.debug("批注数量:", tiptapDoc.comments?.length || 0);
 
       // 调试每个节点的类型
       tiptapDoc.content?.forEach((node, index) => {
@@ -539,6 +540,11 @@ export class WordToTiptapConverter {
           }个子节点`
         );
       });
+
+      // 注意：批注数据将通过单独的comments.xml文件处理，不在文档内容中添加范围标记
+      if (tiptapDoc.comments && tiptapDoc.comments.length > 0) {
+        Console.debug("文档包含批注数据，将通过comments.xml文件处理，批注数量:", tiptapDoc.comments.length);
+      }
 
       const paragraphs = tiptapDoc.content
         .map((node) => this.convertTiptapNodeToWordXml(node))
@@ -551,9 +557,6 @@ export class WordToTiptapConverter {
 
       Console.debug("Tiptap JSON 转换为 Word XML 完成");
       Console.debug("生成的Word XML内容:", wordXml.substring(0, 500) + "...");
-
-      // 保存完整的Word XML到文件用于调试
-      // this.saveWordXmlToFile(wordXml);
 
       return wordXml;
     } catch (error) {

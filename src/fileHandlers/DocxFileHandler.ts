@@ -54,17 +54,40 @@ export class DocxFileHandler {
     });
   }
 
+  /**
+   * 生成包含批注的.docx文件
+   */
+  async generateDocxFileWithComments(wordContent: string, commentsXml?: string): Promise<Blob> {
+    const zip = new JSZip();
+    
+    // 添加基本结构文件
+    await this.addDocxStructureFiles(zip, wordContent, !!commentsXml);
+    
+    // 如果有批注数据，添加批注文件
+    if (commentsXml) {
+      console.log('添加批注文件到Word文档...');
+      zip.folder('word')!.file('comments.xml', commentsXml);
+      console.log('批注文件添加完成');
+    }
+    
+    // 生成ZIP文件
+    return await zip.generateAsync({
+      type: 'blob',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    });
+  }
+
   // === 私有方法 ===
 
-  private async addDocxStructureFiles(zip: any, wordContent: string): Promise<void> {
-    // [Content_Types].xml
-    zip.file('[Content_Types].xml', this.getContentTypesXml());
+  private async addDocxStructureFiles(zip: any, wordContent: string, hasComments: boolean = false): Promise<void> {
+    // [Content_Types].xml - 根据是否有批注调整内容类型
+    zip.file('[Content_Types].xml', this.getContentTypesXml(hasComments));
     
     // _rels/.rels
     zip.folder('_rels')!.file('.rels', this.getRelsXml());
     
-    // word/_rels/document.xml.rels
-    zip.folder('word')!.folder('_rels')!.file('document.xml.rels', this.getDocumentRelsXml());
+    // word/_rels/document.xml.rels - 根据是否有批注调整关系文件
+    zip.folder('word')!.folder('_rels')!.file('document.xml.rels', this.getDocumentRelsXml(hasComments));
     
     // word/document.xml
     zip.folder('word')!.file('document.xml', wordContent);
@@ -82,8 +105,8 @@ export class DocxFileHandler {
     zip.folder('word')!.file('numbering.xml', this.getNumberingXmlForContent(wordContent));
   }
 
-  private getContentTypesXml(): string {
-    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+  private getContentTypesXml(hasComments: boolean = false): string {
+    let contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
   <Default Extension="xml" ContentType="application/xml"/>
@@ -91,8 +114,18 @@ export class DocxFileHandler {
   <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
   <Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>
   <Override PartName="/word/fontTable.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml"/>
-  <Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>
+  <Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>`;
+    
+    // 如果有批注，添加批注内容类型
+    if (hasComments) {
+      contentTypes += `
+  <Override PartName="/word/comments.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml"/>`;
+    }
+    
+    contentTypes += `
 </Types>`;
+    
+    return contentTypes;
   }
 
   private getRelsXml(): string {
@@ -102,14 +135,24 @@ export class DocxFileHandler {
 </Relationships>`;
   }
 
-  private getDocumentRelsXml(): string {
-    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+  private getDocumentRelsXml(hasComments: boolean = false): string {
+    let relationships = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
   <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>
   <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable" Target="fontTable.xml"/>
-  <Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>
+  <Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>`;
+    
+    // 如果有批注，添加批注关系
+    if (hasComments) {
+      relationships += `
+  <Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments" Target="comments.xml"/>`;
+    }
+    
+    relationships += `
 </Relationships>`;
+    
+    return relationships;
   }
 
   private getStylesXml(): string {

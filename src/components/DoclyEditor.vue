@@ -163,6 +163,7 @@ import type { EditorConfig } from '../types';
 import { showMessage } from '../utils/Message';
 import { Annotation } from './AnnotationSystem.vue';
 import { Console } from '../utils/Console';
+import { ErrorHandler, ErrorType, ErrorSeverity } from '../utils/ErrorHandler';
 
 // Props
 interface Props {
@@ -330,7 +331,7 @@ const initEditor = async (): Promise<void> => {
           htmlContent = convertTiptapNodesToHtml(data.content);
         }
         
-        Console.debug('生成的HTML内容:', htmlContent);
+        // Console.debug('生成的HTML内容:', htmlContent);
         editorContent.value = htmlContent;
         
         // 更新字符数统计
@@ -470,10 +471,30 @@ const handleExport = async (): Promise<void> => {
     // 使用新的 Tiptap JSON 导出方法
     const tiptapJson = await editorCore.value.saveTiptapJson();
     Console.debug('准备导出的 Tiptap JSON 数据:', tiptapJson);
+    Console.debug('当前批注数据:', annotations.value);
     
     if (!tiptapJson || !tiptapJson.content || tiptapJson.content.length === 0) {
       showMessage('没有内容可导出，请先添加一些内容', 'warn');
       return;
+    }
+    
+    // 将当前的批注数据合并到TiptapDocument中
+    if (annotations.value && annotations.value.length > 0) {
+      Console.debug('合并批注数据到导出文档中，批注数量:', annotations.value.length);
+      
+      // 转换批注格式以匹配TiptapDocument.comments的类型
+      tiptapJson.comments = annotations.value.map(annotation => ({
+        id: annotation.id,
+        content: annotation.content,
+        author: annotation.author,
+        user: annotation.user || annotation.author,
+        timestamp: annotation.timestamp,
+        range: annotation.range
+      }));
+      
+      Console.debug('批注数据合并完成，最终文档包含批注数量:', tiptapJson.comments.length);
+    } else {
+      Console.debug('没有批注数据需要导出');
     }
     
     const fileResult = await wordHandler.value.exportFromTiptapJson(tiptapJson);
@@ -530,40 +551,246 @@ const handleImport = async (event: Event): Promise<void> => {
   }
 
   try {
-    showMessage('正在导入文档，请稍候...', 'info');
+    // 显示导入进度提示
+    showMessage('正在读取文档文件...', 'info');
     
-    // 使用新的 Tiptap JSON 转换方法
-    const tiptapJson = await wordHandler.value.importToTiptap(file);
-    
+    // 清空现有批注数据
     annotations.value = [];
-    Console.debug('已清空现有批注');
+    Console.debug('已清空现有批注数据，准备导入新文档');
     
-    // 处理批注数据（如果有的话）
+    // 更新进度提示
+    showMessage('正在解析文档内容...', 'info');
+    
+    // 使用 WordHandler 导入文档，包含批注数据和错误信息
+    const importResult = await wordHandler.value.importToTiptap(file);
+    Console.debug('文档解析完成，TiptapDocument:', importResult);
+    
+    // 处理导入警告和错误
+    if (importResult.importWarnings && importResult.importWarnings.length > 0) {
+      Console.warn('导入警告:', importResult.importWarnings);
+      // 显示重要警告给用户
+      const criticalWarnings = importResult.importWarnings.filter(warning => 
+        warning.includes('解析失败') || 
+        warning.includes('数据丢失') || 
+        warning.includes('格式错误')
+      );
+      if (criticalWarnings.length > 0) {
+        showMessage(`导入警告: ${criticalWarnings[0]}`, 'warn');
+      }
+    }
+    
+    if (importResult.importErrors && importResult.importErrors.length > 0) {
+      Console.error('导入错误:', importResult.importErrors);
+      showMessage(`导入错误: ${importResult.importErrors[0]}`, 'error');
+    }
+    
+    const tiptapJson = importResult;
+    
+    // 处理批注数据集成
+    let importedCommentsCount = 0;
     if (tiptapJson.comments && tiptapJson.comments.length > 0) {
-      tiptapJson.comments.forEach((comment: any, index: number) => {
-        annotations.value.push({
-          id: comment.id || `imported_${Date.now()}_${index}`,
-          content: comment.content,
-          author: comment.author || comment.user || '文档作者',
-          user: comment.user || comment.author || '文档作者',
-          text: comment.range?.text || comment.content.substring(0, 50),
-          timestamp: typeof comment.timestamp === 'number' ? comment.timestamp : Date.now(),
-          resolved: false,
-          range: comment.range || { startOffset: 0, endOffset: 0, text: comment.content.substring(0, 50) }
+      Console.debug('开始处理批注数据，共', tiptapJson.comments.length, '条批注');
+      showMessage(`正在处理 ${tiptapJson.comments.length} 条批注...`, 'info');
+      
+      try {
+        tiptapJson.comments.forEach((comment: any, index: number) => {
+          // 验证批注数据完整性
+          if (!comment.content || typeof comment.content !== 'string') {
+            Console.warn(`批注 ${index + 1} 内容无效，跳过处理`);
+            return;
+          }
+          
+          // 转换为 AnnotationSystem 期望的格式
+          // 处理原文文本 - 优先使用range中的text，如果为空则尝试其他方式
+          let originalText = '';
+          if (comment.range?.text && comment.range.text.trim()) {
+            const rangeText = comment.range.text.trim();
+            // 验证原文质量，避免显示无意义的文本
+            if (rangeText.length >= 2 && !rangeText.includes('(原文内容未能提取)')) {
+              originalText = rangeText;
+            }
+          } else if (comment.text && comment.text.trim()) {
+            const commentText = comment.text.trim();
+            // 验证原文质量
+            if (commentText.length >= 2 && !commentText.includes('(原文内容未能提取)')) {
+              originalText = commentText;
+            }
+          }
+          
+          // 如果没有有效的原文，记录警告但不设置错误提示文本
+          if (!originalText) {
+            Console.warn(`批注 ${index + 1} (ID: ${comment.id}) 缺少有效的原文文本`);
+          }
+          
+          const annotation: Annotation = {
+            id: comment.id || `imported_${Date.now()}_${index}`,
+            content: comment.content.trim(),
+            author: comment.author || comment.user || '文档作者',
+            user: comment.user || comment.author || '文档作者',
+            text: originalText,
+            timestamp: typeof comment.timestamp === 'number' && comment.timestamp > 0 ? comment.timestamp : Date.now(),
+            resolved: false,
+            range: {
+              startOffset: comment.range?.startOffset || 0,
+              endOffset: comment.range?.endOffset || 0,
+              text: originalText
+            }
+          };
+          
+          // 处理批注回复（如果存在）
+          if (comment.replies && Array.isArray(comment.replies) && comment.replies.length > 0) {
+            annotation.replies = comment.replies.map((reply: any, replyIndex: number) => ({
+              id: reply.id || `reply_${Date.now()}_${index}_${replyIndex}`,
+              content: reply.content || '',
+              author: reply.author || reply.user || '回复者',
+              user: reply.user || reply.author || '回复者',
+              timestamp: typeof reply.timestamp === 'number' && reply.timestamp > 0 ? reply.timestamp : Date.now(),
+              resolved: false
+            }));
+          }
+          
+          annotations.value.push(annotation);
+          importedCommentsCount++;
+          
+          Console.debug(`批注 ${index + 1} 处理完成:`, {
+            id: annotation.id,
+            author: annotation.author,
+            contentLength: annotation.content.length,
+            hasReplies: !!(annotation.replies && annotation.replies.length > 0)
+          });
         });
-      });
+        
+        Console.debug('批注数据处理完成，成功导入', importedCommentsCount, '条批注');
+      } catch (commentError) {
+        Console.error('处理批注数据时发生错误:', commentError);
+        showMessage('批注数据处理出现问题，但文档主体内容已成功导入', 'warn');
+      }
+    } else {
+      Console.debug('文档中未包含批注数据');
     }
     
+    // 渲染文档内容
     if (editorCore.value) {
-      // 直接使用 Tiptap JSON 渲染
+      showMessage('正在渲染文档内容...', 'info');
       await editorCore.value.renderTiptapJson(tiptapJson);
-      showMessage('文档导入成功', 'success');
+      
+      // 显示导入成功消息
+      let successMessage = '文档导入成功';
+      if (importedCommentsCount > 0) {
+        successMessage += `，包含 ${importedCommentsCount} 条批注`;
+      }
+      showMessage(successMessage, 'success');
+      
+      Console.debug('文档导入完成，批注数据已集成到UI组件:', {
+        totalAnnotations: annotations.value.length,
+        documentNodes: tiptapJson.content?.length || 0
+      });
+    } else {
+      throw new Error('编辑器核心未初始化');
     }
     
+    // 清空文件输入
     target.value = '';
+    
   } catch (error) {
-    Console.error('导入失败:', error);
-    showMessage(`文档导入失败: ${(error as Error).message || '未知错误'}`, 'error');
+    Console.error('文档导入失败:', error);
+    Console.error('错误详情:', error instanceof Error ? error.stack : '未知错误类型');
+    
+    // 使用ErrorHandler记录和处理错误
+    let errorType = ErrorType.IMPORT_PROCESS;
+    let errorMessage = '文档导入失败';
+    let context = `文件: ${file.name}`;
+    let suggestion = '请重试或检查文件格式';
+    
+    if (error instanceof Error) {
+      // 检查是否有导入警告和错误信息
+      const enhancedError = error as any;
+      let additionalInfo: string[] = [];
+      
+      if (enhancedError.importWarnings && Array.isArray(enhancedError.importWarnings)) {
+        additionalInfo.push(...enhancedError.importWarnings);
+      }
+      if (enhancedError.importErrors && Array.isArray(enhancedError.importErrors)) {
+        additionalInfo.push(...enhancedError.importErrors);
+      }
+      
+      // 根据错误类型提供具体的错误信息和建议
+      if (error.message.includes('文件验证失败')) {
+        errorType = ErrorType.FILE_VALIDATION;
+        errorMessage = '文件格式或大小不符合要求';
+        suggestion = '请选择有效的.docx文件，确保文件大小在50MB以内';
+      } else if (error.message.includes('主文档解析失败')) {
+        errorType = ErrorType.XML_PARSING;
+        errorMessage = '文档内容解析错误';
+        context += ', 可能文件损坏';
+        suggestion = '请检查文件是否损坏，或尝试重新保存文档';
+      } else if (error.message.includes('批注解析')) {
+        errorType = ErrorType.COMMENT_PARSING;
+        errorMessage = '批注数据处理失败';
+        suggestion = '主要内容可能正常，批注功能可能受影响';
+      } else if (error.message.includes('XML')) {
+        errorType = ErrorType.XML_PARSING;
+        errorMessage = '文档内部结构错误';
+        context += ', XML格式问题';
+        suggestion = '文件可能损坏或格式不兼容，请尝试其他文档';
+      } else if (error.message.includes('大小')) {
+        errorType = ErrorType.FILE_VALIDATION;
+        errorMessage = '文件大小问题';
+        suggestion = '请检查文件大小是否超出限制或文件是否为空';
+      } else {
+        errorMessage = error.message;
+        context += `, 错误类型: ${error.constructor.name}`;
+      }
+      
+      // 记录错误到ErrorHandler
+      const errorDetail = ErrorHandler.logError(
+        errorType,
+        ErrorSeverity.ERROR,
+        errorMessage,
+        context,
+        suggestion
+      );
+      
+      // 显示用户友好的错误消息
+      ErrorHandler.showUserFriendlyError(errorDetail);
+      
+      // 如果有额外的详细信息，显示重要的警告
+      if (additionalInfo.length > 0) {
+        const criticalInfo = additionalInfo.filter(info => 
+          info.includes('失败') || 
+          info.includes('错误') || 
+          info.includes('无效') ||
+          info.includes('丢失')
+        );
+        
+        if (criticalInfo.length > 0) {
+          setTimeout(() => {
+            ErrorHandler.logError(
+              ErrorType.IMPORT_PROCESS,
+              ErrorSeverity.WARNING,
+              criticalInfo[0],
+              '导入过程详细信息',
+              '这可能影响部分功能的正常使用'
+            );
+            showMessage(`详细信息: ${criticalInfo[0]}`, 'warn');
+          }, 2000);
+        }
+      }
+    } else {
+      // 处理非Error类型的异常
+      const errorDetail = ErrorHandler.logError(
+        ErrorType.UNKNOWN,
+        ErrorSeverity.ERROR,
+        '发生未知类型的错误',
+        `错误对象类型: ${typeof error}, 文件: ${file.name}`,
+        '请重试，如果问题持续存在请联系技术支持'
+      );
+      
+      ErrorHandler.showUserFriendlyError(errorDetail);
+    }
+    
+    // 清空文件输入以允许重新选择
+    target.value = '';
   }
 };
 

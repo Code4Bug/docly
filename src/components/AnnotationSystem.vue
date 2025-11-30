@@ -16,23 +16,45 @@
         </button>
       </div>
       
+      <div class="annotation-list-controls">
+        <div class="sort-controls">
+          <label>排序方式：</label>
+          <select v-model="sortOrder" @change="updateSortOrder" class="sort-select">
+            <option value="time-desc">时间倒序</option>
+            <option value="time-asc">时间正序</option>
+            <option value="document">文档顺序</option>
+          </select>
+        </div>
+      </div>
+      
       <div class="annotation-list">
         <div 
-          v-for="annotation in annotations" 
+          v-for="annotation in sortedAnnotations" 
           :key="annotation.id"
           class="annotation-item"
           :class="{ 'resolved': annotation.resolved }"
         >
           <div class="annotation-header">
-            <span class="annotation-author">{{ annotation.author }}</span>
-            <span class="annotation-time">{{ formatTime(annotation.timestamp) }}</span>
+            <div class="author-info">
+              <span class="annotation-author">{{ getAuthorDisplay(annotation) }}</span>
+              <span v-if="annotation.initials" class="author-initials">{{ annotation.initials }}</span>
+            </div>
+            <div class="time-info">
+              <span class="annotation-time" :title="getAbsoluteTime(annotation.timestamp)">
+                {{ formatTime(annotation.timestamp) }}
+              </span>
+            </div>
           </div>
           
           <!-- 显示批注对应的原文 -->
-          <div v-if="annotation?.text" class="annotation-original-text">
+          <div class="annotation-original-text" :class="{ 'no-original-text': !getOriginalText(annotation) }">
             <label>原文：</label>
-            <div class="original-text-content">
-              "{{ annotation.text }}"
+            <div v-if="getOriginalText(annotation)" class="original-text-content">
+              "{{ getOriginalText(annotation) }}"
+            </div>
+            <div v-else class="no-original-text-content">
+              <span class="no-text-hint">原文内容未能提取</span>
+              <span class="no-text-reason">可能是文档格式问题或批注范围标记缺失</span>
             </div>
           </div>
           
@@ -52,14 +74,23 @@
           
           <!-- 显示批注的回复 -->
           <div v-if="annotation.replies && annotation.replies.length > 0" class="annotation-replies">
+            <div class="replies-header">
+              <span class="replies-count">{{ annotation.replies.length }} 条回复</span>
+            </div>
             <div 
-              v-for="reply in annotation.replies" 
+              v-for="(reply, index) in annotation.replies" 
               :key="reply.id"
               class="reply-item"
+              :class="{ 'last-reply': index === annotation.replies.length - 1 }"
             >
               <div class="reply-header">
-                <span class="reply-author">{{ reply.author || reply.user }}</span>
-                <span class="reply-time">{{ formatTime(reply.timestamp) }}</span>
+                <div class="reply-author-info">
+                  <span class="reply-author">{{ getAuthorDisplay(reply) }}</span>
+                  <span v-if="reply.initials" class="reply-initials">{{ reply.initials }}</span>
+                </div>
+                <span class="reply-time" :title="getAbsoluteTime(reply.timestamp)">
+                  {{ formatTime(reply.timestamp) }}
+                </span>
               </div>
               <div class="reply-content">{{ reply.content }}</div>
             </div>
@@ -197,6 +228,7 @@ export interface Annotation {
   editing?: boolean;
   editContent?: string;
   text?: string; // 批注对应的原文
+  initials?: string; // 作者缩写
   range?: {
     startOffset: number;
     endOffset: number;
@@ -229,6 +261,7 @@ const emit = defineEmits<{
 
 // 响应式数据
 const annotationContent = ref<string>('');
+const sortOrder = ref<'time-desc' | 'time-asc' | 'document'>('time-desc');
 
 // 计算属性
 const hasResolvedAnnotations = computed(() => {
@@ -236,24 +269,150 @@ const hasResolvedAnnotations = computed(() => {
 });
 
 /**
- * 格式化时间显示
+ * 排序后的批注列表
+ */
+const sortedAnnotations = computed(() => {
+  const annotations = [...props.annotations];
+  
+  switch (sortOrder.value) {
+    case 'time-asc':
+      return annotations.sort((a, b) => a.timestamp - b.timestamp);
+    case 'time-desc':
+      return annotations.sort((a, b) => b.timestamp - a.timestamp);
+    case 'document':
+      // 按文档顺序排序（如果有range信息，按startOffset排序）
+      return annotations.sort((a, b) => {
+        if (a.range && b.range) {
+          return a.range.startOffset - b.range.startOffset;
+        }
+        // 如果没有range信息，回退到时间排序
+        return a.timestamp - b.timestamp;
+      });
+    default:
+      return annotations;
+  }
+});
+
+/**
+ * 格式化时间显示 - 增强版本
  * @param {number} timestamp - 时间戳
  * @returns {string} 格式化后的时间字符串
  */
 const formatTime = (timestamp: number): string => {
+  if (!timestamp || isNaN(timestamp)) {
+    return '未知时间';
+  }
+  
   const date = new Date(timestamp);
   const now = new Date();
   const diff = now.getTime() - date.getTime();
   
+  // 如果时间戳无效，返回默认值
+  if (isNaN(date.getTime())) {
+    return '未知时间';
+  }
+  
+  // 相对时间显示
   if (diff < 60000) {
     return '刚刚';
   } else if (diff < 3600000) {
-    return `${Math.floor(diff / 60000)}分钟前`;
+    const minutes = Math.floor(diff / 60000);
+    return `${minutes}分钟前`;
   } else if (diff < 86400000) {
-    return `${Math.floor(diff / 3600000)}小时前`;
+    const hours = Math.floor(diff / 3600000);
+    return `${hours}小时前`;
+  } else if (diff < 604800000) { // 7天内
+    const days = Math.floor(diff / 86400000);
+    return `${days}天前`;
   } else {
-    return date.toLocaleDateString();
+    // 超过7天显示具体日期
+    return date.toLocaleDateString('zh-CN', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   }
+};
+
+/**
+ * 获取绝对时间显示（用于tooltip）
+ * @param {number} timestamp - 时间戳
+ * @returns {string} 绝对时间字符串
+ */
+const getAbsoluteTime = (timestamp: number): string => {
+  if (!timestamp || isNaN(timestamp)) {
+    return '未知时间';
+  }
+  
+  const date = new Date(timestamp);
+  if (isNaN(date.getTime())) {
+    return '未知时间';
+  }
+  
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+};
+
+/**
+ * 获取作者显示名称
+ * @param {Annotation} annotation - 批注对象
+ * @returns {string} 作者显示名称
+ */
+const getAuthorDisplay = (annotation: Annotation): string => {
+  // 优先显示author，然后是user，最后是默认值
+  return annotation.author || annotation.user || '匿名用户';
+};
+
+/**
+ * 获取原文文本
+ * @param {Annotation} annotation - 批注对象
+ * @returns {string} 原文文本
+ */
+const getOriginalText = (annotation: Annotation): string => {
+  // 优先使用range中的text，然后是直接的text属性
+  if (annotation.range?.text && annotation.range.text.trim()) {
+    const text = annotation.range.text.trim();
+    // 过滤掉无效的原文文本
+    if (text === '(原文内容未能提取)' || text.length < 2) {
+      return '';
+    }
+    // 检查文本质量，避免显示格式标记或无意义字符
+    const specialCharRatio = (text.match(/[^\w\s\u4e00-\u9fff]/g) || []).length / text.length;
+    if (specialCharRatio > 0.7) {
+      return '';
+    }
+    return text;
+  }
+  
+  if (annotation.text && annotation.text.trim()) {
+    const text = annotation.text.trim();
+    // 过滤掉无效的原文文本
+    if (text === '(原文内容未能提取)' || text.length < 2) {
+      return '';
+    }
+    // 检查文本质量
+    const specialCharRatio = (text.match(/[^\w\s\u4e00-\u9fff]/g) || []).length / text.length;
+    if (specialCharRatio > 0.7) {
+      return '';
+    }
+    return text;
+  }
+  
+  return '';
+};
+
+/**
+ * 更新排序顺序
+ */
+const updateSortOrder = (): void => {
+  // 排序顺序改变时的处理逻辑（如果需要的话）
+  // 目前由计算属性自动处理
 };
 
 /**
@@ -340,6 +499,38 @@ export default {
   color: #333;
 }
 
+.annotation-list-controls {
+  padding: 8px 12px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #f8f9fa;
+}
+
+.sort-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sort-controls label {
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+}
+
+.sort-select {
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
+  background: white;
+  cursor: pointer;
+}
+
+.sort-select:focus {
+  outline: none;
+  border-color: #007bff;
+}
+
 .close-btn {
   background: none;
   border: none;
@@ -404,15 +595,36 @@ export default {
   margin-bottom: 8px;
 }
 
+.author-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .annotation-author {
   font-weight: 600;
   color: #333;
   font-size: 14px;
 }
 
+.author-initials {
+  font-size: 10px;
+  color: #666;
+  background: #e9ecef;
+  padding: 2px 4px;
+  border-radius: 2px;
+  font-weight: 500;
+}
+
+.time-info {
+  display: flex;
+  align-items: center;
+}
+
 .annotation-time {
   font-size: 12px;
   color: #666;
+  cursor: help;
 }
 
 .dark-theme .annotation-time {
@@ -449,6 +661,32 @@ export default {
   text-align: left;
 }
 
+.no-original-text-content {
+  margin: 0;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.no-text-hint {
+  display: block;
+  color: #999;
+  font-size: 12px;
+  font-style: italic;
+  margin-bottom: 2px;
+}
+
+.no-text-reason {
+  display: block;
+  color: #bbb;
+  font-size: 11px;
+  font-style: normal;
+}
+
+.annotation-original-text.no-original-text {
+  background: #f9f9f9;
+  border-left-color: #ddd;
+}
+
 .annotation-content {
   margin-bottom: 12px;
 }
@@ -476,12 +714,41 @@ export default {
   border-left: 2px solid #e0e0e0;
 }
 
+.replies-header {
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.replies-count {
+  font-size: 11px;
+  color: #6c757d;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 .reply-item {
   margin-bottom: 8px;
   padding: 8px 12px;
   background: #f8f9fa;
   border-radius: 4px;
   border: 1px solid #e9ecef;
+  position: relative;
+}
+
+.reply-item.last-reply {
+  margin-bottom: 0;
+}
+
+.reply-item::before {
+  content: '';
+  position: absolute;
+  left: -17px;
+  top: 12px;
+  width: 8px;
+  height: 1px;
+  background: #e0e0e0;
 }
 
 .reply-header {
@@ -491,15 +758,31 @@ export default {
   margin-bottom: 4px;
 }
 
+.reply-author-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .reply-author {
   font-weight: 600;
   font-size: 12px;
   color: #007bff;
 }
 
+.reply-initials {
+  font-size: 9px;
+  color: #666;
+  background: #dee2e6;
+  padding: 1px 3px;
+  border-radius: 2px;
+  font-weight: 500;
+}
+
 .reply-time {
   font-size: 11px;
   color: #6c757d;
+  cursor: help;
 }
 
 .reply-content {
@@ -776,9 +1059,34 @@ export default {
 .dark-theme .sidebar-header,
 .dark-theme .modal-header,
 .dark-theme .sidebar-footer,
-.dark-theme .modal-footer {
+.dark-theme .modal-footer,
+.dark-theme .annotation-list-controls {
     background-color: #2d2d2d;
     border-color: #404040;
+}
+
+.dark-theme .sort-controls label {
+  color: #a0aec0;
+}
+
+.dark-theme .sort-select {
+  background: #4a5568;
+  border-color: #718096;
+  color: #e2e8f0;
+}
+
+.dark-theme .author-initials {
+  background: #4a5568;
+  color: #a0aec0;
+}
+
+.dark-theme .replies-count {
+  color: #a0aec0;
+}
+
+.dark-theme .reply-initials {
+  background: #4a5568;
+  color: #a0aec0;
 }
 
 .dark-theme .sidebar-header h4,
@@ -814,6 +1122,19 @@ export default {
 
 .dark-theme .original-text-content {
   color: #cbd5e0;
+}
+
+.dark-theme .no-text-hint {
+  color: #a0aec0;
+}
+
+.dark-theme .no-text-reason {
+  color: #718096;
+}
+
+.dark-theme .annotation-original-text.no-original-text {
+  background: #2d3748;
+  border-left-color: #4a5568;
 }
 
 .dark-theme .comment-text-content {
