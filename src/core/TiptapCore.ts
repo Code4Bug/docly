@@ -5,6 +5,7 @@ import Strike from '@tiptap/extension-strike'
 import Superscript from '@tiptap/extension-superscript'
 import Subscript from '@tiptap/extension-subscript'
 import Link from '@tiptap/extension-link'
+import Image from '@tiptap/extension-image'
 import { TextStyle } from '@tiptap/extension-text-style'
 import { Color } from '@tiptap/extension-color'
 import { Table } from '@tiptap/extension-table'
@@ -109,6 +110,13 @@ export class TiptapCore implements EditorInstance {
         openOnClick: false,
         HTMLAttributes: {
           class: 'editor-link',
+        },
+      }),
+      Image.configure({
+        inline: true,
+        allowBase64: true,
+        HTMLAttributes: {
+          class: 'editor-image',
         },
       }),
       Table.configure({
@@ -553,6 +561,33 @@ export class TiptapCore implements EditorInstance {
   unsetBackgroundColor(): void {
     if (!this.editor) return
     this.editor.chain().focus().unsetHighlight().run()
+  }
+
+  /**
+   * 插入图片
+   * @param src - 图片源（URL 或 base64）
+   * @param alt - 图片替代文本
+   * @param width - 图片宽度
+   * @param height - 图片高度
+   */
+  insertImage(src: string, alt?: string, width?: number, height?: number): void {
+    if (!this.editor) return
+    
+    const attrs: any = { src }
+    if (alt) attrs.alt = alt
+    if (width) attrs.width = width
+    if (height) attrs.height = height
+    
+    this.editor.chain().focus().setImage(attrs).run()
+  }
+
+  /**
+   * 更新图片属性
+   * @param attrs - 图片属性
+   */
+  updateImage(attrs: { src?: string; alt?: string; width?: number; height?: number }): void {
+    if (!this.editor) return
+    this.editor.chain().focus().updateAttributes('image', attrs).run()
   }
 
   /**

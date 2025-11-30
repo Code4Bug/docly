@@ -1,8 +1,10 @@
-import { type TiptapDocument, type Comment as TiptapComment } from '../converters/WordToTiptapConverter';
+import { type TiptapDocument, type Comment as TiptapComment, type ImageInfo } from '../converters/WordToTiptapConverter';
 import { WordXmlParser } from './WordXmlParser';
 import { WordXmlGenerator } from './WordXmlGenerator';
 import { DocxFileHandler } from './DocxFileHandler';
 import { ErrorHandler, ErrorType, ErrorSeverity } from '../utils/ErrorHandler';
+import { ImageProcessor } from '../utils/ImageProcessor';
+import { TiptapToHtmlConverter } from '../converters/TiptapToHtmlConverter';
 
 /**
  * Word文档处理器 - 重构版
@@ -44,14 +46,39 @@ export class WordHandler {
         throw new Error(fileValidation.error!);
       }
       
-      const { documentXml, numberingXml, commentsXml } = await this.fileHandler.readDocxFile(file);
-      console.log('成功读取Word文档文件，包含批注:', !!commentsXml);
+      const { documentXml, numberingXml, commentsXml, relationshipsXml, images } = await this.fileHandler.readDocxFile(file);
+      console.log('成功读取Word文档文件，包含批注:', !!commentsXml, '，包含图片:', Object.keys(images || {}).length);
       
       // 解析主文档内容
       let tiptapDocument: TiptapDocument;
       try {
         tiptapDocument = this.parser.parseToTiptap(documentXml, numberingXml);
         console.log('主文档解析完成，内容节点数:', tiptapDocument.content?.length || 0);
+        
+        // 处理图片数据
+        let processedImages: ImageInfo[] = [];
+        if (images && Object.keys(images).length > 0 && relationshipsXml) {
+          try {
+            console.log('开始处理图片数据...');
+            const imageRelationships = ImageProcessor.parseImageRelationships(relationshipsXml);
+            console.log('解析到的图片关系:', imageRelationships);
+            
+            processedImages = ImageProcessor.processImages(tiptapDocument, imageRelationships, images);
+            console.log('图片处理完成，共处理', processedImages.length, '个图片');
+            
+            if (processedImages.length > 0) {
+              importResult.warnings.push(`成功处理 ${processedImages.length} 个图片`);
+            }
+          } catch (imageError) {
+            console.error('处理图片数据失败:', imageError);
+            importResult.warnings.push('图片处理失败，文档中的图片可能无法正确显示');
+          }
+        }
+        
+        // 将处理后的图片信息添加到文档中
+        if (processedImages.length > 0) {
+          tiptapDocument.images = processedImages;
+        }
         
         // 验证主文档内容
         if (!tiptapDocument.content || tiptapDocument.content.length === 0) {
@@ -503,49 +530,9 @@ export class WordHandler {
   }
 
   private convertTiptapToHtml(tiptapDoc: TiptapDocument): string {
-    if (!tiptapDoc.content || tiptapDoc.content.length === 0) {
-      return '<p></p>';
-    }
-
-    return tiptapDoc.content.map(node => {
-      switch (node.type) {
-        case 'paragraph':
-          let content = '';
-          if (node.content) {
-            content = node.content.map(textNode => {
-              if (textNode.type === 'text') {
-                return this.escapeHtml(textNode.text || '');
-              }
-              return '';
-            }).join('');
-          }
-          return `<p>${content}</p>`;
-        case 'heading':
-          const level = node.attrs?.level || 1;
-          let headingContent = '';
-          if (node.content) {
-            headingContent = node.content.map(textNode => {
-              if (textNode.type === 'text') {
-                return this.escapeHtml(textNode.text || '');
-              }
-              return '';
-            }).join('');
-          }
-          return `<h${level}>${headingContent}</h${level}>`;
-        default:
-          return '<p></p>';
-      }
-    }).join('\n');
+    const htmlConverter = new TiptapToHtmlConverter();
+    return htmlConverter.convertToHtml(tiptapDoc);
   }
 
-  private escapeHtml(text: string): string {
-    const htmlEscapes: Record<string, string> = {
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;'
-    };
-    return text.replace(/[&<>"']/g, (match) => htmlEscapes[match]);
-  }
+
 }

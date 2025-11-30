@@ -7,6 +7,17 @@ export interface TiptapDocument {
   type: "doc";
   content: TiptapNode[];
   comments?: Comment[];
+  images?: ImageInfo[];
+}
+
+export interface ImageInfo {
+  id: string;
+  relationshipId: string;
+  filename: string;
+  data: string; // base64 encoded image data
+  mimeType: string;
+  width?: number;
+  height?: number;
 }
 
 export interface Comment {
@@ -57,9 +68,10 @@ export class WordToTiptapConverter {
   /**
    * 将 Word XML 直接转换为 Tiptap JSON 格式
    * @param xmlContent - Word 文档的 XML 内容
+   * @param images - 图片信息数组（可选）
    * @returns Tiptap 文档格式
    */
-  convertWordXmlToTiptapJson(xmlContent: string): TiptapDocument {
+  convertWordXmlToTiptapJson(xmlContent: string, images?: ImageInfo[]): TiptapDocument {
     try {
       Console.debug("开始将 Word XML 转换为 Tiptap JSON");
 
@@ -166,12 +178,15 @@ export class WordToTiptapConverter {
       const tiptapDoc: TiptapDocument = {
         type: "doc",
         content,
+        images: images || [],
       };
 
       Console.debug(
         "Word XML 转换为 Tiptap JSON 完成，生成了",
         content.length,
-        "个节点"
+        "个节点，",
+        images?.length || 0,
+        "个图片"
       );
       return tiptapDoc;
     } catch (error) {
@@ -206,13 +221,23 @@ export class WordToTiptapConverter {
     // 提取段落级样式属性
     const paragraphAttrs = this.extractParagraphAttrs(paragraphProps);
 
-    // 提取段落中的所有文本运行
+    // 提取段落中的所有文本运行和图片
     const runs = paragraph.querySelectorAll("w\\:r, r");
     const content: TiptapNode[] = [];
 
     runs.forEach((run) => {
-      const textNodes = this.convertRunToTiptapNodes(run);
-      content.push(...textNodes);
+      // 检查是否包含图片
+      const drawing = run.querySelector("w\\:drawing, drawing");
+      if (drawing) {
+        const imageNode = this.convertDrawingToImageNode(drawing);
+        if (imageNode) {
+          content.push(imageNode);
+        }
+      } else {
+        // 处理文本运行
+        const textNodes = this.convertRunToTiptapNodes(run);
+        content.push(...textNodes);
+      }
     });
 
     // 如果段落为空，不添加任何内容（Tiptap 会自动处理空段落）
@@ -692,6 +717,11 @@ export class WordToTiptapConverter {
    * 将文本节点转换为 Word 运行
    */
   private convertTextNodeToWordRun(node: TiptapNode): string {
+    if (node.type === "image") {
+      // 处理图片节点，转换为Word图片XML
+      return this.convertImageNodeToWordXml(node);
+    }
+    
     if (node.type !== "text" || !node.text) {
       return "";
     }
@@ -1133,6 +1163,123 @@ export class WordToTiptapConverter {
       </w:tcPr>
       ${cellContent}
     </w:tc>`;
+  }
+
+  /**
+   * 将 Tiptap 图片节点转换为 Word XML
+   * @param node - Tiptap 图片节点
+   * @returns Word XML 字符串
+   */
+  private convertImageNodeToWordXml(node: TiptapNode): string {
+    const attrs = node.attrs || {};
+    const relationshipId = attrs.relationshipId || 'rId1';
+    const width = attrs.width || 400;
+    const height = attrs.height || 300;
+    const alt = attrs.alt || '图片';
+    
+    // 转换像素到EMU (English Metric Units)
+    // 1 像素 = 9525 EMU
+    const widthEmu = width * 9525;
+    const heightEmu = height * 9525;
+    
+    return `<w:r>
+      <w:drawing>
+        <wp:inline distT="0" distB="0" distL="114300" distR="114300">
+          <wp:extent cx="${widthEmu}" cy="${heightEmu}"/>
+          <wp:effectExtent l="0" t="0" r="16510" b="8890"/>
+          <wp:docPr id="1" name="${alt}" descr="${alt}"/>
+          <wp:cNvGraphicFramePr>
+            <a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/>
+          </wp:cNvGraphicFramePr>
+          <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+            <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+              <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                <pic:nvPicPr>
+                  <pic:cNvPr id="1" name="${alt}" descr="${alt}"/>
+                  <pic:cNvPicPr>
+                    <a:picLocks noChangeAspect="1"/>
+                  </pic:cNvPicPr>
+                </pic:nvPicPr>
+                <pic:blipFill>
+                  <a:blip r:embed="${relationshipId}"/>
+                  <a:stretch>
+                    <a:fillRect/>
+                  </a:stretch>
+                </pic:blipFill>
+                <pic:spPr>
+                  <a:xfrm>
+                    <a:off x="0" y="0"/>
+                    <a:ext cx="${widthEmu}" cy="${heightEmu}"/>
+                  </a:xfrm>
+                  <a:prstGeom prst="rect">
+                    <a:avLst/>
+                  </a:prstGeom>
+                </pic:spPr>
+              </pic:pic>
+            </a:graphicData>
+          </a:graphic>
+        </wp:inline>
+      </w:drawing>
+    </w:r>`;
+  }
+
+  /**
+   * 将 Word 图片绘制元素转换为 Tiptap 图片节点
+   * @param drawing - Word 绘制元素
+   * @returns Tiptap 图片节点
+   */
+  private convertDrawingToImageNode(drawing: Element): TiptapNode | null {
+    try {
+      // 查找图片的 blip 元素，包含关系ID
+      const blip = drawing.querySelector("a\\:blip, blip");
+      if (!blip) {
+        Console.debug("未找到图片 blip 元素");
+        return null;
+      }
+
+      // 获取关系ID
+      const relationshipId = blip.getAttribute("r:embed") || blip.getAttribute("embed");
+      if (!relationshipId) {
+        Console.debug("未找到图片关系ID");
+        return null;
+      }
+
+      // 获取图片尺寸信息
+      const extent = drawing.querySelector("wp\\:extent, extent");
+      let width: number | undefined;
+      let height: number | undefined;
+
+      if (extent) {
+        const cx = extent.getAttribute("cx");
+        const cy = extent.getAttribute("cy");
+        if (cx && cy) {
+          // Word 中的尺寸单位是 EMU (English Metric Units)
+          // 1 EMU = 1/914400 英寸，1 英寸 = 96 像素
+          width = Math.round(parseInt(cx) / 914400 * 96);
+          height = Math.round(parseInt(cy) / 914400 * 96);
+        }
+      }
+
+      // 获取图片描述信息
+      const docPr = drawing.querySelector("wp\\:docPr, docPr");
+      const alt = docPr?.getAttribute("descr") || docPr?.getAttribute("name") || "";
+
+      Console.debug(`发现图片: relationshipId=${relationshipId}, 尺寸=${width}x${height}, 描述=${alt}`);
+
+      return {
+        type: "image",
+        attrs: {
+          src: `#${relationshipId}`, // 使用关系ID作为临时src，后续会被替换为实际的base64数据
+          alt: alt,
+          width: width,
+          height: height,
+          relationshipId: relationshipId
+        }
+      };
+    } catch (error) {
+      Console.error("转换图片节点时发生错误:", error);
+      return null;
+    }
   }
 
   /**

@@ -15,7 +15,7 @@ export class WordXmlParser {
   /**
    * 解析Word XML为TiptapDocument
    */
-  parseToTiptap(xmlContent: string, numberingXml?: string): TiptapDocument {
+  parseToTiptap(xmlContent: string, numberingXml?: string, images?: any[]): TiptapDocument {
     // 如果提供了 numbering.xml，则先构建列表类型映射供转换器使用
     if (numberingXml) {
       const map = this.buildNumberingTypeMap(numberingXml);
@@ -24,7 +24,7 @@ export class WordXmlParser {
       this.wordToTiptapConverter.setNumberingTypeMap({});
     }
 
-    return this.wordToTiptapConverter.convertWordXmlToTiptapJson(xmlContent);
+    return this.wordToTiptapConverter.convertWordXmlToTiptapJson(xmlContent, images);
   }
 
   /**

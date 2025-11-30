@@ -9,7 +9,13 @@ export class DocxFileHandler {
   /**
    * 读取.docx文件内容
    */
-  async readDocxFile(file: File): Promise<{ documentXml: string; commentsXml?: string; numberingXml?: string }> {
+  async readDocxFile(file: File): Promise<{ 
+    documentXml: string; 
+    commentsXml?: string; 
+    numberingXml?: string;
+    relationshipsXml?: string;
+    images?: { [key: string]: { data: string; mimeType: string; filename: string } };
+  }> {
     const zip = new JSZip();
     const zipContent = await zip.loadAsync(file);
     
@@ -35,7 +41,55 @@ export class DocxFileHandler {
       numberingXml = await numberingFile.async('text');
     }
 
-    return { documentXml, commentsXml, numberingXml };
+    // 读取关系文件
+    let relationshipsXml: string | undefined;
+    const relationshipsFile = zipContent.file('word/_rels/document.xml.rels');
+    if (relationshipsFile) {
+      relationshipsXml = await relationshipsFile.async('text');
+    }
+
+    // 读取图片文件
+    const images: { [key: string]: { data: string; mimeType: string; filename: string } } = {};
+    const mediaFolder = zipContent.folder('word/media');
+    if (mediaFolder) {
+      const mediaFiles = mediaFolder.filter((relativePath, file) => {
+        return !file.dir && /\.(png|jpg|jpeg|gif|bmp|svg)$/i.test(relativePath);
+      });
+
+      for (const mediaFile of mediaFiles) {
+        try {
+          const filename = mediaFile.name.split('/').pop() || '';
+          const extension = filename.split('.').pop()?.toLowerCase() || '';
+          
+          // 确定MIME类型
+          const mimeTypeMap: { [key: string]: string } = {
+            'png': 'image/png',
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'gif': 'image/gif',
+            'bmp': 'image/bmp',
+            'svg': 'image/svg+xml'
+          };
+          
+          const mimeType = mimeTypeMap[extension] || 'image/png';
+          
+          // 读取图片数据并转换为base64
+          const imageData = await mediaFile.async('base64');
+          
+          images[filename] = {
+            data: `data:${mimeType};base64,${imageData}`,
+            mimeType,
+            filename
+          };
+          
+          console.log(`读取图片: ${filename}, 类型: ${mimeType}, 大小: ${imageData.length} bytes`);
+        } catch (error) {
+          console.error(`读取图片文件 ${mediaFile.name} 失败:`, error);
+        }
+      }
+    }
+
+    return { documentXml, commentsXml, numberingXml, relationshipsXml, images };
   }
 
   /**
