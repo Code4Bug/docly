@@ -95,21 +95,13 @@
       </div>
     </Teleport>
 
-    <!-- 快捷键表组件 -->
-    <Teleport to="body">
-      <ShortcutTable
-        v-if="showShortcutTable"
-        :isDarkTheme="isDarkTheme"
-        @close="closeShortcutTable"
-      />
-    </Teleport>
+
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
 import { formatShortcutDisplay } from '../utils/platform';
-import ShortcutTable from './ShortcutTable.vue';
 
 // Props
 interface Props {
@@ -127,11 +119,11 @@ const emit = defineEmits<{
   'import-file': [];
   'export-file': [];
   'save-document': [];
+  'show-shortcuts': [];
 }>();
 
 // 响应式数据
 const isOpen = ref(false);
-const showShortcutTable = ref(false);
 const dropdownTrigger = ref<HTMLElement>();
 const dropdownStyle = ref({});
 
@@ -213,27 +205,18 @@ const handleSave = () => {
  * 显示快捷键表
  */
 const handleShowShortcuts = () => {
-  showShortcutTable.value = true;
+  emit('show-shortcuts');
   closeDropdown();
 };
 
-/**
- * 关闭快捷键表
- */
-const closeShortcutTable = () => {
-  showShortcutTable.value = false;
-};
+
 
 /**
  * 处理键盘事件
  */
 const handleKeydown = (event: KeyboardEvent) => {
-  if (event.key === 'Escape') {
-    if (showShortcutTable.value) {
-      closeShortcutTable();
-    } else if (isOpen.value) {
-      closeDropdown();
-    }
+  if (event.key === 'Escape' && isOpen.value) {
+    closeDropdown();
   }
 };
 

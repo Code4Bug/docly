@@ -14,6 +14,7 @@
               @import-file="$emit('import-file')"
               @export-file="$emit('export-file')"
               @save-document="handleSaveDocument"
+              @show-shortcuts="$emit('show-shortcuts')"
             />
             
             <!-- 撤销重做按钮组 -->
@@ -626,6 +627,7 @@ const emit = defineEmits<{
   "delete-row": [];
   "toggle-annotation-mode": [];
   "show-annotation-list": [];
+  "show-shortcuts": [];
 }>();
 
 /**

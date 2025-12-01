@@ -38,6 +38,7 @@
       @delete-row="deleteRow"
       @toggle-annotation-mode="toggleAnnotationMode"
       @show-annotation-list="showAnnotationList"
+      @show-shortcuts="showShortcutPanel"
     />
 
     <!-- 主内容区域 -->
