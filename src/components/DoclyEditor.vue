@@ -15,6 +15,7 @@
       :editor-instance="editorCore"
       @import-file="importFile"
       @export-file="exportFile"
+      @save-document="handleSaveDocument"
       @undo="undo"
       @redo="redo"
       @change-heading="changeHeading"
@@ -354,6 +355,12 @@ const initEditor = async (): Promise<void> => {
     updateEditorTheme();
     
     // 注册编辑器快捷键
+    console.log('注册编辑器快捷键，回调函数:', {
+      importFile: typeof importFile,
+      exportFile: typeof handleExport,
+      save: typeof editorStore.saveDocument
+    });
+    
     registerEditorShortcuts({
       importFile,
       exportFile: handleExport,
@@ -531,10 +538,15 @@ const handleExport = async (): Promise<void> => {
  * 处理文件导入
  */
 const handleImport = async (event: Event): Promise<void> => {
+  console.log('handleImport 函数被调用，事件:', event);
+  
   const target = event.target as HTMLInputElement;
   const file = target.files?.[0];
   
+  console.log('选择的文件:', file);
+  
   if (!file) {
+    console.log('没有选择文件');
     showMessage('请选择一个文件', 'error');
     return;
   }
@@ -1220,7 +1232,16 @@ const handleFontStyleChange = (style: any): void => {
  * 导入文件
  */
 const importFile = (): void => {
-  fileInputRef.value?.click();
+  console.log('importFile 函数被调用');
+  console.log('fileInputRef.value:', fileInputRef.value);
+  
+  if (fileInputRef.value) {
+    console.log('触发文件选择器');
+    fileInputRef.value.click();
+  } else {
+    console.error('文件输入元素未找到');
+    showMessage('文件选择器初始化失败，请刷新页面重试', 'error');
+  }
 };
 
 /**
@@ -1348,6 +1369,20 @@ const toggleReadOnly = (): void => {
   showMessage(editorStore.isReadOnly ? '已开启只读模式' : '已关闭只读模式', 'info');
 };
 
+/**
+ * 处理保存文档
+ */
+const handleSaveDocument = async (): Promise<void> => {
+  try {
+    await editorStore.saveDocument();
+    isSaved.value = true;
+    showMessage('文档已保存', 'success');
+  } catch (error) {
+    Console.error('保存文档失败:', error);
+    showMessage('保存文档失败', 'error');
+  }
+};
+
 // 监听只读状态变化
 watch(isReadOnly, (newReadOnly: boolean) => {
   if (editorCore.value) {
@@ -1364,11 +1399,7 @@ onMounted(async () => {
     systemThemeQuery.value.addEventListener('change', handleThemeChange);
   }
   
-  // 注册撤销和重做快捷键
-  registerEditorShortcuts({
-    undo,
-    redo
-  });
+  // 快捷键已在 initEditor 中注册，这里不需要重复注册
   
   // 初始化编辑器
   await initEditor();

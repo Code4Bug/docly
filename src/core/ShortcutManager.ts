@@ -98,12 +98,24 @@ export class ShortcutManager {
    * @param event - 键盘事件
    */
   private handleKeyDown(event: KeyboardEvent): void {
-    if (!this.isEnabled) return;
+    if (!this.isEnabled) {
+      Console.debug('快捷键管理器已禁用');
+      return;
+    }
 
     const shortcutKey = this.getShortcutKey(event);
     const shortcut = this.shortcuts.get(shortcutKey);
 
+    Console.debug('快捷键检测结果:', { 
+      shortcutKey, 
+      hasShortcut: !!shortcut, 
+      enabled: shortcut?.enabled,
+      registeredShortcuts: Array.from(this.shortcuts.keys())
+    });
+
     if (shortcut && shortcut.enabled) {
+      Console.debug(`执行快捷键: ${shortcutKey}`);
+      
       if (shortcut.preventDefault) {
         event.preventDefault();
       }
@@ -114,10 +126,15 @@ export class ShortcutManager {
       try {
         shortcut.callback();
         this.emit('shortcut-executed', { key: shortcutKey, shortcut });
+        Console.debug(`快捷键 ${shortcutKey} 执行成功`);
       } catch (error) {
         Console.error(`执行快捷键 ${shortcutKey} 时出错:`, error);
         this.emit('shortcut-error', { key: shortcutKey, error });
       }
+    } else if (shortcut && !shortcut.enabled) {
+      Console.debug(`快捷键 ${shortcutKey} 已禁用`);
+    } else {
+      Console.debug(`未找到快捷键: ${shortcutKey}`);
     }
   }
 
@@ -129,13 +146,13 @@ export class ShortcutManager {
   private getShortcutKey(event: KeyboardEvent): string {
     const parts: string[] = [];
 
-    // 检测修饰键（Mac 优先使用 Cmd，Windows/Linux 使用 Ctrl）
-    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-    
-    if (isMac && event.metaKey) {
-      parts.push('Cmd');
-    } else if (!isMac && event.ctrlKey) {
+    // 检测修饰键
+    if (event.ctrlKey) {
       parts.push('Ctrl');
+    }
+
+    if (event.metaKey) {
+      parts.push('Cmd');
     }
 
     if (event.altKey) {
@@ -147,12 +164,50 @@ export class ShortcutManager {
     }
 
     // 添加主键
-    if (event.key && event.key !== 'Meta' && event.key !== 'Control' && 
-        event.key !== 'Alt' && event.key !== 'Shift') {
-      parts.push(event.key.toUpperCase());
+    let key = event.key;
+    
+    // 处理特殊键名
+    if (key === ' ') {
+      key = 'Space';
+    } else if (key === 'Enter') {
+      key = 'Enter';
+    } else if (key === 'Escape') {
+      key = 'Escape';
+    } else if (key === 'Tab') {
+      key = 'Tab';
+    } else if (key === 'Backspace') {
+      key = 'Backspace';
+    } else if (key === 'Delete') {
+      key = 'Delete';
+    } else if (key === 'ArrowUp') {
+      key = 'Up';
+    } else if (key === 'ArrowDown') {
+      key = 'Down';
+    } else if (key === 'ArrowLeft') {
+      key = 'Left';
+    } else if (key === 'ArrowRight') {
+      key = 'Right';
+    }
+    
+    // 只添加非修饰键
+    if (key && key !== 'Meta' && key !== 'Control' && 
+        key !== 'Alt' && key !== 'Shift') {
+      parts.push(key.toUpperCase());
     }
 
-    return parts.join('+');
+    const result = parts.join('+');
+    Console.debug('快捷键检测:', { 
+      event: { 
+        key: event.key, 
+        ctrlKey: event.ctrlKey, 
+        metaKey: event.metaKey, 
+        altKey: event.altKey, 
+        shiftKey: event.shiftKey 
+      }, 
+      result 
+    });
+    
+    return result;
   }
 
   /**

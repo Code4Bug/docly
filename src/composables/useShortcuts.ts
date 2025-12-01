@@ -51,36 +51,96 @@ export function useShortcuts() {
   }) => {
     // 文件操作快捷键
     if (callbacks.importFile) {
+      // 注册 Ctrl+O 用于导入
       shortcutManager.registerShortcut('Ctrl+O', {
         description: '导入文档',
         group: 'file',
-        callback: callbacks.importFile,
+        callback: () => {
+          console.log('快捷键 Ctrl+O 被触发，执行导入文档');
+          callbacks.importFile();
+        },
         enabled: true,
         preventDefault: true,
         stopPropagation: false
       });
+      
+      // 在 macOS 上也注册 Cmd+O
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      if (isMac) {
+        shortcutManager.registerShortcut('Cmd+O', {
+          description: '导入文档',
+          group: 'file',
+          callback: () => {
+            console.log('快捷键 Cmd+O 被触发，执行导入文档');
+            callbacks.importFile();
+          },
+          enabled: true,
+          preventDefault: true,
+          stopPropagation: false
+        });
+      }
     }
 
     if (callbacks.exportFile) {
+      // 注册 Ctrl+E 用于导出
       shortcutManager.registerShortcut('Ctrl+E', {
         description: '导出文档',
         group: 'file',
-        callback: callbacks.exportFile,
+        callback: () => {
+          console.log('快捷键 Ctrl+E 被触发，执行导出文档');
+          callbacks.exportFile();
+        },
         enabled: true,
         preventDefault: true,
         stopPropagation: false
       });
+      
+      // 在 macOS 上也注册 Cmd+E
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      if (isMac) {
+        shortcutManager.registerShortcut('Cmd+E', {
+          description: '导出文档',
+          group: 'file',
+          callback: () => {
+            console.log('快捷键 Cmd+E 被触发，执行导出文档');
+            callbacks.exportFile();
+          },
+          enabled: true,
+          preventDefault: true,
+          stopPropagation: false
+        });
+      }
     }
 
     if (callbacks.save) {
+      // 注册 Ctrl+S 用于保存
       shortcutManager.registerShortcut('Ctrl+S', {
         description: '保存文档',
         group: 'file',
-        callback: callbacks.save,
+        callback: () => {
+          console.log('快捷键 Ctrl+S 被触发，执行保存文档');
+          callbacks.save();
+        },
         enabled: true,
         preventDefault: true,
         stopPropagation: false
       });
+      
+      // 在 macOS 上也注册 Cmd+S
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      if (isMac) {
+        shortcutManager.registerShortcut('Cmd+S', {
+          description: '保存文档',
+          group: 'file',
+          callback: () => {
+            console.log('快捷键 Cmd+S 被触发，执行保存文档');
+            callbacks.save();
+          },
+          enabled: true,
+          preventDefault: true,
+          stopPropagation: false
+        });
+      }
     }
 
     // 编辑操作快捷键

@@ -3,45 +3,20 @@
     <div class="toolbar-container">
       <!-- 左侧功能区域 -->
       <div class="toolbar-left">
-        <!-- 文件操作和撤销重做 -->
+        <!-- 合并菜单和撤销重做 -->
         <div class="toolbar-row">
           <div class="toolbar-section file-operations">
-            <div class="button-group">
-              <button
-                @click="$emit('import-file')"
-                class="toolbar-btn"
-                @mouseenter="showTooltip($event, '导入文档')"
-                @mouseleave="hideTooltip"
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path
-                    d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20M12,19L8,15H10.5V12H13.5V15H16L12,19Z"
-                  />
-                </svg>
-              </button>
-              <button
-                @click="$emit('export-file')"
-                class="toolbar-btn"
-                @mouseenter="showTooltip($event, '导出文档')"
-                @mouseleave="hideTooltip"
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path
-                    d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20M12,19L8,15H10.5V12H13.5V15H16L12,19Z"
-                  />
-                </svg>
-              </button>
-            </div>
+            <!-- 合并菜单 -->
+            <DropdownMenu
+              :isDarkTheme="isDarkTheme"
+              :showTooltip="showTooltip"
+              :hideTooltip="hideTooltip"
+              @import-file="$emit('import-file')"
+              @export-file="$emit('export-file')"
+              @save-document="handleSaveDocument"
+            />
+            
+            <!-- 撤销重做按钮组 -->
             <div class="button-group">
               <button
                 @click="$emit('undo')"
@@ -566,6 +541,7 @@ import ColorPicker from "./ColorPicker.vue";
 import FontTool from "./FontTool.vue";
 import Tooltip from "./Tooltip.vue";
 import TableSizeSelector from "./TableSizeSelector.vue";
+import DropdownMenu from "./DropdownMenu.vue";
 import type { TiptapCore } from "../core/TiptapCore";
 
 // 主题系统
@@ -627,6 +603,7 @@ const formatStates = ref({
 const emit = defineEmits<{
   "import-file": [];
   "export-file": [];
+  "save-document": [];
   undo: [];
   redo: [];
   "change-heading": [value: string];
@@ -919,6 +896,13 @@ const handleTableSizeSelected = (size: {
 const handleCustomTableRequested = (): void => {
   // 可以在这里添加自定义表格对话框逻辑
   emit("insert-table", { rows: 3, cols: 3 });
+};
+
+/**
+ * 处理保存文档
+ */
+const handleSaveDocument = (): void => {
+  emit("save-document");
 };
 </script>
 
