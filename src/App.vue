@@ -26,6 +26,9 @@ import DoclyEditor from './components/DoclyEditor.vue'
   background-color: #fff;
   border-bottom: 1px solid #e0e0e0;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  height: 72px; /* 固定高度 */
+  display: flex;
+  align-items: center;
 }
 
 .app-header h1 {

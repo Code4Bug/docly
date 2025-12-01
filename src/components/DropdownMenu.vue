@@ -41,7 +41,7 @@
                 </svg>
                 <span>导入文档</span>
               </div>
-              <kbd>Ctrl+O</kbd>
+              <kbd :class="{ 'mac-symbol': hasMacSymbols(formatShortcut('Ctrl+O')) }">{{ formatShortcut('Ctrl+O') }}</kbd>
             </button>
             
             <button
@@ -54,7 +54,7 @@
                 </svg>
                 <span>导出文档</span>
               </div>
-              <kbd>Ctrl+E</kbd>
+              <kbd :class="{ 'mac-symbol': hasMacSymbols(formatShortcut('Ctrl+E')) }">{{ formatShortcut('Ctrl+E') }}</kbd>
             </button>
           </div>
 
@@ -71,17 +71,45 @@
                 </svg>
                 <span>保存文档</span>
               </div>
-              <kbd>Ctrl+S</kbd>
+              <kbd :class="{ 'mac-symbol': hasMacSymbols(formatShortcut('Ctrl+S')) }">{{ formatShortcut('Ctrl+S') }}</kbd>
+            </button>
+          </div>
+
+          <div class="dropdown-divider"></div>
+
+          <div class="dropdown-section">
+            <button
+              @click="handleShowShortcuts"
+              class="dropdown-item"
+            >
+              <div class="item-left">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M20,12A8,8 0 0,0 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12M22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2A10,10 0 0,1 22,12M10,17L6,13L7.41,11.58L10,14.17L16.59,7.58L18,9L10,17Z" />
+                </svg>
+                <span>快捷键查询</span>
+              </div>
+              <kbd :class="{ 'mac-symbol': hasMacSymbols(formatShortcut('Ctrl+/')) }">{{ formatShortcut('Ctrl+/') }}</kbd>
             </button>
           </div>
         </div>
       </div>
+    </Teleport>
+
+    <!-- 快捷键表组件 -->
+    <Teleport to="body">
+      <ShortcutTable
+        v-if="showShortcutTable"
+        :isDarkTheme="isDarkTheme"
+        @close="closeShortcutTable"
+      />
     </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
+import { formatShortcutDisplay } from '../utils/platform';
+import ShortcutTable from './ShortcutTable.vue';
 
 // Props
 interface Props {
@@ -103,8 +131,23 @@ const emit = defineEmits<{
 
 // 响应式数据
 const isOpen = ref(false);
+const showShortcutTable = ref(false);
 const dropdownTrigger = ref<HTMLElement>();
 const dropdownStyle = ref({});
+
+/**
+ * 格式化快捷键显示
+ */
+const formatShortcut = (shortcut: string): string => {
+  return formatShortcutDisplay(shortcut);
+};
+
+/**
+ * 检查是否包含Mac符号
+ */
+const hasMacSymbols = (text: string): boolean => {
+  return /[⌘⌥⇧]/.test(text);
+};
 
 /**
  * 切换下拉菜单
@@ -167,11 +210,30 @@ const handleSave = () => {
 };
 
 /**
+ * 显示快捷键表
+ */
+const handleShowShortcuts = () => {
+  showShortcutTable.value = true;
+  closeDropdown();
+};
+
+/**
+ * 关闭快捷键表
+ */
+const closeShortcutTable = () => {
+  showShortcutTable.value = false;
+};
+
+/**
  * 处理键盘事件
  */
 const handleKeydown = (event: KeyboardEvent) => {
-  if (event.key === 'Escape' && isOpen.value) {
-    closeDropdown();
+  if (event.key === 'Escape') {
+    if (showShortcutTable.value) {
+      closeShortcutTable();
+    } else if (isOpen.value) {
+      closeDropdown();
+    }
   }
 };
 
@@ -245,7 +307,7 @@ export default {
 }
 
 .dropdown-content {
-  min-width: 200px;
+  min-width: 180px;
   width: max-content;
   background: #ffffff;
   border: 1px solid #e1e5e9;
@@ -267,20 +329,20 @@ export default {
 }
 
 .dropdown-header {
-  padding: 12px 16px;
+  padding: 10px 14px;
   background: #f8f9fa;
   border-bottom: 1px solid #e1e5e9;
 }
 
 .dropdown-header h3 {
   margin: 0;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: #374151;
 }
 
 .dropdown-section {
-  padding: 8px 0;
+  padding: 6px 0;
 }
 
 .dropdown-item {
@@ -288,21 +350,21 @@ export default {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 10px 12px;
+  padding: 6px 10px;
   border: none;
   background: none;
   color: #374151;
-  font-size: 14px;
+  font-size: 13px;
   text-align: left;
   cursor: pointer;
   transition: background-color 0.2s ease;
-  min-height: 40px;
+  min-height: 32px;
 }
 
 .dropdown-item .item-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex: 1;
 }
 
@@ -313,8 +375,8 @@ export default {
 .dropdown-item svg {
   flex-shrink: 0;
   color: #6b7280;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
 }
 
 .dropdown-item kbd {
@@ -323,12 +385,15 @@ export default {
   border-radius: 3px;
   padding: 2px 6px;
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   color: #6b7280;
   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
   white-space: nowrap;
   flex-shrink: 0;
+  line-height: 1.2;
+  min-width: 20px;
+  text-align: center;
 }
 
 .dropdown-divider {
@@ -387,6 +452,24 @@ export default {
   border-color: #4b5563;
   color: #d1d5db;
   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+}
+
+/* Mac符号特殊样式 */
+@media (platform: macOS) {
+  .dropdown-item kbd {
+    font-size: 14px;
+    font-weight: 600;
+  }
+}
+
+/* Mac符号特殊样式 */
+.dropdown-item kbd.mac-symbol {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  padding: 3px 8px;
+  background: linear-gradient(135deg, #333333 0%, #444444 100%) !important;
+  color: #ffffff !important;
+  border-color: #555555 !important;
 }
 
 .dropdown-content.dark-theme .dropdown-divider {

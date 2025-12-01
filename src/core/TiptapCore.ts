@@ -17,7 +17,7 @@ import Highlight from '@tiptap/extension-highlight'
 import { createLowlight } from 'lowlight'
 import { FontSize } from '../extensions/FontSize'
 import { FontFamily } from '../extensions/FontFamily'
-import { TextAlign } from '../extensions/TextAlign'
+import TextAlign from '@tiptap/extension-text-align'
 import type { EditorConfig, EditorInstance } from '../types'
 import type { TiptapDocument } from '../converters/WordToTiptapConverter'
 import { Console } from '../utils/Console'
@@ -117,7 +117,11 @@ export class TiptapCore implements EditorInstance {
       Color,
       FontSize,
       FontFamily,
-      TextAlign,
+      TextAlign.configure({
+        types: ['heading', 'paragraph'],
+        alignments: ['left', 'center', 'right', 'justify'],
+        defaultAlignment: 'left',
+      }),
       Link.configure({
         openOnClick: false,
         HTMLAttributes: {
@@ -535,8 +539,29 @@ export class TiptapCore implements EditorInstance {
    * @param alignment - 对齐方式：'left', 'center', 'right', 'justify'
    */
   setTextAlign(alignment: string): void {
-    if (!this.editor) return
-    this.editor.chain().focus().setTextAlign(alignment).run()
+    if (!this.editor) {
+      Console.error('编辑器实例不存在，无法设置对齐方式')
+      return
+    }
+    
+    Console.debug(`设置文本对齐: ${alignment}`)
+    
+    try {
+      // 使用官方TextAlign扩展的API
+      const result = this.editor.chain().focus().setTextAlign(alignment).run()
+      Console.debug(`对齐命令执行结果: ${result}`)
+      
+      // 强制更新编辑器视图
+      this.editor.view.updateState(this.editor.state)
+      
+      // 检查当前选中内容的对齐状态
+      setTimeout(() => {
+        const currentAlign = this.editor?.isActive({ textAlign: alignment })
+        Console.debug(`对齐状态检查: ${alignment} - ${currentAlign}`)
+      }, 100)
+    } catch (error) {
+      Console.error('设置对齐方式时出错:', error)
+    }
   }
 
   /**
@@ -545,6 +570,8 @@ export class TiptapCore implements EditorInstance {
   unsetTextAlign(): void {
     if (!this.editor) return
     this.editor.chain().focus().unsetTextAlign().run()
+    // 强制更新编辑器视图
+    this.editor.view.updateState(this.editor.state)
   }
 
   /**

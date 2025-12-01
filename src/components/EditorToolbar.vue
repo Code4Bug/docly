@@ -226,7 +226,7 @@
             <div class="toolbar-section">
               <div class="button-group">
                 <button
-                  @click="$emit('set-alignment', 'left')"
+                  @click="handleAlignmentClick('left')"
                   class="toolbar-btn"
                   :class="{ active: currentAlignment === 'left' }"
                   @mouseenter="showTooltip($event, '左对齐')"
@@ -244,7 +244,7 @@
                   </svg>
                 </button>
                 <button
-                  @click="$emit('set-alignment', 'center')"
+                  @click="handleAlignmentClick('center')"
                   class="toolbar-btn"
                   :class="{ active: currentAlignment === 'center' }"
                   @mouseenter="showTooltip($event, '居中对齐')"
@@ -262,7 +262,7 @@
                   </svg>
                 </button>
                 <button
-                  @click="$emit('set-alignment', 'right')"
+                  @click="handleAlignmentClick('right')"
                   class="toolbar-btn"
                   :class="{ active: currentAlignment === 'right' }"
                   @mouseenter="showTooltip($event, '右对齐')"
@@ -280,7 +280,7 @@
                   </svg>
                 </button>
                 <button
-                  @click="$emit('set-alignment', 'justify')"
+                  @click="handleAlignmentClick('justify')"
                   class="toolbar-btn"
                   :class="{ active: currentAlignment === 'justify' }"
                   @mouseenter="showTooltip($event, '两端对齐')"
@@ -663,15 +663,21 @@ const updateFormatStates = (): void => {
     }
 
     // 更新对齐状态
-    if (editor.isActive({ textAlign: 'left' })) {
-      formatStates.value.alignment = 'left';
-    } else if (editor.isActive({ textAlign: 'center' })) {
-      formatStates.value.alignment = 'center';
-    } else if (editor.isActive({ textAlign: 'right' })) {
-      formatStates.value.alignment = 'right';
-    } else if (editor.isActive({ textAlign: 'justify' })) {
-      formatStates.value.alignment = 'justify';
-    } else {
+    try {
+      // 检查各种对齐状态
+      if (editor.isActive({ textAlign: 'left' }) || (!editor.isActive({ textAlign: 'center' }) && !editor.isActive({ textAlign: 'right' }) && !editor.isActive({ textAlign: 'justify' }))) {
+        formatStates.value.alignment = 'left';
+      } else if (editor.isActive({ textAlign: 'center' })) {
+        formatStates.value.alignment = 'center';
+      } else if (editor.isActive({ textAlign: 'right' })) {
+        formatStates.value.alignment = 'right';
+      } else if (editor.isActive({ textAlign: 'justify' })) {
+        formatStates.value.alignment = 'justify';
+      } else {
+        formatStates.value.alignment = 'left';
+      }
+    } catch (error) {
+      console.warn('获取对齐状态失败:', error);
       formatStates.value.alignment = 'left';
     }
 
@@ -853,6 +859,15 @@ const handleFontFamilyChange = (fontFamily: string): void => {
  */
 const handleFontSizeChange = (fontSize: string): void => {
   emit("font-size-change", fontSize);
+};
+
+/**
+ * 处理对齐按钮点击
+ * @param {string} alignment - 对齐方式
+ */
+const handleAlignmentClick = (alignment: string): void => {
+  console.log('对齐按钮被点击:', alignment);
+  emit("set-alignment", alignment);
 };
 
 /**

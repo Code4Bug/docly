@@ -1,5 +1,6 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { shortcutManager } from '../core/ShortcutManager';
+import { isMacOS, getPrimaryModifierKey } from '../utils/platform';
 
 /**
  * 快捷键组合式函数
@@ -51,105 +52,54 @@ export function useShortcuts() {
   }) => {
     // 文件操作快捷键
     if (callbacks.importFile) {
-      // 注册 Ctrl+O 用于导入
-      shortcutManager.registerShortcut('Ctrl+O', {
+      const primaryKey = getPrimaryModifierKey();
+      shortcutManager.registerShortcut(`${primaryKey}+O`, {
         description: '导入文档',
         group: 'file',
         callback: () => {
-          console.log('快捷键 Ctrl+O 被触发，执行导入文档');
+          console.log(`快捷键 ${primaryKey}+O 被触发，执行导入文档`);
           callbacks.importFile();
         },
         enabled: true,
         preventDefault: true,
         stopPropagation: false
       });
-      
-      // 在 macOS 上也注册 Cmd+O
-      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-      if (isMac) {
-        shortcutManager.registerShortcut('Cmd+O', {
-          description: '导入文档',
-          group: 'file',
-          callback: () => {
-            console.log('快捷键 Cmd+O 被触发，执行导入文档');
-            callbacks.importFile();
-          },
-          enabled: true,
-          preventDefault: true,
-          stopPropagation: false
-        });
-      }
     }
 
     if (callbacks.exportFile) {
-      // 注册 Ctrl+E 用于导出
-      shortcutManager.registerShortcut('Ctrl+E', {
+      const primaryKey = getPrimaryModifierKey();
+      shortcutManager.registerShortcut(`${primaryKey}+E`, {
         description: '导出文档',
         group: 'file',
         callback: () => {
-          console.log('快捷键 Ctrl+E 被触发，执行导出文档');
+          console.log(`快捷键 ${primaryKey}+E 被触发，执行导出文档`);
           callbacks.exportFile();
         },
         enabled: true,
         preventDefault: true,
         stopPropagation: false
       });
-      
-      // 在 macOS 上也注册 Cmd+E
-      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-      if (isMac) {
-        shortcutManager.registerShortcut('Cmd+E', {
-          description: '导出文档',
-          group: 'file',
-          callback: () => {
-            console.log('快捷键 Cmd+E 被触发，执行导出文档');
-            callbacks.exportFile();
-          },
-          enabled: true,
-          preventDefault: true,
-          stopPropagation: false
-        });
-      }
     }
 
     if (callbacks.save) {
-      // 注册 Ctrl+S 用于保存
-      shortcutManager.registerShortcut('Ctrl+S', {
+      const primaryKey = getPrimaryModifierKey();
+      shortcutManager.registerShortcut(`${primaryKey}+S`, {
         description: '保存文档',
         group: 'file',
         callback: () => {
-          console.log('快捷键 Ctrl+S 被触发，执行保存文档');
+          console.log(`快捷键 ${primaryKey}+S 被触发，执行保存文档`);
           callbacks.save();
         },
         enabled: true,
         preventDefault: true,
         stopPropagation: false
       });
-      
-      // 在 macOS 上也注册 Cmd+S
-      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-      if (isMac) {
-        shortcutManager.registerShortcut('Cmd+S', {
-          description: '保存文档',
-          group: 'file',
-          callback: () => {
-            console.log('快捷键 Cmd+S 被触发，执行保存文档');
-            callbacks.save();
-          },
-          enabled: true,
-          preventDefault: true,
-          stopPropagation: false
-        });
-      }
     }
 
     // 编辑操作快捷键
     if (callbacks.undo) {
-      // 检测操作系统，Mac使用Cmd+Z，Windows/Linux使用Ctrl+Z
-      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-      const undoKey = isMac ? 'Cmd+Z' : 'Ctrl+Z';
-      
-      shortcutManager.registerShortcut(undoKey, {
+      const primaryKey = getPrimaryModifierKey();
+      shortcutManager.registerShortcut(`${primaryKey}+Z`, {
         description: '撤销',
         group: 'edit',
         callback: callbacks.undo,
@@ -160,9 +110,8 @@ export function useShortcuts() {
     }
 
     if (callbacks.redo) {
-      // 检测操作系统，Mac使用Cmd+Shift+Z，Windows/Linux使用Ctrl+Y
-      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-      const redoKey = isMac ? 'Cmd+Shift+Z' : 'Ctrl+Y';
+      const primaryKey = getPrimaryModifierKey();
+      const redoKey = isMacOS() ? `${primaryKey}+Shift+Z` : `${primaryKey}+Y`;
       
       shortcutManager.registerShortcut(redoKey, {
         description: '重做',
@@ -220,7 +169,8 @@ export function useShortcuts() {
 
     // 格式化操作快捷键
     if (callbacks.bold) {
-      shortcutManager.registerShortcut('Ctrl+B', {
+      const primaryKey = getPrimaryModifierKey();
+      shortcutManager.registerShortcut(`${primaryKey}+B`, {
         description: '粗体',
         group: 'format',
         callback: callbacks.bold,
@@ -231,7 +181,8 @@ export function useShortcuts() {
     }
 
     if (callbacks.italic) {
-      shortcutManager.registerShortcut('Ctrl+I', {
+      const primaryKey = getPrimaryModifierKey();
+      shortcutManager.registerShortcut(`${primaryKey}+I`, {
         description: '斜体',
         group: 'format',
         callback: callbacks.italic,
@@ -242,7 +193,8 @@ export function useShortcuts() {
     }
 
     if (callbacks.underline) {
-      shortcutManager.registerShortcut('Ctrl+U', {
+      const primaryKey = getPrimaryModifierKey();
+      shortcutManager.registerShortcut(`${primaryKey}+U`, {
         description: '下划线',
         group: 'format',
         callback: callbacks.underline,
@@ -287,7 +239,8 @@ export function useShortcuts() {
 
     // 插入操作快捷键
     if (callbacks.insertLink) {
-      shortcutManager.registerShortcut('Ctrl+K', {
+      const primaryKey = getPrimaryModifierKey();
+      shortcutManager.registerShortcut(`${primaryKey}+K`, {
         description: '插入链接',
         group: 'insert',
         callback: callbacks.insertLink,
@@ -388,11 +341,15 @@ export function useShortcuts() {
     }
 
     // 快捷键面板切换
-    shortcutManager.registerShortcut('Ctrl+/', {
+    const primaryKey = getPrimaryModifierKey();
+    console.log('注册快捷键面板切换快捷键:', `${primaryKey}+/`);
+    shortcutManager.registerShortcut(`${primaryKey}+/`, {
       description: '显示/隐藏快捷键面板',
       group: 'view',
       callback: () => {
+        console.log('快捷键面板切换被触发，当前状态:', isShortcutPanelVisible.value);
         isShortcutPanelVisible.value = !isShortcutPanelVisible.value;
+        console.log('快捷键面板新状态:', isShortcutPanelVisible.value);
       },
       enabled: true,
       preventDefault: true,

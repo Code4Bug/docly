@@ -1,5 +1,5 @@
 <template>
-  <div class="docly-editor" :class="{ 'dark-theme': isDarkMode }">
+  <div class="docly-editor" :class="{ 'dark-theme': isDarkMode, 'with-shortcut-drawer': isShortcutPanelVisible }">
     <!-- 工具栏组件 -->
     <EditorToolbar
       :current-heading="currentHeading"
@@ -40,32 +40,36 @@
       @show-annotation-list="showAnnotationList"
     />
 
-    <!-- 编辑器容器 -->
-    <div class="docly-editor-container" :class="{ 'with-sidebar': showAnnotationPanel }">
-      <div class="docly-elditor-wrapper">
-        <div 
-          class="docly-editor-holder" 
-          ref="editorRef"
-          @mouseup="handleTextSelection"
-        ></div>
+    <!-- 主内容区域 -->
+    <div class="docly-editor-main">
+      <!-- 编辑器容器 -->
+      <div class="docly-editor-container" :class="{ 'with-sidebar': showAnnotationPanel }">
+        <div class="docly-elditor-wrapper">
+          <div 
+            class="docly-editor-holder" 
+            ref="editorRef"
+            @mouseup="handleTextSelection"
+          ></div>
+        </div>
+        
+        <!-- 批注系统 -->
+        <AnnotationSystem
+          :show-sidebar="showAnnotationPanel"
+          :show-create-modal="isAnnotationMode && !!selectedText"
+          :annotations="annotations"
+          :selected-text="selectedText"
+          :is-dark-theme="isDarkTheme"
+          @close-sidebar="showAnnotationPanel = false"
+          @delete-resolved="deleteResolvedAnnotations"
+          @export-annotations="exportAnnotations"
+          @edit-annotation="editAnnotation"
+          @resolve-annotation="resolveAnnotation"
+          @delete-annotation="deleteAnnotation"
+          @cancel-annotation="cancelAnnotation"
+          @confirm-annotation="confirmAnnotation"
+        />
       </div>
-      
-      <!-- 批注系统 -->
-      <AnnotationSystem
-        :show-sidebar="showAnnotationPanel"
-        :show-create-modal="isAnnotationMode && !!selectedText"
-        :annotations="annotations"
-        :selected-text="selectedText"
-        :is-dark-theme="isDarkTheme"
-        @close-sidebar="showAnnotationPanel = false"
-        @delete-resolved="deleteResolvedAnnotations"
-        @export-annotations="exportAnnotations"
-        @edit-annotation="editAnnotation"
-        @resolve-annotation="resolveAnnotation"
-        @delete-annotation="deleteAnnotation"
-        @cancel-annotation="cancelAnnotation"
-        @confirm-annotation="confirmAnnotation"
-      />
+
     </div>
 
     <!-- 状态栏 -->
@@ -89,53 +93,6 @@
       style="display: none;"
     />
 
-    <!-- 快捷键面板 -->
-    <Teleport to="body">
-      <div 
-        v-if="isShortcutPanelVisible" 
-        class="shortcut-panel-overlay"
-        @click.self="hideShortcutPanel"
-      >
-        <div class="shortcut-panel-container">
-          <div class="shortcut-panel" :class="{ 'dark-theme': isDarkTheme }">
-            <!-- 面板头部 -->
-            <div class="panel-header">
-              <div class="header-left">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M20,12A8,8 0 0,0 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12M22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2A10,10 0 0,1 22,12M10,17L6,13L7.41,11.58L10,14.17L16.59,7.58L18,9L10,17Z" />
-                </svg>
-                <h3>快捷键设置</h3>
-              </div>
-              <div class="header-actions">
-                <button @click="hideShortcutPanel" class="close-btn">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <!-- 简化的快捷键列表 -->
-            <div class="panel-content">
-              <div class="shortcut-info">
-                <p>按 <kbd>Ctrl</kbd> + <kbd>/</kbd> 显示/隐藏此面板</p>
-                <p>快捷键系统已启用，您可以使用以下快捷键：</p>
-                <ul>
-                  <li><kbd>Ctrl</kbd> + <kbd>S</kbd> - 保存文档</li>
-                  <li><kbd>Ctrl</kbd> + <kbd>O</kbd> - 导入文档</li>
-                  <li><kbd>Ctrl</kbd> + <kbd>E</kbd> - 导出文档</li>
-                  <li><kbd>Ctrl</kbd> + <kbd>Z</kbd> - 撤销</li>
-                  <li><kbd>Ctrl</kbd> + <kbd>Y</kbd> - 重做</li>
-                  <li><kbd>Ctrl</kbd> + <kbd>B</kbd> - 粗体</li>
-                  <li><kbd>Ctrl</kbd> + <kbd>I</kbd> - 斜体</li>
-                  <li><kbd>Ctrl</kbd> + <kbd>K</kbd> - 插入链接</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Teleport>
-
     <!-- 自定义悬浮提示 -->
     <div 
       v-if="tooltip.visible" 
@@ -147,6 +104,27 @@
     >
       {{ tooltip.text }}
     </div>
+
+    <!-- 快捷键抽屉 - 使用Teleport传送到body -->
+    <Teleport to="body">
+      <div 
+        v-if="isShortcutPanelVisible"
+        class="shortcut-drawer-overlay"
+        @click="hideShortcutPanel"
+      >
+        <div 
+          class="shortcut-drawer"
+          :class="{ 'dark-theme': isDarkTheme }"
+          @click.stop
+        >
+          <ShortcutTable
+            :isDarkTheme="isDarkTheme"
+            :isEmbedded="true"
+            @close="hideShortcutPanel"
+          />
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -160,11 +138,13 @@ import { useShortcuts } from '../composables/useShortcuts';
 import EditorToolbar from './EditorToolbar.vue';
 import AnnotationSystem from './AnnotationSystem.vue';
 import EditorStatusBar from './EditorStatusBar.vue';
+import ShortcutTable from './ShortcutTable.vue';
 import type { EditorConfig } from '../types';
 import { showMessage } from '../utils/Message';
 import { Annotation } from './AnnotationSystem.vue';
 import { Console } from '../utils/Console';
 import { ErrorHandler, ErrorType, ErrorSeverity } from '../utils/ErrorHandler';
+import { formatShortcutDisplay, isMacOS } from '../utils/platform';
 
 // Props
 interface Props {
@@ -229,6 +209,8 @@ const systemThemeQuery = ref<MediaQueryList | null>(null);
 
 // 编辑器内容和导出状态
 const editorContent = ref('');
+
+
 
 // 计算属性
 const isDarkTheme = computed(() => isDarkMode.value);
@@ -1152,14 +1134,36 @@ const redo = (): void => {
  * 设置对齐方式
  */
 const setAlignment = (alignment: string): void => {
+  console.log('设置对齐方式:', alignment);
   currentAlignment.value = alignment;
   
   // 调用编辑器核心的对齐方法
   if (editorCore.value) {
-    editorCore.value.setTextAlign(alignment);
+    try {
+      editorCore.value.setTextAlign(alignment);
+      console.log('对齐方式设置成功:', alignment);
+      showMessage(`已设置${getAlignmentName(alignment)}对齐`, 'success');
+    } catch (error) {
+      console.error('设置对齐方式失败:', error);
+      showMessage('设置对齐方式失败', 'error');
+    }
+  } else {
+    console.error('编辑器实例不存在');
+    showMessage('编辑器未初始化', 'error');
   }
-  
-  showMessage(`已设置${alignment}对齐`, 'success');
+};
+
+/**
+ * 获取对齐方式的中文名称
+ */
+const getAlignmentName = (alignment: string): string => {
+  const names: Record<string, string> = {
+    'left': '左',
+    'center': '居中',
+    'right': '右',
+    'justify': '两端'
+  };
+  return names[alignment] || alignment;
 };
 
 /**
@@ -1383,6 +1387,22 @@ const handleSaveDocument = async (): Promise<void> => {
   }
 };
 
+/**
+ * 格式化快捷键显示
+ */
+const formatShortcut = (shortcut: string): string => {
+  return formatShortcutDisplay(shortcut);
+};
+
+/**
+ * 检查是否包含Mac符号
+ */
+const hasMacSymbols = (text: string): boolean => {
+  return /[⌘⌥⇧]/.test(text);
+};
+
+
+
 // 监听只读状态变化
 watch(isReadOnly, (newReadOnly: boolean) => {
   if (editorCore.value) {
@@ -1475,36 +1495,59 @@ onUnmounted(() => {
   --border-color: #444444;
 }
 
-.shortcut-panel-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+/* 主内容区域 */
+.docly-editor-main {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.shortcut-panel-container {
-  max-width: 600px;
-  width: 90%;
-  max-height: 80vh;
-  overflow-y: auto;
-}
-
-.shortcut-panel {
-  background: var(--bg-color, #ffffff);
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  flex: 1;
+  position: relative;
   overflow: hidden;
 }
 
-.shortcut-panel.dark-theme {
-  --bg-color: #2a2a2a;
-  --text-color: #e0e0e0;
+/* 编辑器容器调整 */
+.docly-editor.with-shortcut-drawer .docly-editor-main {
+  margin-right: 500px;
+  transition: margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 快捷键抽屉覆盖层 */
+.shortcut-drawer-overlay {
+  position: fixed;
+  top: 72px; /* app-header的高度 */
+  right: 0;
+  width: 500px;
+  height: calc(100vh - 72px);
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+/* 快捷键抽屉样式 */
+.shortcut-drawer {
+  width: 100%;
+  height: 100%;
+  background: #f5f5f5;
+  border-left: 1px solid #e0e0e0;
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
+  transform: translateX(0);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: slideInRight 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.shortcut-drawer.dark-theme {
+  background: #1a1a1a;
+  border-left-color: #333333;
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
 }
 
 .panel-header {
@@ -1571,20 +1614,39 @@ onUnmounted(() => {
   border-bottom: none;
 }
 
+
+
 kbd {
   background: var(--kbd-bg, #f8f9fa);
   border: 1px solid var(--kbd-border, #d0d7de);
   border-radius: 4px;
   padding: 2px 6px;
   font-family: monospace;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--kbd-color, #24292f);
+  line-height: 1.2;
+}
+
+/* 为Mac符号使用更大的字体 */
+kbd.mac-symbol {
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  padding: 3px 8px;
+  background: linear-gradient(135deg, #333333 0%, #444444 100%) !important;
+  color: #ffffff !important;
+  border-color: #555555 !important;
 }
 
 .dark-theme kbd {
   --kbd-bg: #444444;
   --kbd-border: #666666;
   --kbd-color: #e0e0e0;
+}
+
+.dark-theme kbd.mac-symbol {
+  background: linear-gradient(135deg, #222222 0%, #333333 100%) !important;
+  color: #ffffff !important;
+  border-color: #444444 !important;
 }
 
 .custom-tooltip {

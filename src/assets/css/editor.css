@@ -103,6 +103,48 @@
   font-style: italic;
 }
 
+/* 编辑器默认对齐 */
+.ProseMirror {
+  text-align: left;
+}
+
+.ProseMirror p,
+.ProseMirror h1,
+.ProseMirror h2,
+.ProseMirror h3,
+.ProseMirror h4,
+.ProseMirror h5,
+.ProseMirror h6 {
+  text-align: left;
+}
+
+/* 文本对齐样式 */
+.ProseMirror p[style*="text-align"],
+.ProseMirror h1[style*="text-align"],
+.ProseMirror h2[style*="text-align"],
+.ProseMirror h3[style*="text-align"],
+.ProseMirror h4[style*="text-align"],
+.ProseMirror h5[style*="text-align"],
+.ProseMirror h6[style*="text-align"] {
+  /* 确保对齐样式被正确应用 */
+}
+
+.ProseMirror [style*="text-align: left"] {
+  text-align: left !important;
+}
+
+.ProseMirror [style*="text-align: center"] {
+  text-align: center !important;
+}
+
+.ProseMirror [style*="text-align: right"] {
+  text-align: right !important;
+}
+
+.ProseMirror [style*="text-align: justify"] {
+  text-align: justify !important;
+}
+
 /* 表格样式 */
 .ProseMirror table {
   border-collapse: collapse;
